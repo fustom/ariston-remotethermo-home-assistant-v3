@@ -101,6 +101,16 @@ class AristonDevice(ClimateEntity):
         )
 
     @property
+    def icon(self):
+        """Return the name of the Climate device."""
+        plant_mode = Plant_mode(self.plant_mode["value"])
+
+        if plant_mode in [Plant_mode.WINTER, Plant_mode.HEATING_ONLY]:
+            return "mdi:radiator"
+        else:
+            return "mdi:radiator-off"
+
+    @property
     def temperature_unit(self) -> str:
         """Return the temperature units for the device."""
         return (
