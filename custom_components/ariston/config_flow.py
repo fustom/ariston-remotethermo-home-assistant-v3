@@ -41,7 +41,7 @@ async def try_login(hass: HomeAssistant, data: dict[str, Any]) -> dict[str, Any]
 
     return {"title": "Ariston"}
 
-class AristonConfigFlow(config_entries.ConfigFlow):
+class AristonConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
     """Ariston Config Flow."""
 
     VERSION = 1
