@@ -3,7 +3,7 @@ import logging
 from .ariston import AristonAPI, Plant_mode, Zone_mode
 from .const import DOMAIN
 
-from homeassistant.const import CONF_PASSWORD, CONF_USERNAME
+from homeassistant.const import CONF_DEVICE, CONF_PASSWORD, CONF_USERNAME
 from homeassistant.components.climate import ClimateEntity
 from homeassistant.helpers.entity import DeviceInfo
 from homeassistant.components.climate.const import (
@@ -34,24 +34,24 @@ async def async_setup_entry(hass, entry, async_add_entities):
     if not reponse:
         _LOGGER.error("Failed to connect to Ariston")
 
-    devices = await api.get_devices()
+    device = entry.data[CONF_DEVICE]
+    features = await api.get_features_for_device(device["gwId"])
+    zones = features["zones"]
     devs = []
-
-    for device in devices:
-        ariston_device = AristonDevice(api, device)
-        await ariston_device.async_get_features()
-        await ariston_device.async_update()
-        devs.append(ariston_device)
-
+    for zone in zones:
+        ariston_zone_device = AristonDevice(api, device, features, zone["num"])
+        await ariston_zone_device.async_update()
+        devs.append(ariston_zone_device)
     async_add_entities(devs)
 
 
 class AristonDevice(ClimateEntity):
     """Representation of a base Ariston discovery device."""
 
-    def __init__(self, api: AristonAPI, device):
+    def __init__(self, api: AristonAPI, device, features, zone):
         """Initialize the entity."""
         self.api = api
+        self.location = "en-US"
 
         # device specific variables
         self.gw_id = device["gwId"]
@@ -74,10 +74,8 @@ class AristonDevice(ClimateEntity):
             "value": None,
         }
         self.zone_mode = {"optTexts": None, "options": [], "value": None}
-        self.features = {}
-        self.zones = {}
-        # missing multiple zone handling use only the first zone
-        self.first_zone_number = 1
+        self.features = features
+        self.zone = zone
 
     @property
     def name(self) -> str:
@@ -219,11 +217,6 @@ class AristonDevice(ClimateEntity):
         """Return a list of available preset modes."""
         return self.plant_mode["optTexts"]
 
-    async def async_get_features(self) -> None:
-        self.features = await self.api.get_features_for_device(self.gw_id)
-        self.zones = self.features["zones"]
-        self.first_zone_number = self.zones[0]["num"]
-
     def set_hvac_mode(self, hvac_mode):
         """Set new target hvac mode."""
         plant_modes = self.plant_mode["options"]
@@ -248,7 +241,7 @@ class AristonDevice(ClimateEntity):
                 # if already heating or cooling just change CH mode
                 self.api.set_zone_mode(
                     self.gw_id,
-                    self.first_zone_number,
+                    self.zone,
                     zone_mode,
                     self.zone_mode["value"],
                 )
@@ -259,7 +252,7 @@ class AristonDevice(ClimateEntity):
                 )
                 self.api.set_zone_mode(
                     self.gw_id,
-                    self.first_zone_number,
+                    self.zone,
                     zone_mode,
                     self.zone_mode["value"],
                 )
@@ -273,7 +266,7 @@ class AristonDevice(ClimateEntity):
                     )
                     self.api.set_zone_mode(
                         self.gw_id,
-                        self.first_zone_number,
+                        self.zone,
                         zone_mode,
                         self.zone_mode["value"],
                     )
@@ -283,7 +276,7 @@ class AristonDevice(ClimateEntity):
                     )
                     self.api.set_zone_mode(
                         self.gw_id,
-                        self.first_zone_number,
+                        self.zone,
                         zone_mode,
                         self.zone_mode["value"],
                     )
@@ -293,7 +286,7 @@ class AristonDevice(ClimateEntity):
                 # if already heating, change CH mode
                 self.api.set_zone_mode(
                     self.gw_id,
-                    self.first_zone_number,
+                    self.zone,
                     zone_mode,
                     self.zone_mode["value"],
                 )
@@ -304,7 +297,7 @@ class AristonDevice(ClimateEntity):
                 )
                 self.api.set_zone_mode(
                     self.gw_id,
-                    self.first_zone_number,
+                    self.zone,
                     zone_mode,
                     self.zone_mode["value"],
                 )
@@ -318,7 +311,7 @@ class AristonDevice(ClimateEntity):
                     )
                     self.api.set_zone_mode(
                         self.gw_id,
-                        self.first_zone_number,
+                        self.zone,
                         zone_mode,
                         self.zone_mode["value"],
                     )
@@ -328,7 +321,7 @@ class AristonDevice(ClimateEntity):
                     )
                     self.api.set_zone_mode(
                         self.gw_id,
-                        self.first_zone_number,
+                        self.zone,
                         zone_mode,
                         self.zone_mode["value"],
                     )
@@ -338,7 +331,7 @@ class AristonDevice(ClimateEntity):
                 self.gw_id, Plant_mode.COOLING, Plant_mode(self.preset_mode)
             )
             self.api.set_zone_mode(
-                self.gw_id, self.first_zone_number, zone_mode, self.zone_mode["value"]
+                self.gw_id, self.zone, zone_mode, self.zone_mode["value"]
             )
 
     def set_preset_mode(self, preset_mode):
@@ -364,13 +357,13 @@ class AristonDevice(ClimateEntity):
         )
 
         await self.api.set_temperature(
-            self.gw_id, self.first_zone_number, temperature, self.target_temperature
+            self.gw_id, self.zone, temperature, self.target_temperature
         )
         self.async_write_ha_state()
 
     async def async_update(self) -> None:
         data = await self.api.update_device(
-            self.gw_id, self.first_zone_number, self.features, "en-US"
+            self.gw_id, self.zone, self.features, self.location
         )
         for item in data["items"]:
             if item["id"] == "ZoneComfortTemp":

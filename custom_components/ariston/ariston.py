@@ -164,6 +164,8 @@ class AristonAPI:
                             )
                         raise Exception("Login failed (password changed?)")
                     raise Exception("Invalid token")
+                if response.status == 404:
+                    return None
                 raise Exception(response.status)
 
             if response.content_length > 0:
