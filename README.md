@@ -4,6 +4,7 @@ But it does not use Ariston website. It uses Ariston API what I reversed enginee
 
 ## Integration was tested on and works with:
 - Ariston Alteas One
+
 I only have one Ariston Alteas One with only one zone, but feel free to test something else and create new issue / pull request if something goes wrong.
 
 ## Installation
