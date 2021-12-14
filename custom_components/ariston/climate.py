@@ -1,6 +1,6 @@
 import logging
 
-from .ariston import AristonAPI, Plant_mode, Zone_mode
+from .ariston import AristonAPI, PlantMode, ZoneMode
 from .const import DOMAIN
 
 from homeassistant.const import CONF_DEVICE, CONF_PASSWORD, CONF_USERNAME
@@ -101,9 +101,9 @@ class AristonDevice(ClimateEntity):
     @property
     def icon(self):
         """Return the name of the Climate device."""
-        plant_mode = Plant_mode(self.plant_mode["value"])
+        plant_mode = PlantMode(self.plant_mode["value"])
 
-        if plant_mode in [Plant_mode.WINTER, Plant_mode.HEATING_ONLY]:
+        if plant_mode in [PlantMode.WINTER, PlantMode.HEATING_ONLY]:
             return "mdi:radiator"
         else:
             return "mdi:radiator-off"
@@ -153,19 +153,19 @@ class AristonDevice(ClimateEntity):
     @property
     def hvac_mode(self) -> str:
         """Return the current HVAC mode for the device."""
-        plant_mode = Plant_mode(self.plant_mode["value"])
-        zone_mode = Zone_mode(self.zone_mode["value"])
+        plant_mode = PlantMode(self.plant_mode["value"])
+        zone_mode = ZoneMode(self.zone_mode["value"])
 
         curr_hvac_mode = HVAC_MODE_OFF
-        if plant_mode in [Plant_mode.WINTER, Plant_mode.HEATING_ONLY]:
-            if zone_mode == Zone_mode.MANUAL:
+        if plant_mode in [PlantMode.WINTER, PlantMode.HEATING_ONLY]:
+            if zone_mode == ZoneMode.MANUAL:
                 curr_hvac_mode = HVAC_MODE_HEAT
-            elif zone_mode == Zone_mode.TIME_PROGRAM:
+            elif zone_mode == ZoneMode.TIME_PROGRAM:
                 curr_hvac_mode = HVAC_MODE_AUTO
-        if plant_mode in [Plant_mode.COOLING]:
-            if zone_mode == Zone_mode.MANUAL:
+        if plant_mode in [PlantMode.COOLING]:
+            if zone_mode == ZoneMode.MANUAL:
                 curr_hvac_mode = HVAC_MODE_COOL
-            elif zone_mode == Zone_mode.TIME_PROGRAM:
+            elif zone_mode == ZoneMode.TIME_PROGRAM:
                 curr_hvac_mode = HVAC_MODE_AUTO
         return curr_hvac_mode
 
@@ -176,13 +176,13 @@ class AristonDevice(ClimateEntity):
         zone_modes = self.zone_mode["options"]
 
         supported_modes = []
-        if Zone_mode.MANUAL in zone_modes:
+        if ZoneMode.MANUAL in zone_modes:
             supported_modes.append(HVAC_MODE_HEAT)
-            if Plant_mode.COOLING in plant_modes:
+            if PlantMode.COOLING in plant_modes:
                 supported_modes.append(HVAC_MODE_COOL)
-        if Zone_mode.TIME_PROGRAM in zone_modes:
+        if ZoneMode.TIME_PROGRAM in zone_modes:
             supported_modes.append(HVAC_MODE_AUTO)
-        if Zone_mode.OFF in zone_modes:
+        if ZoneMode.OFF in zone_modes:
             supported_modes.append(HVAC_MODE_OFF)
 
         return supported_modes
@@ -190,16 +190,16 @@ class AristonDevice(ClimateEntity):
     @property
     def hvac_action(self):
         """Return the current running hvac operation."""
-        plant_mode = Plant_mode(self.plant_mode["value"])
+        plant_mode = PlantMode(self.plant_mode["value"])
         if_flame_on = self.is_flame_on["value"] == 1
 
         curr_hvac_action = CURRENT_HVAC_OFF
-        if plant_mode in [Plant_mode.WINTER, Plant_mode.HEATING_ONLY]:
+        if plant_mode in [PlantMode.WINTER, PlantMode.HEATING_ONLY]:
             if if_flame_on:
                 curr_hvac_action = CURRENT_HVAC_HEAT
             else:
                 curr_hvac_action = CURRENT_HVAC_IDLE
-        if plant_mode in [Plant_mode.COOLING]:
+        if plant_mode in [PlantMode.COOLING]:
             if if_flame_on:
                 curr_hvac_action = CURRENT_HVAC_COOL
             else:
@@ -220,23 +220,23 @@ class AristonDevice(ClimateEntity):
     def set_hvac_mode(self, hvac_mode):
         """Set new target hvac mode."""
         plant_modes = self.plant_mode["options"]
-        plant_mode = Plant_mode(self.plant_mode["value"])
+        plant_mode = PlantMode(self.plant_mode["value"])
 
         if hvac_mode == HVAC_MODE_OFF:
-            if Plant_mode.OFF in plant_modes:
+            if PlantMode.OFF in plant_modes:
                 self.api.set_plant_mode(
-                    self.gw_id, Plant_mode.OFF, Plant_mode(self.preset_mode)
+                    self.gw_id, PlantMode.OFF, PlantMode(self.preset_mode)
                 )
             else:
                 self.api.set_plant_mode(
-                    self.gw_id, Plant_mode.SUMMER, Plant_mode(self.preset_mode)
+                    self.gw_id, PlantMode.SUMMER, PlantMode(self.preset_mode)
                 )
         elif hvac_mode == HVAC_MODE_AUTO:
-            zone_mode = Zone_mode.TIME_PROGRAM
+            zone_mode = ZoneMode.TIME_PROGRAM
             if plant_mode in [
-                Plant_mode.WINTER,
-                Plant_mode.HEATING_ONLY,
-                Plant_mode.COOLING,
+                PlantMode.WINTER,
+                PlantMode.HEATING_ONLY,
+                PlantMode.COOLING,
             ]:
                 # if already heating or cooling just change CH mode
                 self.api.set_zone_mode(
@@ -245,10 +245,10 @@ class AristonDevice(ClimateEntity):
                     zone_mode,
                     self.zone_mode["value"],
                 )
-            elif plant_mode == Plant_mode.SUMMER:
+            elif plant_mode == PlantMode.SUMMER:
                 # DHW is working, so use Winter where CH and DHW are active
                 self.api.set_plant_mode(
-                    self.gw_id, Plant_mode.WINTER, Plant_mode(self.preset_mode)
+                    self.gw_id, PlantMode.WINTER, PlantMode(self.preset_mode)
                 )
                 self.api.set_zone_mode(
                     self.gw_id,
@@ -258,11 +258,11 @@ class AristonDevice(ClimateEntity):
                 )
             else:
                 # hvac is OFF, so use heating only, if not supported then winter
-                if Plant_mode.HEATING_ONLY in plant_modes:
+                if PlantMode.HEATING_ONLY in plant_modes:
                     self.api.set_plant_mode(
                         self.gw_id,
-                        Plant_mode.HEATING_ONLY,
-                        Plant_mode(self.preset_mode),
+                        PlantMode.HEATING_ONLY,
+                        PlantMode(self.preset_mode),
                     )
                     self.api.set_zone_mode(
                         self.gw_id,
@@ -272,7 +272,7 @@ class AristonDevice(ClimateEntity):
                     )
                 else:
                     self.api.set_plant_mode(
-                        self.gw_id, Plant_mode.WINTER, Plant_mode(self.preset_mode)
+                        self.gw_id, PlantMode.WINTER, PlantMode(self.preset_mode)
                     )
                     self.api.set_zone_mode(
                         self.gw_id,
@@ -281,8 +281,8 @@ class AristonDevice(ClimateEntity):
                         self.zone_mode["value"],
                     )
         elif hvac_mode == HVAC_MODE_HEAT:
-            zone_mode = Zone_mode.MANUAL
-            if plant_mode in [Plant_mode.WINTER, Plant_mode.HEATING_ONLY]:
+            zone_mode = ZoneMode.MANUAL
+            if plant_mode in [PlantMode.WINTER, PlantMode.HEATING_ONLY]:
                 # if already heating, change CH mode
                 self.api.set_zone_mode(
                     self.gw_id,
@@ -290,10 +290,10 @@ class AristonDevice(ClimateEntity):
                     zone_mode,
                     self.zone_mode["value"],
                 )
-            elif plant_mode in [Plant_mode.SUMMER, Plant_mode.COOLING]:
+            elif plant_mode in [PlantMode.SUMMER, PlantMode.COOLING]:
                 # DHW is working, so use Winter and change mode
                 self.api.set_plant_mode(
-                    self.gw_id, Plant_mode.WINTER, Plant_mode(self.preset_mode)
+                    self.gw_id, PlantMode.WINTER, PlantMode(self.preset_mode)
                 )
                 self.api.set_zone_mode(
                     self.gw_id,
@@ -303,11 +303,11 @@ class AristonDevice(ClimateEntity):
                 )
             else:
                 # hvac is OFF, so use heating only, if not supported then winter
-                if Plant_mode.HEATING_ONLY in plant_modes:
+                if PlantMode.HEATING_ONLY in plant_modes:
                     self.api.set_plant_mode(
                         self.gw_id,
-                        Plant_mode.HEATING_ONLY,
-                        Plant_mode(self.preset_mode),
+                        PlantMode.HEATING_ONLY,
+                        PlantMode(self.preset_mode),
                     )
                     self.api.set_zone_mode(
                         self.gw_id,
@@ -317,7 +317,7 @@ class AristonDevice(ClimateEntity):
                     )
                 else:
                     self.api.set_plant_mode(
-                        self.gw_id, Plant_mode.WINTER, Plant_mode(self.preset_mode)
+                        self.gw_id, PlantMode.WINTER, PlantMode(self.preset_mode)
                     )
                     self.api.set_zone_mode(
                         self.gw_id,
@@ -326,9 +326,9 @@ class AristonDevice(ClimateEntity):
                         self.zone_mode["value"],
                     )
         elif hvac_mode == HVAC_MODE_COOL:
-            zone_mode = Zone_mode.MANUAL
+            zone_mode = ZoneMode.MANUAL
             self.api.set_plant_mode(
-                self.gw_id, Plant_mode.COOLING, Plant_mode(self.preset_mode)
+                self.gw_id, PlantMode.COOLING, PlantMode(self.preset_mode)
             )
             self.api.set_zone_mode(
                 self.gw_id, self.zone, zone_mode, self.zone_mode["value"]
@@ -342,7 +342,7 @@ class AristonDevice(ClimateEntity):
             self.name,
         )
 
-        self.api.set_plant_mode(self.gw_id, preset_mode, Plant_mode(self.preset_mode))
+        self.api.set_plant_mode(self.gw_id, preset_mode, PlantMode(self.preset_mode))
 
     async def async_set_temperature(self, **kwargs):
         """Set new target temperature."""
