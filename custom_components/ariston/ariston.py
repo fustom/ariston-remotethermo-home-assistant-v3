@@ -98,7 +98,6 @@ class AristonAPI:
                     {"id": "IsFlameOn", "zn": 0},
                     {"id": "Holiday", "zn": 0},
                     {"id": "OutsideTemp", "zn": 0},
-                    {"id": "DhwTemp", "zn": 0},
                     {"id": "HeatingCircuitPressure", "zn": 0},
                     {"id": "ChFlowSetpointTemp", "zn": 0},
                     {"id": "DhwMode", "zn": 0},
@@ -139,6 +138,17 @@ class AristonAPI:
             {
                 "new": mode,
                 "old": current_mode,
+            },
+        )
+
+    async def set_dhwtemp(
+        self, gw_id: str, zone: int, temperature: float, current_temperature: float
+    ) -> None:
+        await self.post(
+            f"{ARISTON_API_URL}/{ARISTON_REMOTE}/{ARISTON_PLANT_DATA}/{gw_id}/dhwTemp",
+            {
+                "new": temperature,
+                "old": current_temperature,
             },
         )
 

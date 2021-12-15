@@ -1,9 +1,17 @@
+"""Support for Ariston boilers."""
 import logging
 
 from .ariston import AristonAPI, PlantMode, ZoneMode
-from .const import DOMAIN
+from .const import DOMAIN, FEATURES, API
 
-from homeassistant.const import CONF_DEVICE, CONF_PASSWORD, CONF_USERNAME
+from homeassistant.config_entries import ConfigEntry
+from homeassistant.core import HomeAssistant
+from homeassistant.const import (
+    CONF_DEVICE,
+    TEMP_CELSIUS,
+    TEMP_FAHRENHEIT,
+    ATTR_TEMPERATURE,
+)
 from homeassistant.components.climate import ClimateEntity
 from homeassistant.helpers.entity import DeviceInfo
 from homeassistant.components.climate.const import (
@@ -18,24 +26,19 @@ from homeassistant.components.climate.const import (
     SUPPORT_PRESET_MODE,
     SUPPORT_TARGET_TEMPERATURE,
 )
-from homeassistant.const import TEMP_CELSIUS, TEMP_FAHRENHEIT, ATTR_TEMPERATURE
 
 _LOGGER = logging.getLogger(__name__)
 
 SUPPORT_FLAGS = SUPPORT_TARGET_TEMPERATURE | SUPPORT_PRESET_MODE
 
 
-async def async_setup_entry(hass, entry, async_add_entities):
+async def async_setup_entry(
+    hass: HomeAssistant, entry: ConfigEntry, async_add_entities
+):
     """Set up the Ariston device from config entry."""
-    api = AristonAPI()
-
-    reponse = await api.connect(entry.data[CONF_USERNAME], entry.data[CONF_PASSWORD])
-
-    if not reponse:
-        _LOGGER.error("Failed to connect to Ariston")
-
+    api: AristonAPI = hass.data[DOMAIN][API]
     device = entry.data[CONF_DEVICE]
-    features = await api.get_features_for_device(device["gwId"])
+    features = hass.data[DOMAIN][FEATURES]
     zones = features["zones"]
     devs = []
     for zone in zones:
@@ -51,6 +54,9 @@ class AristonDevice(ClimateEntity):
     def __init__(self, api: AristonAPI, device, features, zone):
         """Initialize the entity."""
         self.api = api
+        self.features = features
+        self.zone = zone
+
         self.location = "en-US"
 
         # device specific variables
@@ -63,19 +69,13 @@ class AristonDevice(ClimateEntity):
         if self.gw_sys_type == 3:  # I'm not sure at all
             self.model = "Alteas One"
 
-        self.plant_mode = {"optTexts": None, "options": [], "value": None}
-        self.is_flame_on = 0
+        self.plant_mode = None
+        self.is_flame_on = None
 
         # zone specific variables
-        self.zone_comfort_temp = {"step": None, "value": None}
-        self.zone_measured_temp = {
-            "decimals": None,
-            "unit": TEMP_CELSIUS,
-            "value": None,
-        }
-        self.zone_mode = {"optTexts": None, "options": [], "value": None}
-        self.features = features
-        self.zone = zone
+        self.zone_comfort_temp = None
+        self.zone_measured_temp = None
+        self.zone_mode = None
 
     @property
     def name(self) -> str:
@@ -85,7 +85,7 @@ class AristonDevice(ClimateEntity):
     @property
     def unique_id(self) -> str:
         """Return a unique id for the device."""
-        return self.gw_id
+        return f"{self.gw_id}_{self.zone}"
 
     @property
     def device_info(self) -> DeviceInfo:

@@ -7,7 +7,12 @@ from typing import Any
 import voluptuous as vol
 
 from homeassistant import config_entries
-from homeassistant.const import CONF_DEVICE, CONF_PASSWORD, CONF_USERNAME
+from homeassistant.const import (
+    CONF_DEVICE,
+    CONF_PASSWORD,
+    CONF_USERNAME,
+    CONF_AUTH_PROVIDERS,
+)
 from homeassistant.data_entry_flow import FlowResult
 from homeassistant.exceptions import HomeAssistantError
 
@@ -30,16 +35,17 @@ class AristonConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
     VERSION = 1
 
     def __init__(self):
+        self.api = AristonAPI()
         self.cloud_username = None
         self.cloud_password = None
         self.cloud_devices = {}
 
-    async def try_login(self, api: AristonAPI) -> None:
+    async def try_login(self) -> None:
         """Validate the user input allows us to connect.
 
         Data has the keys from STEP_USER_DATA_SCHEMA with values provided by the user.
         """
-        response = await api.connect(
+        response = await self.api.connect(
             username=self.cloud_username,
             password=self.cloud_password,
         )
@@ -59,10 +65,9 @@ class AristonConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
         errors = {}
 
         try:
-            api = AristonAPI()
             self.cloud_username = user_input[CONF_USERNAME]
             self.cloud_password = user_input[CONF_PASSWORD]
-            await self.try_login(api)
+            await self.try_login()
         except CannotConnect:
             errors["base"] = "cannot_connect"
         except InvalidAuth:
@@ -71,7 +76,7 @@ class AristonConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
             _LOGGER.exception("Unexpected exception")
             errors["base"] = "unknown"
         else:
-            cloud_devices = await api.get_devices()
+            cloud_devices = await self.api.get_devices()
             if len(cloud_devices) == 1:
                 cloud_device = cloud_devices[0]
                 existing_entry = await self.async_set_unique_id(
