@@ -15,6 +15,7 @@ from homeassistant.const import (
     CONF_DEVICE,
     TEMP_CELSIUS,
     TEMP_FAHRENHEIT,
+    ATTR_TEMPERATURE,
 )
 
 _LOGGER = logging.getLogger(__name__)
@@ -102,8 +103,43 @@ class AristonWaterHeater(WaterHeaterEntity):
         """List of available operation modes."""
         return self.dhw_mode["optTexts"]
 
+    @property
+    def current_operation(self):
+        """Return current operation"""
+        res = self.dhw_mode["options"].index(self.dhw_mode["value"])
+        return self.dhw_mode["optTexts"][res]
+
+    async def async_set_temperature(self, **kwargs):
+        """Set new target temperature."""
+        if ATTR_TEMPERATURE not in kwargs:
+            raise ValueError(f"Missing parameter {ATTR_TEMPERATURE}")
+
+        temperature = kwargs[ATTR_TEMPERATURE]
+        _LOGGER.debug(
+            "Setting temperature to %d for %s",
+            temperature,
+            self.name,
+        )
+
+        await self.api.async_set_dhwtemp(
+            self.gw_id, temperature, self.target_temperature
+        )
+        self.async_write_ha_state()
+
+    async def async_set_operation_mode(self, operation_mode):
+        """Set operation mode."""
+        # self.api.set_dhw_mode(operation_mode)
+        # self.dhw_mode["value"] = operation_mode
+        # self.async_write_ha_state()
+        _LOGGER.warning(
+            "Set operation mode is currently not supported. I need device to get the api calls."
+        )
+        return
+
     async def async_update(self) -> None:
-        data = await self.api.update_device(self.gw_id, 0, self.features, self.location)
+        data = await self.api.async_get_water_heater_properties(
+            self.gw_id, self.features, self.location
+        )
         for item in data["items"]:
             if item["id"] == "DhwTemp":
                 self.dhw_temp = item

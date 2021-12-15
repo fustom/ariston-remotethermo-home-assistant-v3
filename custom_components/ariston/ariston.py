@@ -4,6 +4,8 @@ from typing import Any
 from datetime import datetime
 from enum import IntFlag
 
+from homeassistant.helpers.typing import UNDEFINED
+
 ARISTON_API_URL = "https://www.ariston-net.remotethermo.com/api/v2/"
 ARISTON_LOGIN = "accounts/login"
 ARISTON_REMOTE = "remote"
@@ -14,21 +16,53 @@ ARISTON_ZONES = "zones"
 ARISTON_PLANT_DATA = "plantData"
 ARISTON_REPORTS = "reports"
 
+WATER_HEATER_REQUEST_ITEMS = [
+    {"id": "DhwMode", "zn": 0},
+    {"id": "DhwTemp", "zn": 0},
+]
+
 _LOGGER = logging.getLogger(__name__)
 
 
 class PlantMode(IntFlag):
+    UNDEFINED = -1
     SUMMER = 0
     WINTER = 1
     HEATING_ONLY = 2
     COOLING = 3
+    COOLING_ONLY = 4
     OFF = 5
 
 
 class ZoneMode(IntFlag):
+    UNDEFINED = -1
     OFF = 0
-    MANUAL = 2
+    MANUAL = 1
+    MANUAL2 = 2
     TIME_PROGRAM = 3
+
+
+class DhwMode(IntFlag):
+    DISABLED = 0
+    TIME_BASED = 1
+    ALWAYS_ACTIVE = 2
+    HC_HP = 3
+    HC_HP_40 = 4
+    GREEN = 5
+
+
+class Weather(IntFlag):
+    UNAVAILABLE = 0
+    CLEAR = 1
+    VARIABLE = 2
+    CLOUDY = 3
+    RAINY = 4
+    RAINSTORM = 5
+    SNOW = 6
+    FOG = 7
+    WINDY = 8
+    CLEAR_BY_NIGHT = 129
+    VARIABLE_BY_NIGHT = 130
 
 
 class AristonAPI:
@@ -38,7 +72,7 @@ class AristonAPI:
         self.__username = ""
         self.__password = ""
 
-    async def connect(self, username: str, password: str) -> bool:
+    async def async_connect(self, username: str, password: str) -> bool:
         self.__username = username
         self.__password = password
 
@@ -53,35 +87,35 @@ class AristonAPI:
 
         return True
 
-    async def get_devices(self) -> dict[str, Any]:
+    async def async_get_devices(self) -> dict[str, Any]:
         return await self.get(
             f"{ARISTON_API_URL}{ARISTON_REMOTE}/{ARISTON_PLANTS}/{ARISTON_LITE}"
         )
 
-    async def get_features_for_device(self, gw_id: str) -> dict[str, Any]:
+    async def async_get_features_for_device(self, gw_id: str) -> dict[str, Any]:
         return await self.get(
             f"{ARISTON_API_URL}{ARISTON_REMOTE}/{ARISTON_PLANTS}/{gw_id}/features"
         )
 
-    async def get_energy_account(self, gw_id: str) -> dict[str, Any]:
+    async def async_get_energy_account(self, gw_id: str) -> dict[str, Any]:
         return await self.get(
             f"{ARISTON_API_URL}{ARISTON_REMOTE}/{ARISTON_REPORTS}/{gw_id}/energyAccount"
         )
 
-    async def get_consumptions_sequences(
+    async def async_get_consumptions_sequences(
         self, gw_id: str, hasSlp: bool
     ) -> dict[str, Any]:
         return await self.get(
             f"{ARISTON_API_URL}{ARISTON_REMOTE}/{ARISTON_REPORTS}/{gw_id}/consSequencesApi8?usages=Ch%2CDhw&hasSlp={hasSlp}"
         )
 
-    async def get_consumptions_settings(self, gw_id: str) -> dict[str, Any]:
+    async def async_get_consumptions_settings(self, gw_id: str) -> dict[str, Any]:
         return await self.post(
             f"{ARISTON_API_URL}{ARISTON_REMOTE}/{ARISTON_PLANTS}/{gw_id}/getConsumptionsSettings",
             {},
         )
 
-    async def update_device(
+    async def async_get_device_properies(
         self, gw_id: str, zone: int, features: dict[str, Any], culture: str
     ) -> dict[str, Any]:
         return await self.post(
@@ -100,15 +134,25 @@ class AristonAPI:
                     {"id": "OutsideTemp", "zn": 0},
                     {"id": "HeatingCircuitPressure", "zn": 0},
                     {"id": "ChFlowSetpointTemp", "zn": 0},
-                    {"id": "DhwMode", "zn": 0},
-                    {"id": "DhwTemp", "zn": 0},
                 ],
                 "features": features,
                 "culture": culture,
             },
         )
 
-    async def set_temperature(
+    async def async_get_water_heater_properties(
+        self, gw_id: str, features: dict[str, Any], culture: str
+    ) -> dict[str, Any]:
+        return await self.post(
+            f"{ARISTON_API_URL}{ARISTON_REMOTE}/{ARISTON_DATA_ITEMS}/{gw_id}/get",
+            {
+                "items": WATER_HEATER_REQUEST_ITEMS,
+                "features": features,
+                "culture": culture,
+            },
+        )
+
+    async def async_set_temperature(
         self, gw_id: str, zone: int, temperature: float, current_temperature: float
     ) -> None:
         await self.post(
@@ -119,7 +163,7 @@ class AristonAPI:
             },
         )
 
-    async def set_plant_mode(
+    async def async_set_plant_mode(
         self, gw_id: str, mode: PlantMode, current_mode: PlantMode
     ) -> None:
         await self.post(
@@ -130,7 +174,7 @@ class AristonAPI:
             },
         )
 
-    async def set_zone_mode(
+    async def async_set_zone_mode(
         self, gw_id: str, zone: int, mode: ZoneMode, current_mode: ZoneMode
     ) -> None:
         await self.post(
@@ -141,8 +185,8 @@ class AristonAPI:
             },
         )
 
-    async def set_dhwtemp(
-        self, gw_id: str, zone: int, temperature: float, current_temperature: float
+    async def async_set_dhwtemp(
+        self, gw_id: str, temperature: float, current_temperature: float
     ) -> None:
         await self.post(
             f"{ARISTON_API_URL}/{ARISTON_REMOTE}/{ARISTON_PLANT_DATA}/{gw_id}/dhwTemp",
@@ -152,7 +196,7 @@ class AristonAPI:
             },
         )
 
-    async def set_holiday(
+    async def async_set_holiday(
         self,
         gw_id: str,
         holiday_end_datetime: datetime,
@@ -195,7 +239,7 @@ class AristonAPI:
             if not response.ok:
                 if response.status == 405:
                     if not is_retry:
-                        if await self.connect(self.__username, self.__password):
+                        if await self.async_connect(self.__username, self.__password):
                             return await self.__request(
                                 method, path, params, body, True
                             )

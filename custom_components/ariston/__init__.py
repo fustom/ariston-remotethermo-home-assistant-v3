@@ -23,14 +23,16 @@ PLATFORMS: list[str] = [Platform.CLIMATE]
 async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
     """Set up Ariston from a config entry."""
     api = AristonAPI()
-    reponse = await api.connect(entry.data[CONF_USERNAME], entry.data[CONF_PASSWORD])
+    reponse = await api.async_connect(
+        entry.data[CONF_USERNAME], entry.data[CONF_PASSWORD]
+    )
     if not reponse:
         _LOGGER.error("Failed to connect to Ariston")
         return False
 
     hass.data.setdefault(DOMAIN, {FEATURES: {}, API: {}})
     device = entry.data[CONF_DEVICE]
-    features = await api.get_features_for_device(device["gwId"])
+    features = await api.async_get_features_for_device(device["gwId"])
     hass.data[DOMAIN][FEATURES] = features
     hass.data[DOMAIN][API] = api
 

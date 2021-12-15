@@ -11,7 +11,6 @@ from homeassistant.const import (
     CONF_DEVICE,
     CONF_PASSWORD,
     CONF_USERNAME,
-    CONF_AUTH_PROVIDERS,
 )
 from homeassistant.data_entry_flow import FlowResult
 from homeassistant.exceptions import HomeAssistantError
@@ -45,7 +44,7 @@ class AristonConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
 
         Data has the keys from STEP_USER_DATA_SCHEMA with values provided by the user.
         """
-        response = await self.api.connect(
+        response = await self.api.async_connect(
             username=self.cloud_username,
             password=self.cloud_password,
         )
@@ -76,7 +75,7 @@ class AristonConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
             _LOGGER.exception("Unexpected exception")
             errors["base"] = "unknown"
         else:
-            cloud_devices = await self.api.get_devices()
+            cloud_devices = await self.api.async_get_devices()
             if len(cloud_devices) == 1:
                 cloud_device = cloud_devices[0]
                 existing_entry = await self.async_set_unique_id(
