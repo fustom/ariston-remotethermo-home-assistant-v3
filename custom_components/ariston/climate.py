@@ -1,9 +1,17 @@
+"""Support for Ariston boilers."""
 import logging
 
 from .ariston import AristonAPI, PlantMode, ZoneMode
-from .const import DOMAIN
+from .const import DOMAIN, FEATURES, API
 
-from homeassistant.const import CONF_DEVICE, CONF_PASSWORD, CONF_USERNAME
+from homeassistant.config_entries import ConfigEntry
+from homeassistant.core import HomeAssistant
+from homeassistant.const import (
+    CONF_DEVICE,
+    TEMP_CELSIUS,
+    TEMP_FAHRENHEIT,
+    ATTR_TEMPERATURE,
+)
 from homeassistant.components.climate import ClimateEntity
 from homeassistant.helpers.entity import DeviceInfo
 from homeassistant.components.climate.const import (
@@ -18,24 +26,19 @@ from homeassistant.components.climate.const import (
     SUPPORT_PRESET_MODE,
     SUPPORT_TARGET_TEMPERATURE,
 )
-from homeassistant.const import TEMP_CELSIUS, TEMP_FAHRENHEIT, ATTR_TEMPERATURE
 
 _LOGGER = logging.getLogger(__name__)
 
 SUPPORT_FLAGS = SUPPORT_TARGET_TEMPERATURE | SUPPORT_PRESET_MODE
 
 
-async def async_setup_entry(hass, entry, async_add_entities):
+async def async_setup_entry(
+    hass: HomeAssistant, entry: ConfigEntry, async_add_entities
+):
     """Set up the Ariston device from config entry."""
-    api = AristonAPI()
-
-    reponse = await api.connect(entry.data[CONF_USERNAME], entry.data[CONF_PASSWORD])
-
-    if not reponse:
-        _LOGGER.error("Failed to connect to Ariston")
-
+    api: AristonAPI = hass.data[DOMAIN][API]
     device = entry.data[CONF_DEVICE]
-    features = await api.get_features_for_device(device["gwId"])
+    features = hass.data[DOMAIN][FEATURES]
     zones = features["zones"]
     devs = []
     for zone in zones:
@@ -51,31 +54,27 @@ class AristonDevice(ClimateEntity):
     def __init__(self, api: AristonAPI, device, features, zone):
         """Initialize the entity."""
         self.api = api
+        self.features = features
+        self.zone = zone
+
         self.location = "en-US"
 
-        # device specific variables
+        # device specific constants
         self.gw_id = device["gwId"]
         self.gw_serial = device["gwSerial"]
         self.plant_name = device["plantName"]
         self.gw_fw_ver = device["gwFwVer"]
         self.gw_sys_type = device["gwSysType"]
-        self.model = ""
-        if self.gw_sys_type == 3:  # I'm not sure at all
-            self.model = "Alteas One"
+        self.model = device["plantName"]
 
-        self.plant_mode = {"optTexts": None, "options": [], "value": None}
-        self.is_flame_on = 0
+        # devices specific variables
+        self.plant_mode = None
+        self.is_flame_on = None
 
         # zone specific variables
-        self.zone_comfort_temp = {"step": None, "value": None}
-        self.zone_measured_temp = {
-            "decimals": None,
-            "unit": TEMP_CELSIUS,
-            "value": None,
-        }
-        self.zone_mode = {"optTexts": None, "options": [], "value": None}
-        self.features = features
-        self.zone = zone
+        self.zone_comfort_temp = None
+        self.zone_measured_temp = None
+        self.zone_mode = None
 
     @property
     def name(self) -> str:
@@ -85,7 +84,7 @@ class AristonDevice(ClimateEntity):
     @property
     def unique_id(self) -> str:
         """Return a unique id for the device."""
-        return self.gw_id
+        return f"{self.gw_id}_{self.zone}"
 
     @property
     def device_info(self) -> DeviceInfo:
@@ -158,14 +157,14 @@ class AristonDevice(ClimateEntity):
 
         curr_hvac_mode = HVAC_MODE_OFF
         if plant_mode in [PlantMode.WINTER, PlantMode.HEATING_ONLY]:
-            if zone_mode == ZoneMode.MANUAL:
+            if zone_mode is ZoneMode.MANUAL or zone_mode is ZoneMode.MANUAL2:
                 curr_hvac_mode = HVAC_MODE_HEAT
-            elif zone_mode == ZoneMode.TIME_PROGRAM:
+            elif zone_mode is ZoneMode.TIME_PROGRAM:
                 curr_hvac_mode = HVAC_MODE_AUTO
         if plant_mode in [PlantMode.COOLING]:
-            if zone_mode == ZoneMode.MANUAL:
+            if zone_mode is ZoneMode.MANUAL or zone_mode is ZoneMode.MANUAL2:
                 curr_hvac_mode = HVAC_MODE_COOL
-            elif zone_mode == ZoneMode.TIME_PROGRAM:
+            elif zone_mode is ZoneMode.TIME_PROGRAM:
                 curr_hvac_mode = HVAC_MODE_AUTO
         return curr_hvac_mode
 
@@ -176,7 +175,7 @@ class AristonDevice(ClimateEntity):
         zone_modes = self.zone_mode["options"]
 
         supported_modes = []
-        if ZoneMode.MANUAL in zone_modes:
+        if ZoneMode.MANUAL in zone_modes or ZoneMode.MANUAL2 in zone_modes:
             supported_modes.append(HVAC_MODE_HEAT)
             if PlantMode.COOLING in plant_modes:
                 supported_modes.append(HVAC_MODE_COOL)
@@ -217,132 +216,178 @@ class AristonDevice(ClimateEntity):
         """Return a list of available preset modes."""
         return self.plant_mode["optTexts"]
 
-    def set_hvac_mode(self, hvac_mode):
+    async def async_set_hvac_mode(self, hvac_mode):
         """Set new target hvac mode."""
         plant_modes = self.plant_mode["options"]
-        plant_mode = PlantMode(self.plant_mode["value"])
+        current_plant_mode = PlantMode(self.plant_mode["value"])
+        current_zone_mode = ZoneMode(self.zone_mode["value"])
 
-        if hvac_mode == HVAC_MODE_OFF:
+        if hvac_mode is HVAC_MODE_OFF:
             if PlantMode.OFF in plant_modes:
-                self.api.set_plant_mode(
-                    self.gw_id, PlantMode.OFF, PlantMode(self.preset_mode)
+                await self.api.async_set_plant_mode(
+                    self.gw_id, PlantMode.OFF, current_plant_mode
                 )
+                self.plant_mode["value"] = PlantMode.OFF
+                self.async_write_ha_state()
             else:
-                self.api.set_plant_mode(
-                    self.gw_id, PlantMode.SUMMER, PlantMode(self.preset_mode)
+                await self.api.async_set_plant_mode(
+                    self.gw_id, PlantMode.SUMMER, current_plant_mode
                 )
-        elif hvac_mode == HVAC_MODE_AUTO:
+                self.plant_mode["value"] = PlantMode.SUMMER
+                self.async_write_ha_state()
+
+        elif hvac_mode is HVAC_MODE_AUTO:
             zone_mode = ZoneMode.TIME_PROGRAM
-            if plant_mode in [
+            if current_plant_mode in [
                 PlantMode.WINTER,
                 PlantMode.HEATING_ONLY,
                 PlantMode.COOLING,
             ]:
                 # if already heating or cooling just change CH mode
-                self.api.set_zone_mode(
+                await self.api.async_set_zone_mode(
                     self.gw_id,
                     self.zone,
                     zone_mode,
-                    self.zone_mode["value"],
+                    current_zone_mode,
                 )
-            elif plant_mode == PlantMode.SUMMER:
+                self.zone_mode["value"] = zone_mode
+                self.async_write_ha_state()
+            elif current_plant_mode is PlantMode.SUMMER:
                 # DHW is working, so use Winter where CH and DHW are active
-                self.api.set_plant_mode(
-                    self.gw_id, PlantMode.WINTER, PlantMode(self.preset_mode)
+                await self.api.async_set_plant_mode(
+                    self.gw_id, PlantMode.WINTER, current_plant_mode
                 )
-                self.api.set_zone_mode(
+                await self.api.async_set_zone_mode(
                     self.gw_id,
                     self.zone,
                     zone_mode,
-                    self.zone_mode["value"],
+                    current_zone_mode,
                 )
-            else:
-                # hvac is OFF, so use heating only, if not supported then winter
-                if PlantMode.HEATING_ONLY in plant_modes:
-                    self.api.set_plant_mode(
-                        self.gw_id,
-                        PlantMode.HEATING_ONLY,
-                        PlantMode(self.preset_mode),
-                    )
-                    self.api.set_zone_mode(
-                        self.gw_id,
-                        self.zone,
-                        zone_mode,
-                        self.zone_mode["value"],
-                    )
-                else:
-                    self.api.set_plant_mode(
-                        self.gw_id, PlantMode.WINTER, PlantMode(self.preset_mode)
-                    )
-                    self.api.set_zone_mode(
-                        self.gw_id,
-                        self.zone,
-                        zone_mode,
-                        self.zone_mode["value"],
-                    )
-        elif hvac_mode == HVAC_MODE_HEAT:
-            zone_mode = ZoneMode.MANUAL
-            if plant_mode in [PlantMode.WINTER, PlantMode.HEATING_ONLY]:
-                # if already heating, change CH mode
-                self.api.set_zone_mode(
-                    self.gw_id,
-                    self.zone,
-                    zone_mode,
-                    self.zone_mode["value"],
-                )
-            elif plant_mode in [PlantMode.SUMMER, PlantMode.COOLING]:
-                # DHW is working, so use Winter and change mode
-                self.api.set_plant_mode(
-                    self.gw_id, PlantMode.WINTER, PlantMode(self.preset_mode)
-                )
-                self.api.set_zone_mode(
-                    self.gw_id,
-                    self.zone,
-                    zone_mode,
-                    self.zone_mode["value"],
-                )
-            else:
-                # hvac is OFF, so use heating only, if not supported then winter
-                if PlantMode.HEATING_ONLY in plant_modes:
-                    self.api.set_plant_mode(
-                        self.gw_id,
-                        PlantMode.HEATING_ONLY,
-                        PlantMode(self.preset_mode),
-                    )
-                    self.api.set_zone_mode(
-                        self.gw_id,
-                        self.zone,
-                        zone_mode,
-                        self.zone_mode["value"],
-                    )
-                else:
-                    self.api.set_plant_mode(
-                        self.gw_id, PlantMode.WINTER, PlantMode(self.preset_mode)
-                    )
-                    self.api.set_zone_mode(
-                        self.gw_id,
-                        self.zone,
-                        zone_mode,
-                        self.zone_mode["value"],
-                    )
-        elif hvac_mode == HVAC_MODE_COOL:
-            zone_mode = ZoneMode.MANUAL
-            self.api.set_plant_mode(
-                self.gw_id, PlantMode.COOLING, PlantMode(self.preset_mode)
-            )
-            self.api.set_zone_mode(
-                self.gw_id, self.zone, zone_mode, self.zone_mode["value"]
-            )
+                self.plant_mode["value"] = PlantMode.WINTER
+                self.zone_mode["value"] = zone_mode
+                self.async_write_ha_state()
 
-    def set_preset_mode(self, preset_mode):
+            else:
+                # hvac is OFF, so use heating only, if not supported then winter
+                if PlantMode.HEATING_ONLY in plant_modes:
+                    await self.api.async_set_plant_mode(
+                        self.gw_id,
+                        PlantMode.HEATING_ONLY,
+                        current_plant_mode,
+                    )
+                    await self.api.async_set_zone_mode(
+                        self.gw_id,
+                        self.zone,
+                        zone_mode,
+                        current_zone_mode,
+                    )
+                    self.plant_mode["value"] = PlantMode.HEATING_ONLY
+                    self.zone_mode["value"] = zone_mode
+                    self.async_write_ha_state()
+
+                else:
+                    await self.api.async_set_plant_mode(
+                        self.gw_id, PlantMode.WINTER, current_plant_mode
+                    )
+                    await self.api.async_set_zone_mode(
+                        self.gw_id,
+                        self.zone,
+                        zone_mode,
+                        current_zone_mode,
+                    )
+                    self.plant_mode["value"] = PlantMode.WINTER
+                    self.zone_mode["value"] = zone_mode
+                    self.async_write_ha_state()
+
+        elif hvac_mode is HVAC_MODE_HEAT:
+            zone_mode = ZoneMode.MANUAL
+            if ZoneMode.MANUAL2 in self.zone_mode["options"]:
+                zone_mode = ZoneMode.MANUAL2
+            if current_plant_mode in [PlantMode.WINTER, PlantMode.HEATING_ONLY]:
+                # if already heating, change CH mode
+                await self.api.async_set_zone_mode(
+                    self.gw_id,
+                    self.zone,
+                    zone_mode,
+                    current_zone_mode,
+                )
+                self.zone_mode["value"] = zone_mode
+                self.async_write_ha_state()
+            elif current_plant_mode in [PlantMode.SUMMER, PlantMode.COOLING]:
+                # DHW is working, so use Winter and change mode
+                await self.api.async_set_plant_mode(
+                    self.gw_id, PlantMode.WINTER, current_plant_mode
+                )
+                await self.api.async_set_zone_mode(
+                    self.gw_id,
+                    self.zone,
+                    zone_mode,
+                    current_zone_mode,
+                )
+                self.plant_mode["value"] = PlantMode.WINTER
+                self.zone_mode["value"] = zone_mode
+                self.async_write_ha_state()
+            else:
+                # hvac is OFF, so use heating only, if not supported then winter
+                if PlantMode.HEATING_ONLY in plant_modes:
+                    await self.api.async_set_plant_mode(
+                        self.gw_id,
+                        PlantMode.HEATING_ONLY,
+                        current_plant_mode,
+                    )
+                    await self.api.async_set_zone_mode(
+                        self.gw_id,
+                        self.zone,
+                        zone_mode,
+                        current_zone_mode,
+                    )
+                    self.plant_mode["value"] = PlantMode.HEATING_ONLY
+                    self.zone_mode["value"] = zone_mode
+                    self.async_write_ha_state()
+                else:
+                    await self.api.async_set_plant_mode(
+                        self.gw_id, PlantMode.WINTER, current_plant_mode
+                    )
+                    await self.api.async_set_zone_mode(
+                        self.gw_id,
+                        self.zone,
+                        zone_mode,
+                        current_zone_mode,
+                    )
+                    self.plant_mode["value"] = PlantMode.WINTER
+                    self.zone_mode["value"] = zone_mode
+                    self.async_write_ha_state()
+        elif hvac_mode is HVAC_MODE_COOL:
+            zone_mode = ZoneMode.MANUAL
+            if ZoneMode.MANUAL2 in self.zone_mode["options"]:
+                zone_mode = ZoneMode.MANUAL2
+            await self.api.async_set_plant_mode(
+                self.gw_id, PlantMode.COOLING, current_plant_mode
+            )
+            await self.api.async_set_zone_mode(
+                self.gw_id, self.zone, zone_mode, current_zone_mode
+            )
+            self.plant_mode["value"] = PlantMode.COOLING
+            self.zone_mode["value"] = zone_mode
+            self.async_write_ha_state()
+
+    async def async_set_preset_mode(self, preset_mode):
         """Set new target preset mode."""
         _LOGGER.debug(
-            "Setting preset mode to %d for %s",
+            "Setting preset mode to %s for %s",
             preset_mode,
             self.name,
         )
 
-        self.api.set_plant_mode(self.gw_id, preset_mode, PlantMode(self.preset_mode))
+        new_preset_mode = PlantMode(self.plant_mode["optTexts"].index(preset_mode))
+
+        await self.api.async_set_plant_mode(
+            self.gw_id,
+            new_preset_mode,
+            PlantMode(self.plant_mode["value"]),
+        )
+        self.plant_mode["value"] = new_preset_mode
+        self.async_write_ha_state()
 
     async def async_set_temperature(self, **kwargs):
         """Set new target temperature."""
@@ -356,13 +401,14 @@ class AristonDevice(ClimateEntity):
             self.name,
         )
 
-        await self.api.set_temperature(
+        await self.api.async_set_temperature(
             self.gw_id, self.zone, temperature, self.target_temperature
         )
+        self.zone_comfort_temp["value"] = temperature
         self.async_write_ha_state()
 
     async def async_update(self) -> None:
-        data = await self.api.update_device(
+        data = await self.api.async_get_device_properies(
             self.gw_id, self.zone, self.features, self.location
         )
         for item in data["items"]:
