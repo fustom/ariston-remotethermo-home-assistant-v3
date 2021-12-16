@@ -1,8 +1,15 @@
 """Support for Ariston water heaters."""
+from __future__ import annotations
+
 import logging
 
+from homeassistant.helpers.update_coordinator import (
+    CoordinatorEntity,
+    DataUpdateCoordinator,
+)
+
 from .ariston import AristonAPI
-from .const import DOMAIN, FEATURES, API
+from .const import COORDINATORS, DOMAIN, FEATURES, API
 
 from homeassistant.core import HomeAssistant
 from homeassistant.config_entries import ConfigEntry
@@ -28,17 +35,28 @@ async def async_setup_entry(
     api: AristonAPI = hass.data[DOMAIN][API]
     device = entry.data[CONF_DEVICE]
     features = hass.data[DOMAIN][FEATURES]
-    ariston_water_heater = AristonWaterHeater(api, device, features)
+    coordinator = hass.data[DOMAIN][COORDINATORS]
+    ariston_water_heater = AristonWaterHeater(api, device, features, coordinator)
     await ariston_water_heater.async_update()
     async_add_entities([ariston_water_heater])
     return
 
 
-class AristonWaterHeater(WaterHeaterEntity):
+class AristonWaterHeater(CoordinatorEntity, WaterHeaterEntity):
     """Ariston Water Heater Device."""
 
-    def __init__(self, api: AristonAPI, device, features):
+    def __init__(
+        self,
+        api: AristonAPI,
+        device,
+        features,
+        coordinator: DataUpdateCoordinator,
+    ):
         """Initialize the thermostat."""
+
+        # Pass coordinator to CoordinatorEntity.
+        super().__init__(coordinator)
+
         self.api = api
         self.features = features
         self.location = "en-US"

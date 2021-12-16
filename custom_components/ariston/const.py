@@ -2,3 +2,4 @@
 DOMAIN = "ariston"
 FEATURES = "features"
 API = "api"
+COORDINATORS = "coordinators"

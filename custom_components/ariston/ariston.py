@@ -1,6 +1,9 @@
 """Ariston API"""
+from __future__ import annotations
+
 import aiohttp
 import logging
+
 from typing import Any
 from datetime import datetime
 from enum import IntFlag, unique
