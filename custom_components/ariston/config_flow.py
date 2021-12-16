@@ -110,6 +110,7 @@ class AristonConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
         )
 
     async def async_step_select(self, user_input=None):
+        """Multiple device found, select one of them"""
         errors = {}
         if user_input is not None:
             cloud_device = self.cloud_devices[user_input["select_device"]]

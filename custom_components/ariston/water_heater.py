@@ -24,6 +24,7 @@ _LOGGER = logging.getLogger(__name__)
 async def async_setup_entry(
     hass: HomeAssistant, entry: ConfigEntry, async_add_entities
 ):
+    """Set up the Ariston water heater device from config entry."""
     api: AristonAPI = hass.data[DOMAIN][API]
     device = entry.data[CONF_DEVICE]
     features = hass.data[DOMAIN][FEATURES]
@@ -132,11 +133,12 @@ class AristonWaterHeater(WaterHeaterEntity):
         # self.dhw_mode["value"] = operation_mode
         # self.async_write_ha_state()
         _LOGGER.warning(
-            "Set operation mode is currently not supported. I need device to get the api calls."
+            "Set operation mode is currently not supported. I need device to get the api calls"
         )
         return
 
     async def async_update(self) -> None:
+        """Update device properies"""
         data = await self.api.async_get_water_heater_properties(
             self.gw_id, self.features, self.location
         )

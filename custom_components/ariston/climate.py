@@ -408,6 +408,7 @@ class AristonDevice(ClimateEntity):
         self.async_write_ha_state()
 
     async def async_update(self) -> None:
+        """Update device properies"""
         data = await self.api.async_get_device_properies(
             self.gw_id, self.zone, self.features, self.location
         )
