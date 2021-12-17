@@ -4,7 +4,9 @@ from __future__ import annotations
 import logging
 
 from .ariston import AristonAPI
-from .const import DOMAIN, FEATURES, API
+from .coordinator import DeviceDataUpdateCoordinator
+from .const import DOMAIN
+from .device import AristonDevice
 
 from homeassistant.config_entries import ConfigEntry
 from homeassistant.core import HomeAssistant
@@ -30,14 +32,18 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
         _LOGGER.error("Failed to connect to Ariston")
         return False
 
-    hass.data.setdefault(DOMAIN, {FEATURES: {}, API: {}})
-    device = entry.data[CONF_DEVICE]
-    features = await api.async_get_features_for_device(device["gwId"])
-    hass.data[DOMAIN][FEATURES] = features
-    hass.data[DOMAIN][API] = api
+    device = AristonDevice(entry.data[CONF_DEVICE], api)
+    await device.async_get_features()
 
-    if features["hasBoiler"]:
+    coordinator = DeviceDataUpdateCoordinator(hass, device)
+
+    hass.data.setdefault(DOMAIN, {entry.unique_id: {}})
+    hass.data[DOMAIN][entry.unique_id] = coordinator
+
+    if device.features.has_boiler:
         PLATFORMS.append(Platform.WATER_HEATER)
+
+    await coordinator.async_config_entry_first_refresh()
 
     hass.config_entries.async_setup_platforms(entry, PLATFORMS)
 
@@ -46,4 +52,5 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
 
 async def async_unload_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
     """Unload a config entry."""
+    hass.data[DOMAIN].pop(entry.unique_id)
     return await hass.config_entries.async_unload_platforms(entry, PLATFORMS)

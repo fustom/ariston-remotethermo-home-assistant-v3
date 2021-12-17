@@ -1,6 +1,9 @@
 """Ariston API"""
+from __future__ import annotations
+
 import aiohttp
 import logging
+
 from typing import Any
 from datetime import datetime
 from enum import IntFlag, unique
@@ -14,11 +17,6 @@ ARISTON_DATA_ITEMS = "dataItems"
 ARISTON_ZONES = "zones"
 ARISTON_PLANT_DATA = "plantData"
 ARISTON_REPORTS = "reports"
-
-WATER_HEATER_REQUEST_ITEMS = [
-    {"id": "DhwMode", "zn": 0},
-    {"id": "DhwTemp", "zn": 0},
-]
 
 _LOGGER = logging.getLogger(__name__)
 
@@ -84,6 +82,7 @@ class AristonAPI:
         self.token = ""
         self.__username = ""
         self.__password = ""
+        self.features = None
 
     async def async_connect(self, username: str, password: str) -> bool:
         """Login to ariston cloud and get token"""
@@ -138,10 +137,32 @@ class AristonAPI:
             {},
         )
 
-    async def async_get_device_properies(
+    async def async_update_device(
+        self, gw_id: str, features: dict[str, Any], culture: str
+    ) -> dict[str, Any]:
+        """Get device properties"""
+        return await self.post(
+            f"{ARISTON_API_URL}{ARISTON_REMOTE}/{ARISTON_DATA_ITEMS}/{gw_id}/get",
+            {
+                "items": [
+                    {"id": "PlantMode", "zn": 0},
+                    {"id": "IsFlameOn", "zn": 0},
+                    {"id": "Holiday", "zn": 0},
+                    {"id": "OutsideTemp", "zn": 0},
+                    {"id": "HeatingCircuitPressure", "zn": 0},
+                    {"id": "ChFlowSetpointTemp", "zn": 0},
+                    {"id": "DhwTemp", "zn": 0},
+                    {"id": "DhwMode", "zn": 0},
+                ],
+                "features": features,
+                "culture": culture,
+            },
+        )
+
+    async def async_update_thermostat(
         self, gw_id: str, zone: int, features: dict[str, Any], culture: str
     ) -> dict[str, Any]:
-        """Get device items by request body"""
+        """Get thermostat properties"""
         return await self.post(
             f"{ARISTON_API_URL}{ARISTON_REMOTE}/{ARISTON_DATA_ITEMS}/{gw_id}/get",
             {
@@ -152,26 +173,7 @@ class AristonAPI:
                     {"id": "ZoneMode", "zn": zone},
                     {"id": "ZoneHeatRequest", "zn": zone},
                     {"id": "ZoneEconomyTemp", "zn": zone},
-                    {"id": "PlantMode", "zn": 0},
-                    {"id": "IsFlameOn", "zn": 0},
-                    {"id": "Holiday", "zn": 0},
-                    {"id": "OutsideTemp", "zn": 0},
-                    {"id": "HeatingCircuitPressure", "zn": 0},
-                    {"id": "ChFlowSetpointTemp", "zn": 0},
                 ],
-                "features": features,
-                "culture": culture,
-            },
-        )
-
-    async def async_get_water_heater_properties(
-        self, gw_id: str, features: dict[str, Any], culture: str
-    ) -> dict[str, Any]:
-        """Get water heater properties"""
-        return await self.post(
-            f"{ARISTON_API_URL}{ARISTON_REMOTE}/{ARISTON_DATA_ITEMS}/{gw_id}/get",
-            {
-                "items": WATER_HEATER_REQUEST_ITEMS,
                 "features": features,
                 "culture": culture,
             },
