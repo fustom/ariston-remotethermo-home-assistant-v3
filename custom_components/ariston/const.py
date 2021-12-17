@@ -1,5 +1,3 @@
 """Constants for the Ariston integration."""
 DOMAIN = "ariston"
-FEATURES = "features"
-API = "api"
-COORDINATORS = "coordinators"
+# COORDINATORS = "coordinators"

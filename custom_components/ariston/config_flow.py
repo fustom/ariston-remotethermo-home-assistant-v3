@@ -2,9 +2,9 @@
 from __future__ import annotations
 
 import logging
-from typing import Any
-
 import voluptuous as vol
+
+from typing import Any
 
 from homeassistant import config_entries
 from homeassistant.const import (
