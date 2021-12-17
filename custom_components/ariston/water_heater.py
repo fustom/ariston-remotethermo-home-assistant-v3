@@ -3,10 +3,6 @@ from __future__ import annotations
 
 import logging
 
-from homeassistant.helpers.update_coordinator import (
-    CoordinatorEntity,
-)
-
 from .const import DOMAIN
 from .coordinator import DeviceDataUpdateCoordinator
 
@@ -19,6 +15,9 @@ from homeassistant.components.water_heater import (
 )
 from homeassistant.const import (
     ATTR_TEMPERATURE,
+)
+from homeassistant.helpers.update_coordinator import (
+    CoordinatorEntity,
 )
 
 _LOGGER = logging.getLogger(__name__)
