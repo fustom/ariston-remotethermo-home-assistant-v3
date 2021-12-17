@@ -18,8 +18,6 @@ from homeassistant.components.water_heater import (
     WaterHeaterEntity,
 )
 from homeassistant.const import (
-    TEMP_CELSIUS,
-    TEMP_FAHRENHEIT,
     ATTR_TEMPERATURE,
 )
 
@@ -91,11 +89,7 @@ class AristonWaterHeater(CoordinatorEntity, WaterHeaterEntity):
     @property
     def temperature_unit(self):
         """Return the unit of measurement."""
-        return (
-            TEMP_CELSIUS
-            if self.coordinator.device.dhw_temp_unit == "°C"
-            else TEMP_FAHRENHEIT
-        )
+        return self.coordinator.device.dhw_temp_unit
 
     @property
     def supported_features(self) -> int:

@@ -36,7 +36,9 @@ class AristonDevice:
         self.holiday = None
         self.outside_temp: float = None
         self.heating_circuit_pressure: float = None
+        self.heating_circuit_pressure_unit: str = None
         self.ch_flow_setpoint_temp: int = None
+        self.ch_flow_setpoint_temp_unit: str = None
 
         self.dhw_temp: float = None
         self.dhw_temp_min: float = None
@@ -67,6 +69,16 @@ class AristonDevice:
         self.plant_modes = self.get_item_by_id("PlantMode", "options")
         self.plant_mode_texts = self.get_item_by_id("PlantMode", "optTexts")
         self.is_flame_on = self.get_item_by_id("IsFlameOn", "value")
+        self.ch_flow_setpoint_temp = self.get_item_by_id("ChFlowSetpointTemp", "value")
+        self.ch_flow_setpoint_temp_unit = self.get_item_by_id(
+            "ChFlowSetpointTemp", "unit"
+        )
+        self.heating_circuit_pressure = self.get_item_by_id(
+            "HeatingCircuitPressure", "value"
+        )
+        self.heating_circuit_pressure_unit = self.get_item_by_id(
+            "HeatingCircuitPressure", "unit"
+        )
 
         if self.features.has_boiler:
             self.dhw_temp = self.get_item_by_id("DhwTemp", "value")

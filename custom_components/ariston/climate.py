@@ -10,8 +10,6 @@ from .const import DOMAIN
 from homeassistant.config_entries import ConfigEntry
 from homeassistant.core import HomeAssistant
 from homeassistant.const import (
-    TEMP_CELSIUS,
-    TEMP_FAHRENHEIT,
     ATTR_TEMPERATURE,
 )
 from homeassistant.components.climate import ClimateEntity
@@ -97,11 +95,7 @@ class AristonBoiler(CoordinatorEntity, ClimateEntity):
     @property
     def temperature_unit(self) -> str:
         """Return the temperature units for the device."""
-        return (
-            TEMP_CELSIUS
-            if self.coordinator.device.thermostat(self.zone).measured_temp_unit == "°C"
-            else TEMP_FAHRENHEIT
-        )
+        return self.coordinator.device.thermostat(self.zone).measured_temp_unit
 
     @property
     def precision(self) -> float:
