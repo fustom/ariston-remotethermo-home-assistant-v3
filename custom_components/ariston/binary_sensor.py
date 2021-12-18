@@ -1,4 +1,4 @@
-"""Suppoort for Ariston sensors."""
+"""Support for Ariston sensors."""
 from __future__ import annotations
 
 import logging

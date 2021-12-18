@@ -1,4 +1,4 @@
-"""Support for Ariston sensors."""
+"""Support for Ariston switches."""
 from __future__ import annotations
 
 import logging
@@ -6,10 +6,10 @@ import logging
 from homeassistant.helpers.update_coordinator import CoordinatorEntity
 from homeassistant.core import HomeAssistant
 from homeassistant.config_entries import ConfigEntry
-from homeassistant.components.sensor import SensorEntity, SensorEntityDescription
+from homeassistant.components.switch import SwitchEntity, SwitchEntityDescription
 
 from .ariston import PropertyType
-from .const import ARISTON_SENSOR_TYPES, DOMAIN
+from .const import ARISTON_SWITCH_TYPES, DOMAIN
 from .coordinator import DeviceDataUpdateCoordinator
 
 
@@ -19,30 +19,30 @@ _LOGGER = logging.getLogger(__name__)
 async def async_setup_entry(
     hass: HomeAssistant, entry: ConfigEntry, async_add_entities
 ) -> None:
-    """Set up the Ariston sensors from config entry."""
+    """Set up the Ariston switches from config entry."""
     coordinator: DeviceDataUpdateCoordinator = hass.data[DOMAIN][entry.unique_id]
 
-    ariston_sensors: list[AristonSensor] = []
-    for description in ARISTON_SENSOR_TYPES:
-        ariston_sensors.append(
-            AristonSensor(
+    ariston_switches: list[AristonSwitch] = []
+    for description in ARISTON_SWITCH_TYPES:
+        ariston_switches.append(
+            AristonSwitch(
                 coordinator,
                 description,
             )
         )
 
-    async_add_entities(ariston_sensors)
+    async_add_entities(ariston_switches)
 
 
-class AristonSensor(CoordinatorEntity, SensorEntity):
-    """Base class for specific ariston sensors"""
+class AristonSwitch(CoordinatorEntity, SwitchEntity):
+    """Base class for specific ariston switches"""
 
     def __init__(
         self,
         coordinator: DeviceDataUpdateCoordinator,
-        description: SensorEntityDescription,
+        description: SwitchEntityDescription,
     ) -> None:
-        """Initialize the sensor."""
+        """Initialize the switch."""
         # Pass coordinator to CoordinatorEntity.
         super().__init__(coordinator)
 
@@ -55,14 +55,18 @@ class AristonSensor(CoordinatorEntity, SensorEntity):
         return f"{self.coordinator.device.gw_id}-{self.name}"
 
     @property
-    def native_value(self):
-        """Return value of sensor."""
+    def is_on(self):
+        """Return true if switch is on."""
         return self.coordinator.device.get_item_by_id(
             self.entity_description.key, PropertyType.VALUE
         )
 
-    @property
-    def native_unit_of_measurement(self):
-        return self.coordinator.device.get_item_by_id(
-            self.entity_description.key, PropertyType.UNIT
-        )
+    async def async_turn_on(self, **kwargs) -> None:
+        """Turn the switch on."""
+        await self.coordinator.device.set_item_by_id(self.entity_description.key, 1.0)
+        self.async_write_ha_state()
+
+    async def async_turn_off(self, **kwargs) -> None:
+        """Turn the device off."""
+        await self.coordinator.device.set_item_by_id(self.entity_description.key, 0.0)
+        self.async_write_ha_state()

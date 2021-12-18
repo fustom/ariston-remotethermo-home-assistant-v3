@@ -8,15 +8,16 @@ from typing import Any, final
 from datetime import datetime
 from enum import IntFlag, unique
 
-ARISTON_API_URL = "https://www.ariston-net.remotethermo.com/api/v2/"
-ARISTON_LOGIN = "accounts/login"
-ARISTON_REMOTE = "remote"
-ARISTON_PLANTS = "plants"
-ARISTON_LITE = "lite"
-ARISTON_DATA_ITEMS = "dataItems"
-ARISTON_ZONES = "zones"
-ARISTON_PLANT_DATA = "plantData"
-ARISTON_REPORTS = "reports"
+ARISTON_API_URL: final = "https://www.ariston-net.remotethermo.com/api/v2/"
+ARISTON_LOGIN: final = "accounts/login"
+ARISTON_REMOTE: final = "remote"
+ARISTON_PLANTS: final = "plants"
+ARISTON_LITE: final = "lite"
+ARISTON_DATA_ITEMS: final = "dataItems"
+ARISTON_ZONES: final = "zones"
+ARISTON_PLANT_DATA: final = "plantData"
+ARISTON_REPORTS: final = "reports"
+ARISTON_TIME_PROGS: final = "timeProgs"
 
 _LOGGER = logging.getLogger(__name__)
 
@@ -77,19 +78,49 @@ class Weather(IntFlag):
 class DeviceAttribute:
     """Constants for device attributes"""
 
-    GW_ID: final = "gwId"
-    GW_SERIAL: final = "gwSerial"
-    PLANT_NAME: final = "plantName"
     GW_FW_VER: final = "gwFwVer"
+    GW_ID: final = "gwId"
+    GW_LINK: final = "gwLink"
+    GW_SERIAL: final = "gwSerial"
     GW_SYS_TYPE: final = "gwSysType"
+    PLANT_NAME: final = "plantName"
 
 
 class DeviceFeatures:
     """Constants for device features"""
 
-    HAS_BOILER: final = "hasBoiler"
-    ZONES: final = "zones"
+    AUTO_THERMO_REG: final = "autoThermoReg"
+    BMS_ACTIVE: final = "bmsActive"
+    BUFFER_TIME_PROG_AVAILABLE: final = "bufferTimeProgAvailable"
+    CASCDE_SYS: final = "cascadeSys"
+    CONV_BOILER: final = "convBoiler"
+    DHW_BOILER_PRESENT: final = "dhwBoilerPresent"
+    DHW_HIDDEN: final = "dhwHidden"
     DHW_MODE_CHANGEABLE: final = "dhwModeChangeable"
+    DHW_PROG_SUPPORTED: final = "dhwProgSupported"
+    DICTINCT_HEAT_COOL_SETPOINT: final = "distinctHeatCoolSetpoints"
+    EXTENDED_TIME_PROG: final = "extendedTimeProg"
+    HAS_BOILER: final = "hasBoiler"
+    HAS_EM20: final = "hasEm20"
+    HAS_FIREPLACE: final = "hasFireplace"
+    HAS_METERING: final = "hasMetering"
+    HAS_SLP: final = "hasSlp"
+    HAS_TWO_COOLING_TEMP: final = "hasTwoCoolingTemp"
+    HAS_VMC: final = "hasVmc"
+    HAS_ZONE_NAMES: final = "hasZoneNames"
+    HP_CASCADE_CONFIG: final = "hpCascadeConfig"
+    HP_CASCADE_SYS: final = "hpCascadeSys"
+    HP_SYS: final = "hpSys"
+    HV_INPUT_OFF: final = "hvInputOff"
+    HYBRID_SYS: final = "hybridSys"
+    IS_EVO2: final = "isEvo2"
+    IS_VMC_R2: final = "isVmcR2"
+    PILOT_SUPPORTED: final = "pilotSupported"
+    PRE_HEATING_SUPPORTED: final = "preHeatingSupported"
+    SOLAR: final = "solar"
+    VIRTUAL_ZONES: final = "virtualZones"
+    ZONES: final = "zones"
+    WEATHER_PROVIDER: final = "weatherProvider"
 
 
 class DeviceProperties:
@@ -103,6 +134,10 @@ class DeviceProperties:
     CH_FLOW_SETPOINT_TEMP: final = "ChFlowSetpointTemp"
     DHW_TEMP: final = "DhwTemp"
     DHW_MODE: final = "DhwMode"
+    AUTOMATIC_THERMOREGULATION: final = "AutomaticThermoregulation"
+    ANTILEGIONELLA_ON_OFF: final = "AntilegionellaOnOff"
+    ANTILEGIONELLA_TEMP: final = "AntilegionellaTemp"
+    ANTILEGIONELLA_FREQ: final = "AntilegionellaFreq"
 
 
 class ThermostatProperties:
@@ -114,6 +149,7 @@ class ThermostatProperties:
     ZONE_MODE: final = "ZoneMode"
     ZONE_HEAT_REQUEST: final = "ZoneHeatRequest"
     ZONE_ECONOMY_TEMP: final = "ZoneEconomyTemp"
+    ZONE_DEROGA: final = "ZoneDeroga"
 
 
 class PropertyType:
@@ -192,7 +228,7 @@ class AristonAPI:
             {},
         )
 
-    async def async_update_device(
+    async def async_get_device_properties(
         self, gw_id: str, features: dict[str, Any], culture: str
     ) -> dict[str, Any]:
         """Get device properties"""
@@ -208,6 +244,7 @@ class AristonAPI:
                     {"id": DeviceProperties.CH_FLOW_SETPOINT_TEMP, "zn": 0},
                     {"id": DeviceProperties.DHW_TEMP, "zn": 0},
                     {"id": DeviceProperties.DHW_MODE, "zn": 0},
+                    {"id": DeviceProperties.AUTOMATIC_THERMOREGULATION, "zn": 0},
                 ],
                 "features": features,
                 "culture": culture,
@@ -228,10 +265,42 @@ class AristonAPI:
                     {"id": ThermostatProperties.ZONE_MODE, "zn": zone},
                     {"id": ThermostatProperties.ZONE_HEAT_REQUEST, "zn": zone},
                     {"id": ThermostatProperties.ZONE_ECONOMY_TEMP, "zn": zone},
+                    {"id": ThermostatProperties.ZONE_DEROGA, "zn": zone},
                 ],
                 "features": features,
                 "culture": culture,
             },
+        )
+
+    async def async_set_device_properties(
+        self,
+        gw_id: str,
+        features: dict[str, Any],
+        device_property: str,
+        value: float,
+        prev_value: float,
+    ) -> dict[str, Any]:
+        """Set device properties"""
+        return await self.post(
+            f"{ARISTON_API_URL}{ARISTON_REMOTE}/{ARISTON_DATA_ITEMS}/{gw_id}/set",
+            {
+                "items": [
+                    {
+                        "id": device_property,
+                        "prevValue": prev_value,
+                        "value": value,
+                    }
+                ],
+                "features": features,
+            },
+        )
+
+    async def async_update_thermostat_time_progs(
+        self, gw_id: str, zone: int
+    ) -> dict[str, Any]:
+        """Get thermostat time programs"""
+        return await self.get(
+            f"{ARISTON_API_URL}{ARISTON_REMOTE}/{ARISTON_TIME_PROGS}/{gw_id}/ChZn{zone}",
         )
 
     async def async_set_temperature(

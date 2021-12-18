@@ -71,7 +71,7 @@ class AristonDevice:
 
     async def async_update_state(self) -> None:
         """Update the device states from the cloud"""
-        self.data = await self.api.async_update_device(
+        self.data = await self.api.async_get_device_properties(
             self.gw_id, self.features.data, self.location
         )
 
@@ -151,6 +151,16 @@ class AristonDevice:
         return [
             item[item_value] for item in self.data["items"] if item["id"] == item_id
         ][0]
+
+    async def set_item_by_id(self, item_id: str, value: float):
+        """Set item attribute on device"""
+        current_value = self.get_item_by_id(item_id, PropertyType.VALUE)
+        await self.api.async_set_device_properties(
+            self.gw_id, self.features.data, item_id, value, current_value
+        )
+        for item in self.data["items"]:
+            if item["id"] == item_id:
+                item["value"] = value
 
 
 class Thermostat:
