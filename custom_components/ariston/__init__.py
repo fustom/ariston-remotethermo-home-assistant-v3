@@ -37,6 +37,7 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
         _LOGGER.error("Failed to connect to Ariston")
         return False
 
+    api.set_unit_measurement_system(hass.config.units.is_metric)
     device = AristonDevice(entry.data[CONF_DEVICE], api)
     await device.async_get_features()
 

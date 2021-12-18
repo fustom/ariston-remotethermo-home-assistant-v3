@@ -170,10 +170,15 @@ class AristonAPI:
 
     def __init__(self) -> None:
         """Constructor for Ariston API."""
+        self.umsys = "si"
         self.token = ""
         self.__username = ""
         self.__password = ""
         self.features = None
+
+    def set_unit_measurement_system(self, is_metric: bool) -> None:
+        """Set unit measurement system"""
+        self.umsys = "si" if is_metric else "us"
 
     async def async_connect(self, username: str, password: str) -> bool:
         """Login to ariston cloud and get token"""
@@ -233,7 +238,7 @@ class AristonAPI:
     ) -> dict[str, Any]:
         """Get device properties"""
         return await self.post(
-            f"{ARISTON_API_URL}{ARISTON_REMOTE}/{ARISTON_DATA_ITEMS}/{gw_id}/get",
+            f"{ARISTON_API_URL}{ARISTON_REMOTE}/{ARISTON_DATA_ITEMS}/{gw_id}/get?umsys={self.umsys}",
             {
                 "items": [
                     {"id": DeviceProperties.PLANT_MODE, "zn": 0},
@@ -256,7 +261,7 @@ class AristonAPI:
     ) -> dict[str, Any]:
         """Get thermostat properties"""
         return await self.post(
-            f"{ARISTON_API_URL}{ARISTON_REMOTE}/{ARISTON_DATA_ITEMS}/{gw_id}/get",
+            f"{ARISTON_API_URL}{ARISTON_REMOTE}/{ARISTON_DATA_ITEMS}/{gw_id}/get?umsys={self.umsys}",
             {
                 "items": [
                     {"id": ThermostatProperties.ZONE_MEASURED_TEMP, "zn": zone},
@@ -282,7 +287,7 @@ class AristonAPI:
     ) -> dict[str, Any]:
         """Set device properties"""
         return await self.post(
-            f"{ARISTON_API_URL}{ARISTON_REMOTE}/{ARISTON_DATA_ITEMS}/{gw_id}/set",
+            f"{ARISTON_API_URL}{ARISTON_REMOTE}/{ARISTON_DATA_ITEMS}/{gw_id}/set?umsys={self.umsys}",
             {
                 "items": [
                     {
@@ -300,7 +305,7 @@ class AristonAPI:
     ) -> dict[str, Any]:
         """Get thermostat time programs"""
         return await self.get(
-            f"{ARISTON_API_URL}{ARISTON_REMOTE}/{ARISTON_TIME_PROGS}/{gw_id}/ChZn{zone}",
+            f"{ARISTON_API_URL}{ARISTON_REMOTE}/{ARISTON_TIME_PROGS}/{gw_id}/ChZn{zone}?umsys={self.umsys}",
         )
 
     async def async_set_temperature(
@@ -308,7 +313,7 @@ class AristonAPI:
     ) -> None:
         """Set comfort temperature"""
         await self.post(
-            f"{ARISTON_API_URL}/{ARISTON_REMOTE}/{ARISTON_ZONES}/{gw_id}/{zone}/temperatures",
+            f"{ARISTON_API_URL}/{ARISTON_REMOTE}/{ARISTON_ZONES}/{gw_id}/{zone}/temperatures?umsys={self.umsys}",
             {
                 "new": {"comf": temperature},
                 "old": {"comf": current_temperature},
@@ -344,7 +349,7 @@ class AristonAPI:
     ) -> None:
         """Set domestic hot water temperature"""
         await self.post(
-            f"{ARISTON_API_URL}/{ARISTON_REMOTE}/{ARISTON_PLANT_DATA}/{gw_id}/dhwTemp",
+            f"{ARISTON_API_URL}/{ARISTON_REMOTE}/{ARISTON_PLANT_DATA}/{gw_id}/dhwTemp?umsys={self.umsys}",
             {
                 "new": temperature,
                 "old": current_temperature,
