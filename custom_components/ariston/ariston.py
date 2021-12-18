@@ -4,7 +4,7 @@ from __future__ import annotations
 import aiohttp
 import logging
 
-from typing import Any
+from typing import Any, final
 from datetime import datetime
 from enum import IntFlag, unique
 
@@ -72,6 +72,61 @@ class Weather(IntFlag):
     WINDY = 8
     CLEAR_BY_NIGHT = 129
     VARIABLE_BY_NIGHT = 130
+
+
+class DeviceAttribute:
+    """Constants for device attributes"""
+
+    GW_ID: final = "gwId"
+    GW_SERIAL: final = "gwSerial"
+    PLANT_NAME: final = "plantName"
+    GW_FW_VER: final = "gwFwVer"
+    GW_SYS_TYPE: final = "gwSysType"
+
+
+class DeviceFeatures:
+    """Constants for device features"""
+
+    HAS_BOILER: final = "hasBoiler"
+    ZONES: final = "zones"
+    DHW_MODE_CHANGEABLE: final = "dhwModeChangeable"
+
+
+class DeviceProperties:
+    """Constants for device properties"""
+
+    PLANT_MODE: final = "PlantMode"
+    IS_FLAME_ON: final = "IsFlameOn"
+    HOLIDAY: final = "Holiday"
+    OUTSIDE_TEMP: final = "OutsideTemp"
+    HEATING_CIRCUIT_PRESSURE: final = "HeatingCircuitPressure"
+    CH_FLOW_SETPOINT_TEMP: final = "ChFlowSetpointTemp"
+    DHW_TEMP: final = "DhwTemp"
+    DHW_MODE: final = "DhwMode"
+
+
+class ThermostatProperties:
+    """Constants for thermostat properties"""
+
+    ZONE_MEASURED_TEMP: final = "ZoneMeasuredTemp"
+    ZONE_DESIRED_TEMP: final = "ZoneDesiredTemp"
+    ZONE_COMFORT_TEMP: final = "ZoneComfortTemp"
+    ZONE_MODE: final = "ZoneMode"
+    ZONE_HEAT_REQUEST: final = "ZoneHeatRequest"
+    ZONE_ECONOMY_TEMP: final = "ZoneEconomyTemp"
+
+
+class PropertyType:
+    """Constants for property types"""
+
+    VALUE: final = "value"
+    OPTIONS: final = "options"
+    OPT_TEXTS: final = "optTexts"
+    UNIT: final = "unit"
+    MIN: final = "min"
+    MAX: final = "max"
+    STEP: final = "step"
+    DECIMALS: final = "decimals"
 
 
 class AristonAPI:
@@ -145,14 +200,14 @@ class AristonAPI:
             f"{ARISTON_API_URL}{ARISTON_REMOTE}/{ARISTON_DATA_ITEMS}/{gw_id}/get",
             {
                 "items": [
-                    {"id": "PlantMode", "zn": 0},
-                    {"id": "IsFlameOn", "zn": 0},
-                    {"id": "Holiday", "zn": 0},
-                    {"id": "OutsideTemp", "zn": 0},
-                    {"id": "HeatingCircuitPressure", "zn": 0},
-                    {"id": "ChFlowSetpointTemp", "zn": 0},
-                    {"id": "DhwTemp", "zn": 0},
-                    {"id": "DhwMode", "zn": 0},
+                    {"id": DeviceProperties.PLANT_MODE, "zn": 0},
+                    {"id": DeviceProperties.IS_FLAME_ON, "zn": 0},
+                    {"id": DeviceProperties.HOLIDAY, "zn": 0},
+                    {"id": DeviceProperties.OUTSIDE_TEMP, "zn": 0},
+                    {"id": DeviceProperties.HEATING_CIRCUIT_PRESSURE, "zn": 0},
+                    {"id": DeviceProperties.CH_FLOW_SETPOINT_TEMP, "zn": 0},
+                    {"id": DeviceProperties.DHW_TEMP, "zn": 0},
+                    {"id": DeviceProperties.DHW_MODE, "zn": 0},
                 ],
                 "features": features,
                 "culture": culture,
@@ -167,12 +222,12 @@ class AristonAPI:
             f"{ARISTON_API_URL}{ARISTON_REMOTE}/{ARISTON_DATA_ITEMS}/{gw_id}/get",
             {
                 "items": [
-                    {"id": "ZoneMeasuredTemp", "zn": zone},
-                    {"id": "ZoneDesiredTemp", "zn": zone},
-                    {"id": "ZoneComfortTemp", "zn": zone},
-                    {"id": "ZoneMode", "zn": zone},
-                    {"id": "ZoneHeatRequest", "zn": zone},
-                    {"id": "ZoneEconomyTemp", "zn": zone},
+                    {"id": ThermostatProperties.ZONE_MEASURED_TEMP, "zn": zone},
+                    {"id": ThermostatProperties.ZONE_DESIRED_TEMP, "zn": zone},
+                    {"id": ThermostatProperties.ZONE_COMFORT_TEMP, "zn": zone},
+                    {"id": ThermostatProperties.ZONE_MODE, "zn": zone},
+                    {"id": ThermostatProperties.ZONE_HEAT_REQUEST, "zn": zone},
+                    {"id": ThermostatProperties.ZONE_ECONOMY_TEMP, "zn": zone},
                 ],
                 "features": features,
                 "culture": culture,

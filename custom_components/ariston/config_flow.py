@@ -16,7 +16,7 @@ from homeassistant.data_entry_flow import FlowResult
 from homeassistant.exceptions import HomeAssistantError
 
 from .const import DOMAIN
-from .ariston import AristonAPI
+from .ariston import AristonAPI, DeviceAttribute
 
 _LOGGER = logging.getLogger(__name__)
 
@@ -79,7 +79,7 @@ class AristonConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
             if len(cloud_devices) == 1:
                 cloud_device = cloud_devices[0]
                 existing_entry = await self.async_set_unique_id(
-                    cloud_device["gwId"], raise_on_progress=False
+                    cloud_device[DeviceAttribute.GW_ID], raise_on_progress=False
                 )
                 if existing_entry:
                     data = existing_entry.data.copy()
@@ -90,7 +90,7 @@ class AristonConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
                     return self.async_abort(reason="reauth_successful")
 
                 return self.async_create_entry(
-                    title=cloud_device["plantName"],
+                    title=cloud_device[DeviceAttribute.PLANT_NAME],
                     data={
                         CONF_USERNAME: self.cloud_username,
                         CONF_PASSWORD: self.cloud_password,
@@ -98,8 +98,8 @@ class AristonConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
                     },
                 )
             for device in cloud_devices:
-                name = device["plantName"]
-                model = device["gwSerial"]
+                name = device[DeviceAttribute.PLANT_NAME]
+                model = device[DeviceAttribute.GW_SERIAL]
                 list_name = f"{name} - {model}"
                 self.cloud_devices[list_name] = device
 
@@ -115,7 +115,7 @@ class AristonConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
         if user_input is not None:
             cloud_device = self.cloud_devices[user_input["select_device"]]
             return self.async_create_entry(
-                title=cloud_device["plantName"],
+                title=cloud_device[DeviceAttribute.PLANT_NAME],
                 data={
                     CONF_USERNAME: self.cloud_username,
                     CONF_PASSWORD: self.cloud_password,

@@ -8,6 +8,7 @@ from homeassistant.core import HomeAssistant
 from homeassistant.config_entries import ConfigEntry
 from homeassistant.components.sensor import SensorEntity, SensorEntityDescription
 
+from .ariston import PropertyType
 from .const import ARISTON_SENSOR_TYPES, DOMAIN
 from .coordinator import DeviceDataUpdateCoordinator
 
@@ -57,11 +58,11 @@ class AristonSensor(CoordinatorEntity, SensorEntity):
     def native_value(self):
         """Return value of sensor."""
         return self.coordinator.device.get_item_by_id(
-            self.entity_description.key, "value"
+            self.entity_description.key, PropertyType.VALUE
         )
 
     @property
     def native_unit_of_measurement(self):
         return self.coordinator.device.get_item_by_id(
-            self.entity_description.key, "unit"
+            self.entity_description.key, PropertyType.UNIT
         )

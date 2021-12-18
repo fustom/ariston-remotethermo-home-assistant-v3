@@ -11,6 +11,7 @@ from homeassistant.helpers.update_coordinator import CoordinatorEntity
 
 from .const import ARISTON_BINARY_SENSOR_TYPES, DOMAIN
 from .coordinator import DeviceDataUpdateCoordinator
+from .ariston import PropertyType
 
 _LOGGER = logging.getLogger(__name__)
 
@@ -50,5 +51,5 @@ class AristonBinarySensor(CoordinatorEntity, BinarySensorEntity):
     def is_on(self):
         """Return True if the binary sensor is on."""
         return self.coordinator.device.get_item_by_id(
-            self.entity_description.key, "value"
+            self.entity_description.key, PropertyType.VALUE
         )
