@@ -19,6 +19,7 @@ Use the add integration UI to set up your device.
 
 ![Kazam_screenshot_00006](https://user-images.githubusercontent.com/6751243/146653543-d12ea409-3f8e-4387-bfcc-16dbc393dbb5.png)
 
-![Kazam_screenshot_00008](https://user-images.githubusercontent.com/6751243/146653616-3bb5de96-b51d-4579-bf88-c7835a2e48e8.png)
+![Kazam_screenshot_00008](https://user-images.githubusercontent.com/6751243/146653616-3bb5de96-b51d-4579-bf88-c7835a2e48e8.png)![Kazam_screenshot_00009](https://user-images.githubusercontent.com/6751243/146657797-ed14b741-595a-48a6-9126-1acca3beb69f.png)
+
 
 ## Peace Love Freedom
