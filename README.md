@@ -13,7 +13,7 @@ But it does not use Ariston website. It uses Ariston API what I reversed enginee
 | Less sensors, switches, etc |  More sensors, switches, etc |
 | New code, may contains lot of bugs | Old, tested code |
 
-##TODO
+## TODO
 - Localization. Currently only english is supported.
 - More sensors, switches, binary sersors, selectors, services.
 - Energy.
