@@ -11,7 +11,7 @@ from homeassistant.helpers.update_coordinator import CoordinatorEntity
 
 from .const import ARISTON_BINARY_SENSOR_TYPES, DOMAIN
 from .coordinator import DeviceDataUpdateCoordinator
-from .ariston import PropertyType
+from .ariston import DeviceAttribute, PropertyType
 
 _LOGGER = logging.getLogger(__name__)
 
@@ -45,7 +45,9 @@ class AristonBinarySensor(CoordinatorEntity, BinarySensorEntity):
     @property
     def unique_id(self):
         """Return the unique id."""
-        return f"{self.coordinator.device.gw_id}-{self.name}"
+        return (
+            f"{self.coordinator.device.attributes[DeviceAttribute.GW_ID]}-{self.name}"
+        )
 
     @property
     def is_on(self):

@@ -3,7 +3,7 @@ from __future__ import annotations
 
 import logging
 
-from .ariston import AristonAPI
+from .ariston import AristonAPI, DeviceFeatures
 from .coordinator import DeviceDataUpdateCoordinator
 from .const import DOMAIN
 from .device import AristonDevice
@@ -46,7 +46,7 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
     hass.data.setdefault(DOMAIN, {entry.unique_id: {}})
     hass.data[DOMAIN][entry.unique_id] = coordinator
 
-    if device.features.has_boiler:
+    if device.features[DeviceFeatures.HAS_BOILER]:
         PLATFORMS.append(Platform.WATER_HEATER)
 
     await coordinator.async_config_entry_first_refresh()

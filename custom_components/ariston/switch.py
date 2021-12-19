@@ -8,7 +8,7 @@ from homeassistant.core import HomeAssistant
 from homeassistant.config_entries import ConfigEntry
 from homeassistant.components.switch import SwitchEntity, SwitchEntityDescription
 
-from .ariston import PropertyType
+from .ariston import DeviceAttribute, PropertyType
 from .const import ARISTON_SWITCH_TYPES, DOMAIN
 from .coordinator import DeviceDataUpdateCoordinator
 
@@ -52,7 +52,9 @@ class AristonSwitch(CoordinatorEntity, SwitchEntity):
     @property
     def unique_id(self):
         """Return the unique id."""
-        return f"{self.coordinator.device.gw_id}-{self.name}"
+        return (
+            f"{self.coordinator.device.attributes[DeviceAttribute.GW_ID]}-{self.name}"
+        )
 
     @property
     def is_on(self):

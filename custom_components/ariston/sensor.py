@@ -8,7 +8,7 @@ from homeassistant.core import HomeAssistant
 from homeassistant.config_entries import ConfigEntry
 from homeassistant.components.sensor import SensorEntity, SensorEntityDescription
 
-from .ariston import PropertyType
+from .ariston import DeviceAttribute, PropertyType
 from .const import ARISTON_SENSOR_TYPES, DOMAIN
 from .coordinator import DeviceDataUpdateCoordinator
 
@@ -52,7 +52,9 @@ class AristonSensor(CoordinatorEntity, SensorEntity):
     @property
     def unique_id(self):
         """Return the unique id."""
-        return f"{self.coordinator.device.gw_id}-{self.name}"
+        return (
+            f"{self.coordinator.device.attributes[DeviceAttribute.GW_ID]}-{self.name}"
+        )
 
     @property
     def native_value(self):
