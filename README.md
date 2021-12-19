@@ -1,6 +1,26 @@
 # Ariston NET remotethermo integration for Home Assistant
-This integration based on chomupashchuk fantastic work https://github.com/chomupashchuk/ariston-remotethermo-home-assistant-v2
-But it does not use Ariston website. It uses Ariston API what I reversed engineered. Lot of things are still missing. Use v2 if you need more.
+This integration inspired by chomupashchuk fantastic work https://github.com/chomupashchuk/ariston-remotethermo-home-assistant-v2
+But it does not use Ariston website. It uses Ariston API what I reversed engineered.
+
+
+| [This integration](https://github.com/fustom/ariston-remotethermo-home-assistant-v3)  | [Chomupashchuk's v2 integration](https://github.com/chomupashchuk/ariston-remotethermo-home-assistant-v2) |
+| ------------- | ------------- |
+| Uses real API  | Uses Ariton website  |
+| Fast set/get data  | Sometimes needs minutes to set/get data |
+| Easy to setup with UI | Not so easy to setup (only with configuration.yaml) |
+| Integration & devices & entites | Only entites |
+| Proper asynchronous integration, clean code | Hard to understand and maintain (ariston.py has more than 4000 lines) |
+| Less sensors, switches, etc |  More sensors, switches, etc |
+| New code, may contains lot of bugs | Old, tested code |
+
+##TODO
+- Localization. Currently only english is supported.
+- More sensors, switches, binary sersors, selectors, services.
+- Energy.
+- Exception handling.
+- More logs.
+- Unit tests.
+- Fun.
 
 ## Integration was tested on and works with:
 - Ariston Alteas One 24
