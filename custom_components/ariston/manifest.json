@@ -1,7 +1,7 @@
 {
   "domain": "ariston",
   "name": "Ariston",
-  "version": "0.1.0",
+  "version": "0.2.0",
   "config_flow": true,
   "documentation": "https://github.com/fustom/ariston-remotethermo-home-assistant-v3",
   "issue_tracker": "https://github.com/fustom/ariston-remotethermo-home-assistant-v3/issues",

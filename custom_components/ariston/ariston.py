@@ -86,6 +86,15 @@ class DeviceAttribute:
     PLANT_NAME: final = "plantName"
 
 
+class ZoneAttribute:
+    """Constants for zone attributes"""
+
+    NUM: final = "num"
+    NAME: final = "name"
+    ROOM_SENS: final = "roomSens"
+    GEOFENCE_DEROGA: final = "geofenceDeroga"
+
+
 class DeviceFeatures:
     """Constants for device features"""
 
@@ -256,7 +265,7 @@ class AristonAPI:
             },
         )
 
-    async def async_update_thermostat(
+    async def async_get_thermostat_properties(
         self, gw_id: str, zone: int, features: dict[str, Any], culture: str
     ) -> dict[str, Any]:
         """Get thermostat properties"""
@@ -277,9 +286,10 @@ class AristonAPI:
             },
         )
 
-    async def async_set_device_properties(
+    async def async_set_properties(
         self,
         gw_id: str,
+        zone_id: int,
         features: dict[str, Any],
         device_property: str,
         value: float,
@@ -294,13 +304,14 @@ class AristonAPI:
                         "id": device_property,
                         "prevValue": prev_value,
                         "value": value,
+                        "zone": zone_id,
                     }
                 ],
                 "features": features,
             },
         )
 
-    async def async_update_thermostat_time_progs(
+    async def async_get_thermostat_time_progs(
         self, gw_id: str, zone: int
     ) -> dict[str, Any]:
         """Get thermostat time programs"""
@@ -308,24 +319,12 @@ class AristonAPI:
             f"{ARISTON_API_URL}{ARISTON_REMOTE}/{ARISTON_TIME_PROGS}/{gw_id}/ChZn{zone}?umsys={self.umsys}",
         )
 
-    async def async_set_temperature(
-        self, gw_id: str, zone: int, temperature: float, current_temperature: float
-    ) -> None:
-        """Set comfort temperature"""
-        await self.post(
-            f"{ARISTON_API_URL}/{ARISTON_REMOTE}/{ARISTON_ZONES}/{gw_id}/{zone}/temperatures?umsys={self.umsys}",
-            {
-                "new": {"comf": temperature},
-                "old": {"comf": current_temperature},
-            },
-        )
-
     async def async_set_plant_mode(
         self, gw_id: str, mode: PlantMode, current_mode: PlantMode
     ) -> None:
         """Set plant mode"""
         await self.post(
-            f"{ARISTON_API_URL}/{ARISTON_REMOTE}/{ARISTON_PLANT_DATA}/{gw_id}/mode",
+            f"{ARISTON_API_URL}/{ARISTON_REMOTE}/{ARISTON_PLANT_DATA}/{gw_id}/mode?umsys={self.umsys}",
             {
                 "new": mode,
                 "old": current_mode,
@@ -337,22 +336,10 @@ class AristonAPI:
     ) -> None:
         """Set zone mode"""
         await self.post(
-            f"{ARISTON_API_URL}/{ARISTON_REMOTE}/{ARISTON_ZONES}/{gw_id}/{zone}/mode",
+            f"{ARISTON_API_URL}/{ARISTON_REMOTE}/{ARISTON_ZONES}/{gw_id}/{zone}/mode?umsys={self.umsys}",
             {
                 "new": mode,
                 "old": current_mode,
-            },
-        )
-
-    async def async_set_dhwtemp(
-        self, gw_id: str, temperature: float, current_temperature: float
-    ) -> None:
-        """Set domestic hot water temperature"""
-        await self.post(
-            f"{ARISTON_API_URL}/{ARISTON_REMOTE}/{ARISTON_PLANT_DATA}/{gw_id}/dhwTemp?umsys={self.umsys}",
-            {
-                "new": temperature,
-                "old": current_temperature,
             },
         )
 
