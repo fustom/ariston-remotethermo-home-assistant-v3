@@ -31,15 +31,12 @@ I only have one Ariston Alteas One with only one zone, but feel free to test som
 Copy ariston folder to your configuration/custom_components path or use hacs custom repositories.
 Use the add integration UI to set up your device.
 
-![Kazam_screenshot_00003](https://user-images.githubusercontent.com/6751243/146653448-ff7b6f9d-cbf1-4555-9a75-61bf68bc9d3e.png)
-
-![Kazam_screenshot_00004](https://user-images.githubusercontent.com/6751243/146653484-52e39d78-7c6f-44ae-888d-acf246147290.png)
-
-![Kazam_screenshot_00005](https://user-images.githubusercontent.com/6751243/146653512-373d67d2-dcff-4a58-9a1c-022613f6702f.png)
+| ![Kazam_screenshot_00003](https://user-images.githubusercontent.com/6751243/146653448-ff7b6f9d-cbf1-4555-9a75-61bf68bc9d3e.png) | ![Kazam_screenshot_00004](https://user-images.githubusercontent.com/6751243/146653484-52e39d78-7c6f-44ae-888d-acf246147290.png) | ![Kazam_screenshot_00005](https://user-images.githubusercontent.com/6751243/146653512-373d67d2-dcff-4a58-9a1c-022613f6702f.png) |
+:-------------------------:|:-------------------------:|:-------------------------:
 
 ![Kazam_screenshot_00006](https://user-images.githubusercontent.com/6751243/146653543-d12ea409-3f8e-4387-bfcc-16dbc393dbb5.png)
 
-![Kazam_screenshot_00008](https://user-images.githubusercontent.com/6751243/146653616-3bb5de96-b51d-4579-bf88-c7835a2e48e8.png)![Kazam_screenshot_00009](https://user-images.githubusercontent.com/6751243/146657797-ed14b741-595a-48a6-9126-1acca3beb69f.png)
+| ![Kazam_screenshot_00008](https://user-images.githubusercontent.com/6751243/146653616-3bb5de96-b51d-4579-bf88-c7835a2e48e8.png) | ![Kazam_screenshot_00009](https://user-images.githubusercontent.com/6751243/146657797-ed14b741-595a-48a6-9126-1acca3beb69f.png) |
+:-------------------------:|:-------------------------:
 
-
-## Peace Love Freedom
+<h1 align="center">Peace Love Freedom</h1>
