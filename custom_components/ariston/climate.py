@@ -7,6 +7,7 @@ from .const import DOMAIN
 from .coordinator import DeviceDataUpdateCoordinator
 from .ariston import (
     DeviceAttribute,
+    DeviceFeatures,
     DeviceProperties,
     PlantMode,
     PropertyType,
@@ -47,11 +48,9 @@ async def async_setup_entry(
     """Set up the Ariston device from config entry."""
     coordinator: DeviceDataUpdateCoordinator = hass.data[DOMAIN][entry.unique_id]
     devs = []
-    for thermostat in coordinator.device.thermostats:
-        ariston_thermostat = AristonBoiler(
-            thermostat.zone[ZoneAttribute.NUM], coordinator
-        )
-        devs.append(ariston_thermostat)
+    for zone in coordinator.device.features[DeviceFeatures.ZONES]:
+        ariston_zone = AristonBoiler(zone[ZoneAttribute.NUM], coordinator)
+        devs.append(ariston_zone)
     async_add_entities(devs)
 
 
@@ -113,50 +112,50 @@ class AristonBoiler(CoordinatorEntity, ClimateEntity):
     @property
     def temperature_unit(self) -> str:
         """Return the temperature units for the device."""
-        return self.coordinator.device.thermostat(self.zone).get_item_by_id(
-            ThermostatProperties.ZONE_MEASURED_TEMP, PropertyType.UNIT
+        return self.coordinator.device.get_item_by_id(
+            ThermostatProperties.ZONE_MEASURED_TEMP, PropertyType.UNIT, self.zone
         )
 
     @property
     def precision(self) -> float:
         """Return the precision of temperature for the device."""
-        return 1 / 10 ** self.coordinator.device.thermostat(self.zone).get_item_by_id(
-            ThermostatProperties.ZONE_MEASURED_TEMP, PropertyType.DECIMALS
+        return 1 / 10 ** self.coordinator.device.get_item_by_id(
+            ThermostatProperties.ZONE_MEASURED_TEMP, PropertyType.DECIMALS, self.zone
         )
 
     @property
     def min_temp(self):
         """Return minimum temperature."""
-        return self.coordinator.device.thermostat(self.zone).get_item_by_id(
-            ThermostatProperties.ZONE_COMFORT_TEMP, PropertyType.MIN
+        return self.coordinator.device.get_item_by_id(
+            ThermostatProperties.ZONE_COMFORT_TEMP, PropertyType.MIN, self.zone
         )
 
     @property
     def max_temp(self):
         """Return the maximum temperature."""
-        return self.coordinator.device.thermostat(self.zone).get_item_by_id(
-            ThermostatProperties.ZONE_COMFORT_TEMP, PropertyType.MAX
+        return self.coordinator.device.get_item_by_id(
+            ThermostatProperties.ZONE_COMFORT_TEMP, PropertyType.MAX, self.zone
         )
 
     @property
     def target_temperature_step(self) -> float:
         """Return the target temperature step support by the device."""
-        return self.coordinator.device.thermostat(self.zone).get_item_by_id(
-            ThermostatProperties.ZONE_COMFORT_TEMP, PropertyType.STEP
+        return self.coordinator.device.get_item_by_id(
+            ThermostatProperties.ZONE_COMFORT_TEMP, PropertyType.STEP, self.zone
         )
 
     @property
     def current_temperature(self) -> float:
         """Return the reported current temperature for the device."""
-        return self.coordinator.device.thermostat(self.zone).get_item_by_id(
-            ThermostatProperties.ZONE_MEASURED_TEMP, PropertyType.VALUE
+        return self.coordinator.device.get_item_by_id(
+            ThermostatProperties.ZONE_MEASURED_TEMP, PropertyType.VALUE, self.zone
         )
 
     @property
     def target_temperature(self) -> float:
         """Return the target temperature for the device."""
-        return self.coordinator.device.thermostat(self.zone).get_item_by_id(
-            ThermostatProperties.ZONE_COMFORT_TEMP, PropertyType.VALUE
+        return self.coordinator.device.get_item_by_id(
+            ThermostatProperties.ZONE_COMFORT_TEMP, PropertyType.VALUE, self.zone
         )
 
     @property
@@ -173,8 +172,8 @@ class AristonBoiler(CoordinatorEntity, ClimateEntity):
             )
         )
         zone_mode = ZoneMode(
-            self.coordinator.device.thermostat(self.zone).get_item_by_id(
-                ThermostatProperties.ZONE_MODE, PropertyType.VALUE
+            self.coordinator.device.get_item_by_id(
+                ThermostatProperties.ZONE_MODE, PropertyType.VALUE, self.zone
             )
         )
 
@@ -197,8 +196,8 @@ class AristonBoiler(CoordinatorEntity, ClimateEntity):
         plant_modes = self.coordinator.device.get_item_by_id(
             DeviceProperties.PLANT_MODE, PropertyType.OPTIONS
         )
-        zone_modes = self.coordinator.device.thermostat(self.zone).get_item_by_id(
-            ThermostatProperties.ZONE_MODE, PropertyType.OPTIONS
+        zone_modes = self.coordinator.device.get_item_by_id(
+            ThermostatProperties.ZONE_MODE, PropertyType.OPTIONS, self.zone
         )
 
         supported_modes = []
@@ -268,8 +267,8 @@ class AristonBoiler(CoordinatorEntity, ClimateEntity):
         plant_modes = self.coordinator.device.get_item_by_id(
             DeviceProperties.PLANT_MODE, PropertyType.OPTIONS
         )
-        zone_modes = self.coordinator.device.thermostat(self.zone).get_item_by_id(
-            ThermostatProperties.ZONE_MODE, PropertyType.OPTIONS
+        zone_modes = self.coordinator.device.get_item_by_id(
+            ThermostatProperties.ZONE_MODE, PropertyType.OPTIONS, self.zone
         )
         current_plant_mode = PlantMode(
             self.coordinator.device.get_item_by_id(
@@ -309,8 +308,8 @@ class AristonBoiler(CoordinatorEntity, ClimateEntity):
                     await self.coordinator.device.set_item_by_id(
                         DeviceProperties.PLANT_MODE, PlantMode.WINTER
                     )
-            await self.coordinator.device.thermostat(self.zone).set_item_by_id(
-                ThermostatProperties.ZONE_MODE, ZoneMode.TIME_PROGRAM
+            await self.coordinator.device.set_item_by_id(
+                ThermostatProperties.ZONE_MODE, ZoneMode.TIME_PROGRAM, self.zone
             )
         elif hvac_mode == HVAC_MODE_HEAT:
             if current_plant_mode in [PlantMode.WINTER, PlantMode.HEATING_ONLY]:
@@ -332,24 +331,24 @@ class AristonBoiler(CoordinatorEntity, ClimateEntity):
                         DeviceProperties.PLANT_MODE, PlantMode.WINTER
                     )
             if ZoneMode.MANUAL2 in zone_modes:
-                await self.coordinator.device.thermostat(self.zone).set_item_by_id(
-                    ThermostatProperties.ZONE_MODE, ZoneMode.MANUAL2
+                await self.coordinator.device.set_item_by_id(
+                    ThermostatProperties.ZONE_MODE, ZoneMode.MANUAL2, self.zone
                 )
             else:
-                await self.coordinator.device.thermostat(self.zone).set_item_by_id(
-                    ThermostatProperties.ZONE_MODE, ZoneMode.MANUAL
+                await self.coordinator.device.set_item_by_id(
+                    ThermostatProperties.ZONE_MODE, ZoneMode.MANUAL, self.zone
                 )
         elif hvac_mode == HVAC_MODE_COOL:
             await self.coordinator.device.set_item_by_id(
                 DeviceProperties.PLANT_MODE, PlantMode.COOLING
             )
             if ZoneMode.MANUAL2 in zone_modes:
-                await self.coordinator.device.thermostat(self.zone).set_item_by_id(
-                    ThermostatProperties.ZONE_MODE, ZoneMode.MANUAL2
+                await self.coordinator.device.set_item_by_id(
+                    ThermostatProperties.ZONE_MODE, ZoneMode.MANUAL2, self.zone
                 )
             else:
-                await self.coordinator.device.thermostat(self.zone).set_item_by_id(
-                    ThermostatProperties.ZONE_MODE, ZoneMode.MANUAL
+                await self.coordinator.device.set_item_by_id(
+                    ThermostatProperties.ZONE_MODE, ZoneMode.MANUAL, self.zone
                 )
         self.async_write_ha_state()
 
@@ -383,7 +382,7 @@ class AristonBoiler(CoordinatorEntity, ClimateEntity):
             self.name,
         )
 
-        await self.coordinator.device.thermostat(self.zone).set_item_by_id(
-            ThermostatProperties.ZONE_COMFORT_TEMP, temperature
+        await self.coordinator.device.set_item_by_id(
+            ThermostatProperties.ZONE_COMFORT_TEMP, temperature, self.zone
         )
         self.async_write_ha_state()
