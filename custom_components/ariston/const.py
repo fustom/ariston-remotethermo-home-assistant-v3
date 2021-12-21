@@ -1,4 +1,6 @@
 """Constants for the Ariston integration."""
+from datetime import timedelta
+
 from homeassistant.components.binary_sensor import BinarySensorEntityDescription
 from homeassistant.components.sensor import SensorDeviceClass, SensorEntityDescription
 from homeassistant.components.switch import SwitchEntityDescription
@@ -8,6 +10,8 @@ from .ariston import DeviceProperties
 
 DOMAIN = "ariston"
 NAME = "Ariston"
+
+DEFAULT_SCAN_INTERVAL = timedelta(seconds=60)
 
 ARISTON_SENSOR_TYPES: tuple[SensorEntityDescription, ...] = (
     SensorEntityDescription(

@@ -75,6 +75,55 @@ class Weather(IntFlag):
     VARIABLE_BY_NIGHT = 130
 
 
+@unique
+class GasEnergyUnit(IntFlag):
+    """Gas energy unit enum"""
+
+    KWH = 0
+    GIGA_JOULE = 1
+    THERM = 2
+    MEGA_BTU = 3
+    SMC = 4
+    M3 = 5
+
+
+@unique
+class GasType(IntFlag):
+    """Gas type enu,"""
+
+    NATURAL_GAS = 0
+    LPG = 1
+    AIR_PROPANED = 2
+    GPO = 3
+    PROPANE = 4
+
+
+@unique
+class Currency(IntFlag):
+    """Currency enum"""
+
+    ARS = 1
+    EUR = 2
+    BYN = 3
+    CNY = 4
+    HRK = 5
+    CZK = 6
+    DKK = 7
+    HKD = 8
+    HUF = 9
+    IRR = 10
+    KZT = 11
+    CHF = 12
+    MOP = 13
+    PLZ = 14
+    RON = 15
+    RUB = 16
+    TRY = 17
+    UAH = 18
+    GBP = 19
+    USD = 20
+
+
 class DeviceAttribute:
     """Constants for device attributes"""
 
@@ -161,6 +210,16 @@ class ThermostatProperties:
     ZONE_DEROGA: final = "ZoneDeroga"
 
 
+class ConsumptionProperties:
+    """Constants for consumption properties"""
+
+    CURRENCY: final = "currency"
+    GAS_TYPE: final = "gasType"
+    GAS_ENERGY_UNIT: final = "gasEnergyUnit"
+    ELEC_COST: final = "elecCost"
+    GAS_COST: final = "gasCost"
+
+
 class PropertyType:
     """Constants for property types"""
 
@@ -181,12 +240,13 @@ class AristonAPI:
     def __init__(self) -> None:
         """Constructor for Ariston API."""
         self.umsys = "si"
-        self.token = ""
+        self.currency = -1
+        self.__token = ""
         self.__username = ""
         self.__password = ""
         self.features = None
 
-    def set_unit_measurement_system(self, is_metric: bool) -> None:
+    def configure(self, is_metric: bool) -> None:
         """Set unit measurement system"""
         self.umsys = "si" if is_metric else "us"
 
@@ -202,7 +262,7 @@ class AristonAPI:
         if response is None:
             return False
 
-        self.token = response["token"]
+        self.__token = response["token"]
 
         return True
 
@@ -241,6 +301,27 @@ class AristonAPI:
         return await self.post(
             f"{ARISTON_API_URL}{ARISTON_REMOTE}/{ARISTON_PLANTS}/{gw_id}/getConsumptionsSettings",
             {},
+        )
+
+    async def async_set_consumptions_settings(
+        self,
+        gw_id: str,
+        currency: Currency,
+        gas_type: GasType,
+        gas_energy_unit: GasEnergyUnit,
+        elec_cost: float,
+        gas_cost: float,
+    ) -> dict[str, Any]:
+        """Get consumption settings"""
+        return await self.post(
+            f"{ARISTON_API_URL}{ARISTON_REMOTE}/{ARISTON_PLANTS}/{gw_id}/consumptionsSettings",
+            {
+                ConsumptionProperties.CURRENCY: currency,
+                ConsumptionProperties.GAS_TYPE: gas_type,
+                ConsumptionProperties.GAS_ENERGY_UNIT: gas_energy_unit,
+                ConsumptionProperties.ELEC_COST: elec_cost,
+                ConsumptionProperties.GAS_COST: gas_cost,
+            },
         )
 
     @staticmethod
@@ -313,30 +394,6 @@ class AristonAPI:
             f"{ARISTON_API_URL}{ARISTON_REMOTE}/{ARISTON_TIME_PROGS}/{gw_id}/ChZn{zone}?umsys={self.umsys}",
         )
 
-    async def async_set_plant_mode(
-        self, gw_id: str, mode: PlantMode, current_mode: PlantMode
-    ) -> None:
-        """Set plant mode"""
-        await self.post(
-            f"{ARISTON_API_URL}/{ARISTON_REMOTE}/{ARISTON_PLANT_DATA}/{gw_id}/mode?umsys={self.umsys}",
-            {
-                "new": mode,
-                "old": current_mode,
-            },
-        )
-
-    async def async_set_zone_mode(
-        self, gw_id: str, zone: int, mode: ZoneMode, current_mode: ZoneMode
-    ) -> None:
-        """Set zone mode"""
-        await self.post(
-            f"{ARISTON_API_URL}/{ARISTON_REMOTE}/{ARISTON_ZONES}/{gw_id}/{zone}/mode?umsys={self.umsys}",
-            {
-                "new": mode,
-                "old": current_mode,
-            },
-        )
-
     async def async_set_holiday(
         self,
         gw_id: str,
@@ -371,7 +428,15 @@ class AristonAPI:
         body: dict[str, Any] = None,
         is_retry: bool = False,
     ) -> dict[str, Any]:
-        headers = {"ar.authToken": self.token}
+        headers = {"ar.authToken": self.__token}
+
+        _LOGGER.debug(
+            "Request method %s, path: %s, params: %s, body: %s",
+            method,
+            path,
+            params,
+            body,
+        )
 
         async with aiohttp.ClientSession() as session:
             response = await session.request(
@@ -393,7 +458,7 @@ class AristonAPI:
 
             if response.content_length > 0:
                 json = await response.json()
-                _LOGGER.debug(json)
+                _LOGGER.debug("Response %s", json)
                 return json
 
             return None

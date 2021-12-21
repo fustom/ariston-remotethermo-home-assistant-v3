@@ -1,13 +1,12 @@
 """Coordinator class for Ariston module."""
 from __future__ import annotations
-from datetime import timedelta
 
 import logging
 
 from homeassistant.core import HomeAssistant
 from homeassistant.helpers.update_coordinator import DataUpdateCoordinator
 
-from .const import DOMAIN
+from .const import DEFAULT_SCAN_INTERVAL, DOMAIN
 from .device import AristonDevice
 from .ariston import DeviceAttribute
 
@@ -27,7 +26,7 @@ class DeviceDataUpdateCoordinator(DataUpdateCoordinator):
             hass,
             _LOGGER,
             name=f"{DOMAIN}-{device.attributes[DeviceAttribute.PLANT_NAME]}",
-            update_interval=timedelta(seconds=60),
+            update_interval=DEFAULT_SCAN_INTERVAL,
         )
 
         self.device = device

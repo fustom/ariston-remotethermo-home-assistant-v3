@@ -377,7 +377,7 @@ class AristonBoiler(CoordinatorEntity, ClimateEntity):
 
         temperature = kwargs[ATTR_TEMPERATURE]
         _LOGGER.debug(
-            "Setting temperature to %d for %s",
+            "Setting temperature to %s for %s",
             temperature,
             self.name,
         )

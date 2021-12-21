@@ -7,6 +7,7 @@ from typing import Any
 
 from .ariston import (
     AristonAPI,
+    Currency,
     DeviceAttribute,
     DeviceProperties,
     PropertyType,
@@ -18,18 +19,32 @@ _LOGGER = logging.getLogger(__name__)
 class AristonDevice:
     """Class representing a physical device, it's state and properties."""
 
-    def __init__(self, attributes: dict[str, Any], api: AristonAPI) -> None:
+    def __init__(
+        self, attributes: dict[str, Any], api: AristonAPI, currency: Currency
+    ) -> None:
         self.api = api
         self.attributes = attributes
+        self.currency = currency
 
         self.location = "en-US"
 
         self.features = None
+        self.consumptions_settings = None
+
+        self.energy_account = None
         self.data = None
 
     async def async_get_features(self) -> None:
         """Get device features wrapper"""
         self.features = await self.api.async_get_features_for_device(
+            self.attributes[DeviceAttribute.GW_ID]
+        )
+
+        self.consumptions_settings = await self.api.async_get_consumptions_settings(
+            self.attributes[DeviceAttribute.GW_ID]
+        )
+
+        self.energy_account = await self.api.async_get_energy_account(
             self.attributes[DeviceAttribute.GW_ID]
         )
 

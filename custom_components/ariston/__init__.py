@@ -3,7 +3,7 @@ from __future__ import annotations
 
 import logging
 
-from .ariston import AristonAPI, DeviceFeatures
+from .ariston import AristonAPI, Currency, DeviceFeatures
 from .coordinator import DeviceDataUpdateCoordinator
 from .const import DOMAIN
 from .device import AristonDevice
@@ -37,8 +37,8 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
         _LOGGER.error("Failed to connect to Ariston")
         return False
 
-    api.set_unit_measurement_system(hass.config.units.is_metric)
-    device = AristonDevice(entry.data[CONF_DEVICE], api)
+    api.configure(hass.config.units.is_metric)
+    device = AristonDevice(entry.data[CONF_DEVICE], api, Currency[hass.config.currency])
     await device.async_get_features()
 
     coordinator = DeviceDataUpdateCoordinator(hass, device)
