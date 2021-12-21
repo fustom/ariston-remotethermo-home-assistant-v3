@@ -29,13 +29,15 @@ class AristonData(ABC):
     def get_item_by_id(self, item_id: DeviceProperties, item_value: PropertyType):
         """Get item attribute from data"""
         return [
-            item[item_value] for item in self.data["items"] if item["id"] == item_id
+            item[item_value]
+            for item in self.data["items"]
+            if item["id"] == item_id and item["zone"] == self.zone_number
         ][0]
 
     async def set_item_by_id(self, item_id: str, value: float):
         """Set item attribute on device"""
         current_value = self.get_item_by_id(item_id, PropertyType.VALUE)
-        await self.device.api.async_set_properties(
+        await self.device.api.async_set_property(
             self.device.attributes[DeviceAttribute.GW_ID],
             self.zone_number,
             self.device.features,
@@ -74,12 +76,14 @@ class AristonDevice(AristonData):
 
     async def async_update_state(self) -> None:
         """Update the device states from the cloud"""
-        self.data = await self.api.async_get_device_properties(
-            self.attributes[DeviceAttribute.GW_ID], self.features, self.location
+        self.data = await self.api.async_get_properties(
+            self.attributes[DeviceAttribute.GW_ID],
+            self.features,
+            self.location,
         )
 
         for thermostat in self.thermostats:
-            await thermostat.async_update_state()
+            thermostat.data = self.data
 
     def thermostat(self, zone: int) -> Thermostat:
         """Return a termostate by zone number"""
@@ -95,12 +99,3 @@ class Thermostat(AristonData):
     def __init__(self, device: AristonDevice, zone: dict[str, Any]) -> None:
         super().__init__(device, zone[ZoneAttribute.NUM])
         self.zone = zone
-
-    async def async_update_state(self) -> None:
-        """Update the thermostat states from the cloud"""
-        self.data = await self.device.api.async_get_thermostat_properties(
-            self.device.attributes[DeviceAttribute.GW_ID],
-            self.zone[ZoneAttribute.NUM],
-            self.device.features,
-            self.device.location,
-        )

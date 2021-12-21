@@ -242,51 +242,66 @@ class AristonAPI:
             {},
         )
 
-    async def async_get_device_properties(
+    async def async_get_properties(
         self, gw_id: str, features: dict[str, Any], culture: str
     ) -> dict[str, Any]:
         """Get device properties"""
+        items = [
+            {"id": DeviceProperties.PLANT_MODE, "zn": 0},
+            {"id": DeviceProperties.IS_FLAME_ON, "zn": 0},
+            {"id": DeviceProperties.HOLIDAY, "zn": 0},
+            {"id": DeviceProperties.OUTSIDE_TEMP, "zn": 0},
+            {"id": DeviceProperties.HEATING_CIRCUIT_PRESSURE, "zn": 0},
+            {"id": DeviceProperties.CH_FLOW_SETPOINT_TEMP, "zn": 0},
+            {"id": DeviceProperties.DHW_TEMP, "zn": 0},
+            {"id": DeviceProperties.DHW_MODE, "zn": 0},
+            {"id": DeviceProperties.AUTOMATIC_THERMOREGULATION, "zn": 0},
+        ]
+
+        for zone in features[DeviceFeatures.ZONES]:
+            items.extend(
+                [
+                    {
+                        "id": ThermostatProperties.ZONE_MEASURED_TEMP,
+                        "zn": zone[ZoneAttribute.NUM],
+                    },
+                    {
+                        "id": ThermostatProperties.ZONE_DESIRED_TEMP,
+                        "zn": zone[ZoneAttribute.NUM],
+                    },
+                    {
+                        "id": ThermostatProperties.ZONE_COMFORT_TEMP,
+                        "zn": zone[ZoneAttribute.NUM],
+                    },
+                    {
+                        "id": ThermostatProperties.ZONE_MODE,
+                        "zn": zone[ZoneAttribute.NUM],
+                    },
+                    {
+                        "id": ThermostatProperties.ZONE_HEAT_REQUEST,
+                        "zn": zone[ZoneAttribute.NUM],
+                    },
+                    {
+                        "id": ThermostatProperties.ZONE_ECONOMY_TEMP,
+                        "zn": zone[ZoneAttribute.NUM],
+                    },
+                    {
+                        "id": ThermostatProperties.ZONE_DEROGA,
+                        "zn": zone[ZoneAttribute.NUM],
+                    },
+                ]
+            )
+
         return await self.post(
             f"{ARISTON_API_URL}{ARISTON_REMOTE}/{ARISTON_DATA_ITEMS}/{gw_id}/get?umsys={self.umsys}",
             {
-                "items": [
-                    {"id": DeviceProperties.PLANT_MODE, "zn": 0},
-                    {"id": DeviceProperties.IS_FLAME_ON, "zn": 0},
-                    {"id": DeviceProperties.HOLIDAY, "zn": 0},
-                    {"id": DeviceProperties.OUTSIDE_TEMP, "zn": 0},
-                    {"id": DeviceProperties.HEATING_CIRCUIT_PRESSURE, "zn": 0},
-                    {"id": DeviceProperties.CH_FLOW_SETPOINT_TEMP, "zn": 0},
-                    {"id": DeviceProperties.DHW_TEMP, "zn": 0},
-                    {"id": DeviceProperties.DHW_MODE, "zn": 0},
-                    {"id": DeviceProperties.AUTOMATIC_THERMOREGULATION, "zn": 0},
-                ],
+                "items": items,
                 "features": features,
                 "culture": culture,
             },
         )
 
-    async def async_get_thermostat_properties(
-        self, gw_id: str, zone: int, features: dict[str, Any], culture: str
-    ) -> dict[str, Any]:
-        """Get thermostat properties"""
-        return await self.post(
-            f"{ARISTON_API_URL}{ARISTON_REMOTE}/{ARISTON_DATA_ITEMS}/{gw_id}/get?umsys={self.umsys}",
-            {
-                "items": [
-                    {"id": ThermostatProperties.ZONE_MEASURED_TEMP, "zn": zone},
-                    {"id": ThermostatProperties.ZONE_DESIRED_TEMP, "zn": zone},
-                    {"id": ThermostatProperties.ZONE_COMFORT_TEMP, "zn": zone},
-                    {"id": ThermostatProperties.ZONE_MODE, "zn": zone},
-                    {"id": ThermostatProperties.ZONE_HEAT_REQUEST, "zn": zone},
-                    {"id": ThermostatProperties.ZONE_ECONOMY_TEMP, "zn": zone},
-                    {"id": ThermostatProperties.ZONE_DEROGA, "zn": zone},
-                ],
-                "features": features,
-                "culture": culture,
-            },
-        )
-
-    async def async_set_properties(
+    async def async_set_property(
         self,
         gw_id: str,
         zone_id: int,
