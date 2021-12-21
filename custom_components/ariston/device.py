@@ -48,7 +48,7 @@ class AristonDevice:
         return [
             item[item_value]
             for item in self.data["items"]
-            if item["id"] == item_id and item["zone"] == zone_number
+            if item["id"] == item_id and item[PropertyType.ZONE] == zone_number
         ][0]
 
     async def set_item_by_id(self, item_id: str, value: float, zone_number: int = 0):
@@ -63,5 +63,5 @@ class AristonDevice:
             current_value,
         )
         for item in self.data["items"]:
-            if item["id"] == item_id:
+            if item["id"] == item_id and item[PropertyType.ZONE] == zone_number:
                 item[PropertyType.VALUE] = value

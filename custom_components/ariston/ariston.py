@@ -172,6 +172,7 @@ class PropertyType:
     MAX: final = "max"
     STEP: final = "step"
     DECIMALS: final = "decimals"
+    ZONE: final = "zone"
 
 
 class AristonAPI:
