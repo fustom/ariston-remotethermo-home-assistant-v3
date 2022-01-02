@@ -37,6 +37,8 @@ DEFAULT_SCAN_INTERVAL_SECONDS: final = 60
 DEFAULT_ENERGY_SCAN_INTERVAL_MINUTES: final = 60
 DEFAULT_EXTRA_ENERGY_FEATURES: final = False
 
+ATTR_TARGET_TEMP_STEP = "target_temp_step"
+
 ARISTON_SENSOR_TYPES: tuple[SensorEntityDescription, ...] = (
     SensorEntityDescription(
         key=DeviceProperties.HEATING_CIRCUIT_PRESSURE,

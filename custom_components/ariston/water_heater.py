@@ -4,7 +4,7 @@ from __future__ import annotations
 import logging
 
 from .ariston import DeviceAttribute, DeviceFeatures, DeviceProperties, PropertyType
-from .const import COORDINATOR, DOMAIN
+from .const import ATTR_TARGET_TEMP_STEP, COORDINATOR, DOMAIN
 from .coordinator import DeviceDataUpdateCoordinator
 
 from homeassistant.core import HomeAssistant
@@ -101,12 +101,13 @@ class AristonWaterHeater(CoordinatorEntity, WaterHeaterEntity):
         )
 
     @property
-    def target_temperature_step(self):
-        """Return the target temperature step support by the device.
-        !!! WaterHeaterEntity does not support this property. I don't really understand why."""
-        return self.coordinator.device.get_item_by_id(
+    def extra_state_attributes(self):
+        """Return the supported step of target temperature."""
+        step = self.coordinator.device.get_item_by_id(
             DeviceProperties.DHW_TEMP, PropertyType.STEP
         )
+
+        return {ATTR_TARGET_TEMP_STEP: step}
 
     @property
     def temperature_unit(self):
