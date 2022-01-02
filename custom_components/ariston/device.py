@@ -7,7 +7,9 @@ from typing import Any
 
 from .ariston import (
     AristonAPI,
+    ConsumptionProperties,
     DeviceAttribute,
+    DeviceFeatures,
     DeviceProperties,
     PropertyType,
 )
@@ -18,13 +20,25 @@ _LOGGER = logging.getLogger(__name__)
 class AristonDevice:
     """Class representing a physical device, it's state and properties."""
 
-    def __init__(self, attributes: dict[str, Any], api: AristonAPI) -> None:
+    def __init__(
+        self,
+        attributes: dict[str, Any],
+        api: AristonAPI,
+        extra_energy_features: bool,
+        is_metric: bool = True,
+    ) -> None:
         self.api = api
         self.attributes = attributes
+        self.extra_energy_features = extra_energy_features
+        self.umsys = "si" if is_metric else "us"
 
         self.location = "en-US"
 
         self.features = None
+        self.consumptions_settings = None
+
+        self.energy_account = None
+        self.consumptions_sequences = None
         self.data = None
 
     async def async_get_features(self) -> None:
@@ -39,7 +53,42 @@ class AristonDevice:
             self.attributes[DeviceAttribute.GW_ID],
             self.features,
             self.location,
+            self.umsys,
         )
+
+    async def async_update_energy(self) -> None:
+        """Update the device energy settings from the cloud"""
+
+        # k=1: heating k=2: water
+        # p=1: 12*2 hours p=2: 7*1 day p=3: 15*2 days p=4: 12*? year
+        # v: first element is the latest, last element is the newest"""
+        self.consumptions_sequences = await self.api.async_get_consumptions_sequences(
+            self.attributes[DeviceAttribute.GW_ID],
+            self.features[DeviceFeatures.HAS_BOILER],
+            self.features[DeviceFeatures.HAS_SLP],
+        )
+
+        if self.extra_energy_features:
+            # These settings only for official clients
+            self.consumptions_settings = await self.api.async_get_consumptions_settings(
+                self.attributes[DeviceAttribute.GW_ID]
+            )
+
+            # Last month consumption in kwh
+            self.energy_account = await self.api.async_get_energy_account(
+                self.attributes[DeviceAttribute.GW_ID]
+            )
+
+    async def async_set_consumptions_settings(
+        self, consumption_property: ConsumptionProperties, value: int
+    ):
+        """Set consumption settings"""
+        new_settings = self.consumptions_settings.copy()
+        new_settings[consumption_property] = value
+        await self.api.async_set_consumptions_settings(
+            self.attributes[DeviceAttribute.GW_ID], new_settings
+        )
+        self.consumptions_settings[consumption_property] = value
 
     def get_item_by_id(
         self, item_id: DeviceProperties, item_value: PropertyType, zone_number: int = 0
@@ -61,6 +110,7 @@ class AristonDevice:
             item_id,
             value,
             current_value,
+            self.umsys,
         )
         for item in self.data["items"]:
             if item["id"] == item_id and item[PropertyType.ZONE] == zone_number:

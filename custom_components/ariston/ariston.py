@@ -75,6 +75,55 @@ class Weather(IntFlag):
     VARIABLE_BY_NIGHT = 130
 
 
+@unique
+class GasEnergyUnit(IntFlag):
+    """Gas energy unit enum"""
+
+    KWH = 0
+    GIGA_JOULE = 1
+    THERM = 2
+    MEGA_BTU = 3
+    SMC = 4
+    CUBE_METER = 5
+
+
+@unique
+class GasType(IntFlag):
+    """Gas type enu,"""
+
+    NATURAL_GAS = 0
+    LPG = 1
+    AIR_PROPANED = 2
+    GPO = 3
+    PROPANE = 4
+
+
+@unique
+class Currency(IntFlag):
+    """Currency enum"""
+
+    ARS = 1
+    EUR = 2
+    BYN = 3
+    CNY = 4
+    HRK = 5
+    CZK = 6
+    DKK = 7
+    HKD = 8
+    HUF = 9
+    IRR = 10
+    KZT = 11
+    CHF = 12
+    MOP = 13
+    PLZ = 14
+    RON = 15
+    RUB = 16
+    TRY = 17
+    UAH = 18
+    GBP = 19
+    USD = 20
+
+
 class DeviceAttribute:
     """Constants for device attributes"""
 
@@ -161,6 +210,16 @@ class ThermostatProperties:
     ZONE_DEROGA: final = "ZoneDeroga"
 
 
+class ConsumptionProperties:
+    """Constants for consumption properties"""
+
+    CURRENCY: final = "currency"
+    GAS_TYPE: final = "gasType"
+    GAS_ENERGY_UNIT: final = "gasEnergyUnit"
+    ELEC_COST: final = "elecCost"
+    GAS_COST: final = "gasCost"
+
+
 class PropertyType:
     """Constants for property types"""
 
@@ -178,31 +237,24 @@ class PropertyType:
 class AristonAPI:
     """Ariston API class"""
 
-    def __init__(self) -> None:
+    def __init__(self, username: str, password: str) -> None:
         """Constructor for Ariston API."""
-        self.umsys = "si"
-        self.token = ""
-        self.__username = ""
-        self.__password = ""
-        self.features = None
-
-    def set_unit_measurement_system(self, is_metric: bool) -> None:
-        """Set unit measurement system"""
-        self.umsys = "si" if is_metric else "us"
-
-    async def async_connect(self, username: str, password: str) -> bool:
-        """Login to ariston cloud and get token"""
         self.__username = username
         self.__password = password
+        self.__token = ""
+
+    async def async_connect(self) -> bool:
+        """Login to ariston cloud and get token"""
 
         response = await self.post(
-            f"{ARISTON_API_URL}{ARISTON_LOGIN}", {"usr": username, "pwd": password}
+            f"{ARISTON_API_URL}{ARISTON_LOGIN}",
+            {"usr": self.__username, "pwd": self.__password},
         )
 
         if response is None:
             return False
 
-        self.token = response["token"]
+        self.__token = response["token"]
 
         return True
 
@@ -229,11 +281,11 @@ class AristonAPI:
         )
 
     async def async_get_consumptions_sequences(
-        self, gw_id: str, has_slp: bool
+        self, gw_id: str, has_boiler: bool, has_slp: bool
     ) -> dict[str, Any]:
         """Get consumption sequences for the device"""
         return await self.get(
-            f"{ARISTON_API_URL}{ARISTON_REMOTE}/{ARISTON_REPORTS}/{gw_id}/consSequencesApi8?usages=Ch%2CDhw&hasSlp={has_slp}"
+            f"{ARISTON_API_URL}{ARISTON_REMOTE}/{ARISTON_REPORTS}/{gw_id}/consSequencesApi8?usages=Ch{'%2CDhw' if has_boiler else ''}&hasSlp={has_slp}"
         )
 
     async def async_get_consumptions_settings(self, gw_id: str) -> dict[str, Any]:
@@ -243,18 +295,29 @@ class AristonAPI:
             {},
         )
 
+    async def async_set_consumptions_settings(
+        self,
+        gw_id: str,
+        consumptions_settings,
+    ) -> dict[str, Any]:
+        """Get consumption settings"""
+        return await self.post(
+            f"{ARISTON_API_URL}{ARISTON_REMOTE}/{ARISTON_PLANTS}/{gw_id}/consumptionsSettings",
+            consumptions_settings,
+        )
+
     @staticmethod
     def get_items(features: dict[str, Any]):
         """Get the final strings from DeviceProperies and ThermostatProperties"""
         device_props = [
-            getattr(DeviceProperties, x)
-            for x in dir(DeviceProperties)
-            if not x.startswith("__")
+            getattr(DeviceProperties, device_property)
+            for device_property in dir(DeviceProperties)
+            if not device_property.startswith("__")
         ]
         thermostat_props = [
-            getattr(ThermostatProperties, x)
-            for x in dir(ThermostatProperties)
-            if not x.startswith("__")
+            getattr(ThermostatProperties, thermostat_properties)
+            for thermostat_properties in dir(ThermostatProperties)
+            if not thermostat_properties.startswith("__")
         ]
 
         items = []
@@ -267,12 +330,12 @@ class AristonAPI:
         return items
 
     async def async_get_properties(
-        self, gw_id: str, features: dict[str, Any], culture: str
+        self, gw_id: str, features: dict[str, Any], culture: str, umsys: str
     ) -> dict[str, Any]:
         """Get device properties"""
 
         return await self.post(
-            f"{ARISTON_API_URL}{ARISTON_REMOTE}/{ARISTON_DATA_ITEMS}/{gw_id}/get?umsys={self.umsys}",
+            f"{ARISTON_API_URL}{ARISTON_REMOTE}/{ARISTON_DATA_ITEMS}/{gw_id}/get?umsys={umsys}",
             {
                 "items": self.get_items(features),
                 "features": features,
@@ -288,10 +351,11 @@ class AristonAPI:
         device_property: str,
         value: float,
         prev_value: float,
+        umsys: str,
     ) -> dict[str, Any]:
         """Set device properties"""
         return await self.post(
-            f"{ARISTON_API_URL}{ARISTON_REMOTE}/{ARISTON_DATA_ITEMS}/{gw_id}/set?umsys={self.umsys}",
+            f"{ARISTON_API_URL}{ARISTON_REMOTE}/{ARISTON_DATA_ITEMS}/{gw_id}/set?umsys={umsys}",
             {
                 "items": [
                     {
@@ -306,35 +370,11 @@ class AristonAPI:
         )
 
     async def async_get_thermostat_time_progs(
-        self, gw_id: str, zone: int
+        self, gw_id: str, zone: int, umsys: str
     ) -> dict[str, Any]:
         """Get thermostat time programs"""
         return await self.get(
-            f"{ARISTON_API_URL}{ARISTON_REMOTE}/{ARISTON_TIME_PROGS}/{gw_id}/ChZn{zone}?umsys={self.umsys}",
-        )
-
-    async def async_set_plant_mode(
-        self, gw_id: str, mode: PlantMode, current_mode: PlantMode
-    ) -> None:
-        """Set plant mode"""
-        await self.post(
-            f"{ARISTON_API_URL}/{ARISTON_REMOTE}/{ARISTON_PLANT_DATA}/{gw_id}/mode?umsys={self.umsys}",
-            {
-                "new": mode,
-                "old": current_mode,
-            },
-        )
-
-    async def async_set_zone_mode(
-        self, gw_id: str, zone: int, mode: ZoneMode, current_mode: ZoneMode
-    ) -> None:
-        """Set zone mode"""
-        await self.post(
-            f"{ARISTON_API_URL}/{ARISTON_REMOTE}/{ARISTON_ZONES}/{gw_id}/{zone}/mode?umsys={self.umsys}",
-            {
-                "new": mode,
-                "old": current_mode,
-            },
+            f"{ARISTON_API_URL}{ARISTON_REMOTE}/{ARISTON_TIME_PROGS}/{gw_id}/ChZn{zone}?umsys={umsys}",
         )
 
     async def async_set_holiday(
@@ -371,7 +411,15 @@ class AristonAPI:
         body: dict[str, Any] = None,
         is_retry: bool = False,
     ) -> dict[str, Any]:
-        headers = {"ar.authToken": self.token}
+        headers = {"ar.authToken": self.__token}
+
+        _LOGGER.debug(
+            "Request method %s, path: %s, params: %s, body: %s",
+            method,
+            path,
+            params,
+            body,
+        )
 
         async with aiohttp.ClientSession() as session:
             response = await session.request(
@@ -381,7 +429,7 @@ class AristonAPI:
             if not response.ok:
                 if response.status == 405:
                     if not is_retry:
-                        if await self.async_connect(self.__username, self.__password):
+                        if await self.async_connect():
                             return await self.__request(
                                 method, path, params, body, True
                             )
@@ -393,7 +441,7 @@ class AristonAPI:
 
             if response.content_length > 0:
                 json = await response.json()
-                _LOGGER.debug(json)
+                _LOGGER.debug("Response %s", json)
                 return json
 
             return None
