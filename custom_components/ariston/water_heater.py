@@ -4,7 +4,7 @@ from __future__ import annotations
 import logging
 
 from .ariston import DeviceAttribute, DeviceFeatures, DeviceProperties, PropertyType
-from .const import DOMAIN
+from .const import COORDINATOR, DOMAIN
 from .coordinator import DeviceDataUpdateCoordinator
 
 from homeassistant.core import HomeAssistant
@@ -28,7 +28,9 @@ async def async_setup_entry(
     hass: HomeAssistant, entry: ConfigEntry, async_add_entities
 ):
     """Set up the Ariston water heater device from config entry."""
-    coordinator: DeviceDataUpdateCoordinator = hass.data[DOMAIN][entry.unique_id]
+    coordinator: DeviceDataUpdateCoordinator = hass.data[DOMAIN][entry.unique_id][
+        COORDINATOR
+    ]
     async_add_entities([AristonWaterHeater(coordinator)])
     return
 
@@ -40,7 +42,7 @@ class AristonWaterHeater(CoordinatorEntity, WaterHeaterEntity):
         self,
         coordinator: DeviceDataUpdateCoordinator,
     ) -> None:
-        """Initialize the thermostat."""
+        """Initialize the water heater."""
 
         # Pass coordinator to CoordinatorEntity.
         super().__init__(coordinator)

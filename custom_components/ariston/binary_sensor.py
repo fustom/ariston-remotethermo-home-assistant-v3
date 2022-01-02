@@ -3,13 +3,15 @@ from __future__ import annotations
 
 import logging
 
-from homeassistant.components.binary_sensor import BinarySensorEntity
-from homeassistant.components.sensor import SensorEntityDescription
+from homeassistant.components.binary_sensor import (
+    BinarySensorEntity,
+    BinarySensorEntityDescription,
+)
 from homeassistant.core import HomeAssistant
 from homeassistant.config_entries import ConfigEntry
 from homeassistant.helpers.update_coordinator import CoordinatorEntity
 
-from .const import ARISTON_BINARY_SENSOR_TYPES, DOMAIN
+from .const import ARISTON_BINARY_SENSOR_TYPES, COORDINATOR, DOMAIN
 from .coordinator import DeviceDataUpdateCoordinator
 from .ariston import DeviceAttribute, PropertyType
 
@@ -20,7 +22,9 @@ async def async_setup_entry(
     hass: HomeAssistant, entry: ConfigEntry, async_add_entities
 ) -> None:
     """Set up the Ariston binary sensors from config entry."""
-    coordinator: DeviceDataUpdateCoordinator = hass.data[DOMAIN][entry.unique_id]
+    coordinator: DeviceDataUpdateCoordinator = hass.data[DOMAIN][entry.unique_id][
+        COORDINATOR
+    ]
 
     ariston_binary_sensors: list[AristonBinarySensor] = []
     for description in ARISTON_BINARY_SENSOR_TYPES:
@@ -35,7 +39,7 @@ class AristonBinarySensor(CoordinatorEntity, BinarySensorEntity):
     def __init__(
         self,
         coordinator: DeviceDataUpdateCoordinator,
-        description: SensorEntityDescription,
+        description: BinarySensorEntityDescription,
     ) -> None:
         super().__init__(coordinator)
 

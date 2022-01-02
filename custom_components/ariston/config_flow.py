@@ -10,12 +10,20 @@ from homeassistant import config_entries
 from homeassistant.const import (
     CONF_DEVICE,
     CONF_PASSWORD,
+    CONF_SCAN_INTERVAL,
     CONF_USERNAME,
 )
+from homeassistant.core import callback
 from homeassistant.data_entry_flow import FlowResult
-from homeassistant.exceptions import HomeAssistantError
 
-from .const import DOMAIN
+from .const import (
+    DEFAULT_ENERGY_SCAN_INTERVAL_MINUTES,
+    DEFAULT_EXTRA_ENERGY_FEATURES,
+    DEFAULT_SCAN_INTERVAL_SECONDS,
+    DOMAIN,
+    ENERGY_SCAN_INTERVAL,
+    EXTRA_ENERGY_FEATURES,
+)
 from .ariston import AristonAPI, DeviceAttribute
 
 _LOGGER = logging.getLogger(__name__)
@@ -34,23 +42,10 @@ class AristonConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
     VERSION = 1
 
     def __init__(self):
-        self.api = AristonAPI()
-        self.cloud_username = None
-        self.cloud_password = None
+        self.api: AristonAPI = None
+        self.cloud_username: str = None
+        self.cloud_password: str = None
         self.cloud_devices = {}
-
-    async def try_login(self) -> None:
-        """Validate the user input allows us to connect.
-
-        Data has the keys from STEP_USER_DATA_SCHEMA with values provided by the user.
-        """
-        response = await self.api.async_connect(
-            username=self.cloud_username,
-            password=self.cloud_password,
-        )
-
-        if not response:
-            raise InvalidAuth
 
     async def async_step_user(
         self, user_input: dict[str, Any] | None = None
@@ -66,11 +61,10 @@ class AristonConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
         try:
             self.cloud_username = user_input[CONF_USERNAME]
             self.cloud_password = user_input[CONF_PASSWORD]
-            await self.try_login()
-        except CannotConnect:
-            errors["base"] = "cannot_connect"
-        except InvalidAuth:
-            errors["base"] = "invalid_auth"
+            self.api = AristonAPI(self.cloud_username, self.cloud_password)
+            response = await self.api.async_connect()
+            if not response:
+                errors["base"] = "invalid_auth"
         except Exception:  # pylint: disable=broad-except
             _LOGGER.exception("Unexpected exception")
             errors["base"] = "unknown"
@@ -131,10 +125,51 @@ class AristonConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
             step_id="select", data_schema=select_schema, errors=errors
         )
 
+    @staticmethod
+    @callback
+    def async_get_options_flow(config_entry):
+        """Get the options flow for this handler."""
+        return AristonOptionsFlow(config_entry)
 
-class CannotConnect(HomeAssistantError):
-    """Error to indicate we cannot connect."""
 
+class AristonOptionsFlow(config_entries.OptionsFlow):
+    """Handle Ariston options."""
 
-class InvalidAuth(HomeAssistantError):
-    """Error to indicate there is invalid auth."""
+    def __init__(self, config_entry):
+        """Initialize Ariston options flow."""
+        self.config_entry = config_entry
+
+    async def async_step_init(self, user_input=None):
+        """Manage the options."""
+        if user_input is not None:
+            return self.async_create_entry(title="", data=user_input)
+
+        options = self.config_entry.options
+        extra_energy_features = options.get(
+            EXTRA_ENERGY_FEATURES, DEFAULT_EXTRA_ENERGY_FEATURES
+        )
+        scan_interval = options.get(CONF_SCAN_INTERVAL, DEFAULT_SCAN_INTERVAL_SECONDS)
+        energy_scan_interval = options.get(
+            ENERGY_SCAN_INTERVAL, DEFAULT_ENERGY_SCAN_INTERVAL_MINUTES
+        )
+
+        return self.async_show_form(
+            step_id="init",
+            data_schema=vol.Schema(
+                {
+                    vol.Optional(
+                        EXTRA_ENERGY_FEATURES,
+                        default=extra_energy_features,
+                    ): bool,
+                    vol.Optional(
+                        CONF_SCAN_INTERVAL,
+                        default=scan_interval,
+                    ): int,
+                    vol.Optional(
+                        ENERGY_SCAN_INTERVAL,
+                        default=energy_scan_interval,
+                    ): int,
+                }
+            ),
+            last_step=True,
+        )

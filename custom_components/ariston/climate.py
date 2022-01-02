@@ -3,7 +3,7 @@ from __future__ import annotations
 
 import logging
 
-from .const import DOMAIN
+from .const import COORDINATOR, DOMAIN
 from .coordinator import DeviceDataUpdateCoordinator
 from .ariston import (
     DeviceAttribute,
@@ -46,7 +46,9 @@ async def async_setup_entry(
     hass: HomeAssistant, entry: ConfigEntry, async_add_entities
 ):
     """Set up the Ariston device from config entry."""
-    coordinator: DeviceDataUpdateCoordinator = hass.data[DOMAIN][entry.unique_id]
+    coordinator: DeviceDataUpdateCoordinator = hass.data[DOMAIN][entry.unique_id][
+        COORDINATOR
+    ]
     devs = []
     for zone in coordinator.device.features[DeviceFeatures.ZONES]:
         ariston_zone = AristonBoiler(zone[ZoneAttribute.NUM], coordinator)
@@ -55,14 +57,14 @@ async def async_setup_entry(
 
 
 class AristonBoiler(CoordinatorEntity, ClimateEntity):
-    """Representation of a base Ariston discovery device."""
+    """Ariston Boiler Device."""
 
     def __init__(
         self,
         zone: int,
         coordinator: DeviceDataUpdateCoordinator,
     ) -> None:
-        """Initialize the entity"""
+        """Initialize the boiler"""
         # Pass coordinator to CoordinatorEntity.
         super().__init__(coordinator)
 

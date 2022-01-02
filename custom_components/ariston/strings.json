@@ -17,5 +17,17 @@
       "already_configured": "[%key:common::config_flow::abort::already_configured_device%]",
       "reauth_successful": "[%key:common::config_flow::abort::reauth_successful%]"
     }
+  },
+  "options": {
+    "step": {
+      "init": {
+        "title": "Configure Ariston",
+        "data": {
+          "extra_energy_features": "Extra energy related entities",
+          "scan_interval": "Zone Scan Interval (seconds)",
+          "energy_scan_interval": "Energy Scan Interval (minutes)"
+        }
+      }
+    }
   }
 }

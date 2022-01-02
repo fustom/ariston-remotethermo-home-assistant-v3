@@ -9,7 +9,7 @@ from homeassistant.config_entries import ConfigEntry
 from homeassistant.components.switch import SwitchEntity, SwitchEntityDescription
 
 from .ariston import DeviceAttribute, PropertyType
-from .const import ARISTON_SWITCH_TYPES, DOMAIN
+from .const import ARISTON_SWITCH_TYPES, COORDINATOR, DOMAIN
 from .coordinator import DeviceDataUpdateCoordinator
 
 
@@ -20,7 +20,9 @@ async def async_setup_entry(
     hass: HomeAssistant, entry: ConfigEntry, async_add_entities
 ) -> None:
     """Set up the Ariston switches from config entry."""
-    coordinator: DeviceDataUpdateCoordinator = hass.data[DOMAIN][entry.unique_id]
+    coordinator: DeviceDataUpdateCoordinator = hass.data[DOMAIN][entry.unique_id][
+        COORDINATOR
+    ]
 
     ariston_switches: list[AristonSwitch] = []
     for description in ARISTON_SWITCH_TYPES:
