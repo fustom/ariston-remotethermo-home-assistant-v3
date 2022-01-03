@@ -35,7 +35,7 @@ Use the add integration UI to set up your device.
 
 ![Kazam_screenshot_00011](https://user-images.githubusercontent.com/6751243/147890611-54ae2d28-bf5a-45f8-ba92-e7a00a22615c.png)
 
-![Kazam_screenshot_00006](https://user-images.githubusercontent.com/6751243/146653543-d12ea409-3f8e-4387-bfcc-16dbc393dbb5.png)
+![Kazam_screenshot_00012](https://user-images.githubusercontent.com/6751243/147989103-cdac510f-e6f6-461f-a88e-b8ff0204c34f.png)
 
 | ![Kazam_screenshot_00008](https://user-images.githubusercontent.com/6751243/146653616-3bb5de96-b51d-4579-bf88-c7835a2e48e8.png) | ![Kazam_screenshot_00009](https://user-images.githubusercontent.com/6751243/146657797-ed14b741-595a-48a6-9126-1acca3beb69f.png) |
 :-------------------------:|:-------------------------:
