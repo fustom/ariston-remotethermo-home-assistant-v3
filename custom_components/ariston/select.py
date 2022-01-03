@@ -6,8 +6,8 @@ import logging
 from homeassistant.components.select import SelectEntity
 from homeassistant.core import HomeAssistant
 from homeassistant.config_entries import ConfigEntry
-from homeassistant.helpers.update_coordinator import CoordinatorEntity
 
+from .entity import AristonEntity
 from .const import (
     ARISTON_SELECT_TYPES,
     COORDINATOR,
@@ -15,7 +15,7 @@ from .const import (
     ENERGY_COORDINATOR,
     AristonSelectEntityDescription,
 )
-from .coordinator import DeviceDataUpdateCoordinator
+from .coordinator import DeviceDataUpdateCoordinator, DeviceEnergyUpdateCoordinator
 from .ariston import (
     DeviceAttribute,
     DeviceFeatures,
@@ -38,7 +38,7 @@ async def async_setup_entry(
         coordinator.device.features[DeviceFeatures.HAS_METERING]
         and coordinator.device.extra_energy_features
     ):
-        energy_coordinator: DeviceDataUpdateCoordinator = hass.data[DOMAIN][
+        energy_coordinator: DeviceEnergyUpdateCoordinator = hass.data[DOMAIN][
             entry.unique_id
         ][ENERGY_COORDINATOR]
 
@@ -53,12 +53,12 @@ async def async_setup_entry(
     async_add_entities(ariston_select)
 
 
-class AristonSelect(CoordinatorEntity, SelectEntity):
+class AristonSelect(AristonEntity, SelectEntity):
     """Base class for specific ariston binary sensors"""
 
     def __init__(
         self,
-        coordinator: DeviceDataUpdateCoordinator,
+        coordinator: DeviceEnergyUpdateCoordinator,
         description: AristonSelectEntityDescription,
     ) -> None:
         super().__init__(coordinator)

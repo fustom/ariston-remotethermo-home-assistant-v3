@@ -3,6 +3,7 @@ from __future__ import annotations
 
 import logging
 
+from .entity import AristonEntity
 from .ariston import DeviceAttribute, DeviceFeatures, DeviceProperties, PropertyType
 from .const import ATTR_TARGET_TEMP_STEP, COORDINATOR, DOMAIN
 from .coordinator import DeviceDataUpdateCoordinator
@@ -16,9 +17,6 @@ from homeassistant.components.water_heater import (
 )
 from homeassistant.const import (
     ATTR_TEMPERATURE,
-)
-from homeassistant.helpers.update_coordinator import (
-    CoordinatorEntity,
 )
 
 _LOGGER = logging.getLogger(__name__)
@@ -35,7 +33,7 @@ async def async_setup_entry(
     return
 
 
-class AristonWaterHeater(CoordinatorEntity, WaterHeaterEntity):
+class AristonWaterHeater(AristonEntity, WaterHeaterEntity):
     """Ariston Water Heater Device."""
 
     def __init__(

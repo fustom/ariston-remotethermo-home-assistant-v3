@@ -3,6 +3,7 @@ from __future__ import annotations
 
 import logging
 
+from .entity import AristonEntity
 from .const import COORDINATOR, DOMAIN
 from .coordinator import DeviceDataUpdateCoordinator
 from .ariston import (
@@ -22,8 +23,6 @@ from homeassistant.const import (
     ATTR_TEMPERATURE,
 )
 from homeassistant.components.climate import ClimateEntity
-from homeassistant.helpers.entity import DeviceInfo
-from homeassistant.helpers.update_coordinator import CoordinatorEntity
 from homeassistant.components.climate.const import (
     HVAC_MODE_AUTO,
     HVAC_MODE_HEAT,
@@ -56,7 +55,7 @@ async def async_setup_entry(
     async_add_entities(devs)
 
 
-class AristonBoiler(CoordinatorEntity, ClimateEntity):
+class AristonBoiler(AristonEntity, ClimateEntity):
     """Ariston Boiler Device."""
 
     def __init__(
@@ -81,19 +80,6 @@ class AristonBoiler(CoordinatorEntity, ClimateEntity):
         """Return a unique id for the device."""
         return (
             f"{self.coordinator.device.attributes[DeviceAttribute.GW_ID]}_{self.zone}"
-        )
-
-    @property
-    def device_info(self) -> DeviceInfo:
-        """Return device specific attributes."""
-        return DeviceInfo(
-            identifiers={
-                (DOMAIN, self.coordinator.device.attributes[DeviceAttribute.GW_SERIAL])
-            },
-            manufacturer=DOMAIN,
-            name=self.coordinator.device.attributes[DeviceAttribute.PLANT_NAME],
-            sw_version=self.coordinator.device.attributes[DeviceAttribute.GW_FW_VER],
-            model=self.coordinator.device.attributes[DeviceAttribute.PLANT_NAME],
         )
 
     @property

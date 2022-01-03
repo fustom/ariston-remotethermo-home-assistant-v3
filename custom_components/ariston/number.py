@@ -7,15 +7,15 @@ import sys
 from homeassistant.components.number import NumberEntity, NumberEntityDescription
 from homeassistant.core import HomeAssistant
 from homeassistant.config_entries import ConfigEntry
-from homeassistant.helpers.update_coordinator import CoordinatorEntity
 
+from .entity import AristonEntity
 from .const import (
     ARISTON_NUMBER_TYPES,
     COORDINATOR,
     DOMAIN,
     ENERGY_COORDINATOR,
 )
-from .coordinator import DeviceDataUpdateCoordinator
+from .coordinator import DeviceDataUpdateCoordinator, DeviceEnergyUpdateCoordinator
 from .ariston import (
     DeviceAttribute,
     DeviceFeatures,
@@ -38,7 +38,7 @@ async def async_setup_entry(
         coordinator.device.features[DeviceFeatures.HAS_METERING]
         and coordinator.device.extra_energy_features
     ):
-        energy_coordinator: DeviceDataUpdateCoordinator = hass.data[DOMAIN][
+        energy_coordinator: DeviceEnergyUpdateCoordinator = hass.data[DOMAIN][
             entry.unique_id
         ][ENERGY_COORDINATOR]
 
@@ -53,12 +53,12 @@ async def async_setup_entry(
     async_add_entities(ariston_numbers)
 
 
-class AristonNumber(CoordinatorEntity, NumberEntity):
+class AristonNumber(AristonEntity, NumberEntity):
     """Base class for specific ariston binary sensors"""
 
     def __init__(
         self,
-        coordinator: DeviceDataUpdateCoordinator,
+        coordinator: DeviceEnergyUpdateCoordinator,
         description: NumberEntityDescription,
     ) -> None:
         super().__init__(coordinator)
@@ -80,17 +80,17 @@ class AristonNumber(CoordinatorEntity, NumberEntity):
             self.entity_description.key
         ]
 
-    # Should be removed after HA release the new NumberEntityDescription
+    # Should be removed after HA release the new NumberEntityDescription (https://github.com/home-assistant/core/pull/61100/)
     @property
     def min_value(self) -> float:
         return 0
 
-    # Should be removed after HA release the new NumberEntityDescription
+    # Should be removed after HA release the new NumberEntityDescription (https://github.com/home-assistant/core/pull/61100/)
     @property
     def max_value(self) -> float:
         return sys.maxsize
 
-    # Should be removed after HA release the new NumberEntityDescription
+    # Should be removed after HA release the new NumberEntityDescription (https://github.com/home-assistant/core/pull/61100/)
     @property
     def step(self) -> float:
         return 0.01

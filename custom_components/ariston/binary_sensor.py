@@ -9,8 +9,8 @@ from homeassistant.components.binary_sensor import (
 )
 from homeassistant.core import HomeAssistant
 from homeassistant.config_entries import ConfigEntry
-from homeassistant.helpers.update_coordinator import CoordinatorEntity
 
+from .entity import AristonEntity
 from .const import ARISTON_BINARY_SENSOR_TYPES, COORDINATOR, DOMAIN
 from .coordinator import DeviceDataUpdateCoordinator
 from .ariston import DeviceAttribute, PropertyType
@@ -33,7 +33,7 @@ async def async_setup_entry(
     async_add_entities(ariston_binary_sensors)
 
 
-class AristonBinarySensor(CoordinatorEntity, BinarySensorEntity):
+class AristonBinarySensor(AristonEntity, BinarySensorEntity):
     """Base class for specific ariston binary sensors"""
 
     def __init__(
