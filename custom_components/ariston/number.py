@@ -2,6 +2,7 @@
 from __future__ import annotations
 
 import logging
+import sys
 
 from homeassistant.components.number import NumberEntity, NumberEntityDescription
 from homeassistant.core import HomeAssistant
@@ -78,6 +79,21 @@ class AristonNumber(CoordinatorEntity, NumberEntity):
         return self.coordinator.device.consumptions_settings[
             self.entity_description.key
         ]
+
+    # Should be removed after HA release the new NumberEntityDescription
+    @property
+    def min_value(self) -> float:
+        return 0
+
+    # Should be removed after HA release the new NumberEntityDescription
+    @property
+    def max_value(self) -> float:
+        return sys.maxsize
+
+    # Should be removed after HA release the new NumberEntityDescription
+    @property
+    def step(self) -> float:
+        return 0.01
 
     async def async_set_value(self, value: float):
         """Update the current value."""

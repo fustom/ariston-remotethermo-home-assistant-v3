@@ -1,6 +1,4 @@
 """Constants for the Ariston integration."""
-import sys
-
 from dataclasses import dataclass
 from enum import IntFlag
 from typing import final
@@ -82,18 +80,20 @@ ARISTON_NUMBER_TYPES: tuple[NumberEntityDescription, ...] = (
         name=f"{NAME} elec cost",
         icon="mdi:currency-sign",
         entity_category=EntityCategory.CONFIG,
-        min_value=0,
-        max_value=sys.maxsize,
-        step=0.01,
+        # Currently released HA NumberEntityDescription do not support these fields. Dev branch does.
+        # min_value=0,
+        # max_value=sys.maxsize,
+        # step=0.01,
     ),
     NumberEntityDescription(
         key=ConsumptionProperties.GAS_COST,
         name=f"{NAME} gas cost",
         icon="mdi:currency-sign",
         entity_category=EntityCategory.CONFIG,
-        min_value=0,
-        max_value=sys.maxsize,
-        step=0.01,
+        # Currently released HA NumberEntityDescription do not support these fields. Dev branch does.
+        # min_value=0,
+        # max_value=sys.maxsize,
+        # step=0.01,
     ),
 )
 
