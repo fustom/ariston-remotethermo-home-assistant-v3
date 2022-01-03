@@ -6,9 +6,6 @@ import homeassistant.util.dt as dt_util
 
 from datetime import datetime, timedelta
 
-from homeassistant.helpers.update_coordinator import (
-    CoordinatorEntity,
-)
 from homeassistant.core import HomeAssistant
 from homeassistant.config_entries import ConfigEntry
 from homeassistant.components.sensor import (
@@ -16,6 +13,7 @@ from homeassistant.components.sensor import (
     SensorEntityDescription,
 )
 
+from .entity import AristonEntity
 from .ariston import (
     DeviceAttribute,
     DeviceFeatures,
@@ -31,7 +29,7 @@ from .const import (
     DOMAIN,
     ENERGY_COORDINATOR,
 )
-from .coordinator import DeviceDataUpdateCoordinator
+from .coordinator import DeviceDataUpdateCoordinator, DeviceEnergyUpdateCoordinator
 
 
 _LOGGER = logging.getLogger(__name__)
@@ -55,7 +53,7 @@ async def async_setup_entry(
         )
 
     if coordinator.device.features[DeviceFeatures.HAS_METERING]:
-        energy_coordinator: DeviceDataUpdateCoordinator = hass.data[DOMAIN][
+        energy_coordinator: DeviceEnergyUpdateCoordinator = hass.data[DOMAIN][
             entry.unique_id
         ][ENERGY_COORDINATOR]
         ariston_sensors.append(
@@ -85,7 +83,7 @@ async def async_setup_entry(
     async_add_entities(ariston_sensors)
 
 
-class AristonSensor(CoordinatorEntity, SensorEntity):
+class AristonSensor(AristonEntity, SensorEntity):
     """Base class for specific ariston sensors"""
 
     def __init__(
@@ -122,12 +120,12 @@ class AristonSensor(CoordinatorEntity, SensorEntity):
         )
 
 
-class AristonGasConsumptionLastTwoHours(CoordinatorEntity, SensorEntity):
+class AristonGasConsumptionLastTwoHours(AristonEntity, SensorEntity):
     """Class for specific ariston energy sensors"""
 
     def __init__(
         self,
-        coordinator: DeviceDataUpdateCoordinator,
+        coordinator: DeviceEnergyUpdateCoordinator,
         description: SensorEntityDescription,
     ) -> None:
         """Initialize the sensor."""
@@ -166,12 +164,12 @@ class AristonGasConsumptionLastTwoHours(CoordinatorEntity, SensorEntity):
         return self.reset_datetime
 
 
-class AristonGasEnergyLastMonthSensor(CoordinatorEntity, SensorEntity):
+class AristonGasEnergyLastMonthSensor(AristonEntity, SensorEntity):
     """Class for specific ariston energy sensors"""
 
     def __init__(
         self,
-        coordinator: DeviceDataUpdateCoordinator,
+        coordinator: DeviceEnergyUpdateCoordinator,
         description: SensorEntityDescription,
     ) -> None:
         """Initialize the sensor."""

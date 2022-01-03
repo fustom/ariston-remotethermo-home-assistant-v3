@@ -3,11 +3,11 @@ from __future__ import annotations
 
 import logging
 
-from homeassistant.helpers.update_coordinator import CoordinatorEntity
 from homeassistant.core import HomeAssistant
 from homeassistant.config_entries import ConfigEntry
 from homeassistant.components.switch import SwitchEntity, SwitchEntityDescription
 
+from .entity import AristonEntity
 from .ariston import DeviceAttribute, PropertyType
 from .const import ARISTON_SWITCH_TYPES, COORDINATOR, DOMAIN
 from .coordinator import DeviceDataUpdateCoordinator
@@ -36,7 +36,7 @@ async def async_setup_entry(
     async_add_entities(ariston_switches)
 
 
-class AristonSwitch(CoordinatorEntity, SwitchEntity):
+class AristonSwitch(AristonEntity, SwitchEntity):
     """Base class for specific ariston switches"""
 
     def __init__(
