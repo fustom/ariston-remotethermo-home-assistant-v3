@@ -1,5 +1,6 @@
 """Device class for Ariston module."""
 from __future__ import annotations
+import datetime
 
 import logging
 
@@ -115,3 +116,11 @@ class AristonDevice:
         for item in self.data["items"]:
             if item["id"] == item_id and item[PropertyType.ZONE] == zone_number:
                 item[PropertyType.VALUE] = value
+
+    async def async_set_holiday(self, holiday_end_datetime: datetime):
+        """Set holiday on device"""
+        await self.api.async_set_holiday(
+            self.attributes[DeviceAttribute.GW_ID],
+            holiday_end_datetime,
+            None,
+        )

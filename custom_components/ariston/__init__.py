@@ -2,6 +2,7 @@
 from __future__ import annotations
 
 import logging
+import voluptuous as vol
 
 from .ariston import AristonAPI, DeviceFeatures
 from .coordinator import DeviceDataUpdateCoordinator, DeviceEnergyUpdateCoordinator
@@ -17,9 +18,15 @@ from .const import (
 )
 from .device import AristonDevice
 
+from homeassistant.helpers import (
+    config_validation as cv,
+    device_registry as dr,
+)
+
 from homeassistant.config_entries import ConfigEntry
-from homeassistant.core import HomeAssistant
+from homeassistant.core import HomeAssistant, ServiceCall
 from homeassistant.const import (
+    ATTR_DEVICE_ID,
     CONF_SCAN_INTERVAL,
     Platform,
     CONF_USERNAME,
@@ -37,6 +44,16 @@ PLATFORMS: list[str] = [
     Platform.SELECT,
     Platform.NUMBER,
 ]
+
+SERVICE_CREATE_VACATION = "create_vacation"
+ATTR_END_DATETIME = "end_datetime"
+
+CREATE_VACATION_SCHEMA = vol.Schema(
+    {
+        vol.Required(ATTR_DEVICE_ID): cv.string,
+        vol.Optional(ATTR_END_DATETIME): cv.datetime,
+    }
+)
 
 
 async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
@@ -89,6 +106,27 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
     hass.config_entries.async_setup_platforms(entry, platforms)
 
     entry.async_on_unload(entry.add_update_listener(update_listener))
+
+    async def async_create_vacation_service(service_call: ServiceCall):
+        """Create a vacation on the target device."""
+        device_id = service_call.data[ATTR_DEVICE_ID]
+        end_datetime = service_call.data.get(ATTR_END_DATETIME, None)
+
+        device_registry = dr.async_get(hass)
+        device = device_registry.devices[device_id]
+
+        entry = hass.config_entries.async_get_entry(list(device.config_entries)[0])
+        coordinator: DeviceDataUpdateCoordinator = hass.data[DOMAIN][entry.unique_id][
+            COORDINATOR
+        ]
+        await coordinator.device.async_set_holiday(end_datetime)
+
+    hass.services.async_register(
+        DOMAIN,
+        SERVICE_CREATE_VACATION,
+        async_create_vacation_service,
+        schema=CREATE_VACATION_SCHEMA,
+    )
 
     return True
 
