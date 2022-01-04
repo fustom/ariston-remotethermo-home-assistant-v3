@@ -134,8 +134,8 @@ class AristonGasConsumptionLastTwoHours(AristonEntity, SensorEntity):
 
         self.entity_description = description
         self.coordinator = coordinator
+        self.current_consumptions_sequences = coordinator.device.consumptions_sequences
         self.reset_datetime = None
-        self.current_consumptions_sequences = None
 
     @property
     def unique_id(self):
