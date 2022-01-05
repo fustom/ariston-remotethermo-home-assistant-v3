@@ -1,10 +1,10 @@
 """Device class for Ariston module."""
 from __future__ import annotations
-import datetime
 
 import logging
 
 from typing import Any
+from datetime import date
 
 from .ariston import (
     AristonAPI,
@@ -96,7 +96,7 @@ class AristonDevice:
     ):
         """Get item attribute from data"""
         return [
-            item[item_value]
+            item.get(item_value, None)
             for item in self.data["items"]
             if item["id"] == item_id and item[PropertyType.ZONE] == zone_number
         ][0]
@@ -116,11 +116,23 @@ class AristonDevice:
         for item in self.data["items"]:
             if item["id"] == item_id and item[PropertyType.ZONE] == zone_number:
                 item[PropertyType.VALUE] = value
+                break
 
-    async def async_set_holiday(self, holiday_end_datetime: datetime):
+    async def async_set_holiday(self, holiday_end: date):
         """Set holiday on device"""
+        holiday_end_date = (
+            None if holiday_end is None else holiday_end.strftime("%Y-%m-%dT00:00:00")
+        )
+
         await self.api.async_set_holiday(
             self.attributes[DeviceAttribute.GW_ID],
-            holiday_end_datetime,
-            None,
+            holiday_end_date,
         )
+
+        for item in self.data["items"]:
+            if item["id"] == DeviceProperties.HOLIDAY:
+                item[PropertyType.VALUE] = False if holiday_end_date is None else True
+                item[PropertyType.EXPIRES_ON] = (
+                    None if holiday_end_date is None else holiday_end_date
+                )
+                break

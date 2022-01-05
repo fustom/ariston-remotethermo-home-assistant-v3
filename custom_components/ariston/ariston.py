@@ -5,7 +5,7 @@ import aiohttp
 import logging
 
 from typing import Any, final
-from datetime import datetime
+from datetime import date
 from enum import IntFlag, unique
 
 ARISTON_API_URL: final = "https://www.ariston-net.remotethermo.com/api/v2/"
@@ -232,6 +232,7 @@ class PropertyType:
     STEP: final = "step"
     DECIMALS: final = "decimals"
     ZONE: final = "zone"
+    EXPIRES_ON: final = "expiresOn"
 
 
 class AristonAPI:
@@ -380,26 +381,14 @@ class AristonAPI:
     async def async_set_holiday(
         self,
         gw_id: str,
-        holiday_end_datetime: datetime,
-        current_holiday_end_datetime: datetime,
+        holiday_end_date: date,
     ) -> None:
         """Set holidays"""
-        holiday_end = (
-            None
-            if holiday_end_datetime is None
-            else holiday_end_datetime.strftime("%Y-%m-%dT%H:%M:%S")
-        )
-        current_holiday_end = (
-            None
-            if current_holiday_end_datetime is None
-            else current_holiday_end_datetime.strftime("%Y-%m-%dT%H:%M:%S")
-        )
 
         await self.post(
             f"{ARISTON_API_URL}/{ARISTON_REMOTE}/{ARISTON_PLANT_DATA}/{gw_id}/holiday",
             {
-                "new": holiday_end,
-                "old": current_holiday_end,
+                "new": holiday_end_date,
             },
         )
 

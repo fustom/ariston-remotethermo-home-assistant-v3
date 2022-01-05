@@ -36,6 +36,7 @@ DEFAULT_ENERGY_SCAN_INTERVAL_MINUTES: final = 60
 DEFAULT_EXTRA_ENERGY_FEATURES: final = False
 
 ATTR_TARGET_TEMP_STEP = "target_temp_step"
+ATTR_EXPIRES_ON = "expires_on"
 
 ARISTON_SENSOR_TYPES: tuple[SensorEntityDescription, ...] = (
     SensorEntityDescription(

@@ -1,7 +1,7 @@
 create_vacation:
   name: Create vacation
   description: >-
-    Create a vacation on the selected device. If end datetime is not specified, the
+    Create a vacation on the selected device. If end date is not specified, the
     vacation is going to be deleted.
   fields:
     device_id:
@@ -12,9 +12,8 @@ create_vacation:
         device:
           integration: ariston
           domain: climate
-    end_datetime:
+    end_date:
       name: End date
-      description: >-
-        Datetime the vacation ends in the YYYY-mm-dd HH:MM:SS format.
+      description: Date the vacation ends in the YYYY-mm-dd format.
       selector:
         text:
