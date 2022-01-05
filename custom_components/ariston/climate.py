@@ -266,11 +266,11 @@ class AristonBoiler(AristonEntity, ClimateEntity):
 
         if hvac_mode == HVAC_MODE_OFF:
             if PlantMode.OFF in plant_modes:
-                await self.coordinator.device.set_item_by_id(
+                await self.coordinator.device.async_set_item_by_id(
                     DeviceProperties.PLANT_MODE, PlantMode.OFF
                 )
             else:
-                await self.coordinator.device.set_item_by_id(
+                await self.coordinator.device.async_set_item_by_id(
                     DeviceProperties.PLANT_MODE, PlantMode.SUMMER
                 )
         elif hvac_mode == HVAC_MODE_AUTO:
@@ -283,20 +283,20 @@ class AristonBoiler(AristonEntity, ClimateEntity):
                 pass
             elif current_plant_mode == PlantMode.SUMMER:
                 # DHW is working, so use Winter where CH and DHW are active
-                await self.coordinator.device.set_item_by_id(
+                await self.coordinator.device.async_set_item_by_id(
                     DeviceProperties.PLANT_MODE, PlantMode.WINTER
                 )
             else:
                 # hvac is OFF, so use heating only, if not supported then winter
                 if PlantMode.HEATING_ONLY in plant_modes:
-                    await self.coordinator.device.set_item_by_id(
+                    await self.coordinator.device.async_set_item_by_id(
                         DeviceProperties.PLANT_MODE, PlantMode.HEATING_ONLY
                     )
                 else:
-                    await self.coordinator.device.set_item_by_id(
+                    await self.coordinator.device.async_set_item_by_id(
                         DeviceProperties.PLANT_MODE, PlantMode.WINTER
                     )
-            await self.coordinator.device.set_item_by_id(
+            await self.coordinator.device.async_set_item_by_id(
                 ThermostatProperties.ZONE_MODE, ZoneMode.TIME_PROGRAM, self.zone
             )
         elif hvac_mode == HVAC_MODE_HEAT:
@@ -305,37 +305,37 @@ class AristonBoiler(AristonEntity, ClimateEntity):
                 pass
             elif current_plant_mode in [PlantMode.SUMMER, PlantMode.COOLING]:
                 # DHW is working, so use Winter and change mode
-                await self.coordinator.device.set_item_by_id(
+                await self.coordinator.device.async_set_item_by_id(
                     DeviceProperties.PLANT_MODE, PlantMode.WINTER
                 )
             else:
                 # hvac is OFF, so use heating only, if not supported then winter
                 if PlantMode.HEATING_ONLY in plant_modes:
-                    await self.coordinator.device.set_item_by_id(
+                    await self.coordinator.device.async_set_item_by_id(
                         DeviceProperties.PLANT_MODE, PlantMode.HEATING_ONLY
                     )
                 else:
-                    await self.coordinator.device.set_item_by_id(
+                    await self.coordinator.device.async_set_item_by_id(
                         DeviceProperties.PLANT_MODE, PlantMode.WINTER
                     )
             if ZoneMode.MANUAL2 in zone_modes:
-                await self.coordinator.device.set_item_by_id(
+                await self.coordinator.device.async_set_item_by_id(
                     ThermostatProperties.ZONE_MODE, ZoneMode.MANUAL2, self.zone
                 )
             else:
-                await self.coordinator.device.set_item_by_id(
+                await self.coordinator.device.async_set_item_by_id(
                     ThermostatProperties.ZONE_MODE, ZoneMode.MANUAL, self.zone
                 )
         elif hvac_mode == HVAC_MODE_COOL:
-            await self.coordinator.device.set_item_by_id(
+            await self.coordinator.device.async_set_item_by_id(
                 DeviceProperties.PLANT_MODE, PlantMode.COOLING
             )
             if ZoneMode.MANUAL2 in zone_modes:
-                await self.coordinator.device.set_item_by_id(
+                await self.coordinator.device.async_set_item_by_id(
                     ThermostatProperties.ZONE_MODE, ZoneMode.MANUAL2, self.zone
                 )
             else:
-                await self.coordinator.device.set_item_by_id(
+                await self.coordinator.device.async_set_item_by_id(
                     ThermostatProperties.ZONE_MODE, ZoneMode.MANUAL, self.zone
                 )
         self.async_write_ha_state()
@@ -348,7 +348,7 @@ class AristonBoiler(AristonEntity, ClimateEntity):
             self.name,
         )
 
-        await self.coordinator.device.set_item_by_id(
+        await self.coordinator.device.async_set_item_by_id(
             DeviceProperties.PLANT_MODE,
             PlantMode(
                 self.coordinator.device.get_item_by_id(
@@ -370,7 +370,7 @@ class AristonBoiler(AristonEntity, ClimateEntity):
             self.name,
         )
 
-        await self.coordinator.device.set_item_by_id(
+        await self.coordinator.device.async_set_item_by_id(
             ThermostatProperties.ZONE_COMFORT_TEMP, temperature, self.zone
         )
         self.async_write_ha_state()

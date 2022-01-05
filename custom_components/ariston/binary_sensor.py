@@ -6,7 +6,6 @@ import voluptuous as vol
 
 from homeassistant.components.binary_sensor import (
     BinarySensorEntity,
-    BinarySensorEntityDescription,
 )
 from homeassistant.const import ATTR_DEVICE_ID
 from homeassistant.core import HomeAssistant
@@ -19,9 +18,9 @@ from homeassistant.helpers import (
 from .entity import AristonEntity
 from .const import (
     ARISTON_BINARY_SENSOR_TYPES,
-    ATTR_EXPIRES_ON,
     COORDINATOR,
     DOMAIN,
+    AristonBinarySensorEntityDescription,
 )
 from .coordinator import DeviceDataUpdateCoordinator
 from .ariston import (
@@ -88,11 +87,11 @@ class AristonBinarySensor(AristonEntity, BinarySensorEntity):
     def __init__(
         self,
         coordinator: DeviceDataUpdateCoordinator,
-        description: BinarySensorEntityDescription,
+        description: AristonBinarySensorEntityDescription,
     ) -> None:
         super().__init__(coordinator)
 
-        self.entity_description = description
+        self.entity_description: AristonBinarySensorEntityDescription = description
         self.coordinator = coordinator
 
     @property
@@ -112,10 +111,13 @@ class AristonBinarySensor(AristonEntity, BinarySensorEntity):
     @property
     def extra_state_attributes(self):
         """Return the holiday end date."""
-        expires_on = self.coordinator.device.get_item_by_id(
-            self.entity_description.key, PropertyType.EXPIRES_ON
-        )
-        if expires_on is None:
-            return None
+        state_attributes = {}
 
-        return {ATTR_EXPIRES_ON: expires_on}
+        for extra_state in self.entity_description.extra_states:
+            state_attribute = self.coordinator.device.get_item_by_id(
+                self.entity_description.key, extra_state
+            )
+            if state_attribute is not None:
+                state_attributes[extra_state] = state_attribute
+
+        return state_attributes

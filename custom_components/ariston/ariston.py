@@ -386,7 +386,7 @@ class AristonAPI:
         """Set holidays"""
 
         await self.post(
-            f"{ARISTON_API_URL}/{ARISTON_REMOTE}/{ARISTON_PLANT_DATA}/{gw_id}/holiday",
+            f"{ARISTON_API_URL}{ARISTON_REMOTE}/{ARISTON_PLANT_DATA}/{gw_id}/holiday",
             {
                 "new": holiday_end_date,
             },

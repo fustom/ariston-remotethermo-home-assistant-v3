@@ -101,7 +101,9 @@ class AristonDevice:
             if item["id"] == item_id and item[PropertyType.ZONE] == zone_number
         ][0]
 
-    async def set_item_by_id(self, item_id: str, value: float, zone_number: int = 0):
+    async def async_set_item_by_id(
+        self, item_id: str, value: float, zone_number: int = 0
+    ):
         """Set item attribute on device"""
         current_value = self.get_item_by_id(item_id, PropertyType.VALUE, zone_number)
         await self.api.async_set_property(

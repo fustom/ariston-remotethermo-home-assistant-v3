@@ -1,5 +1,5 @@
 """Constants for the Ariston integration."""
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from enum import IntFlag
 from typing import final
 
@@ -21,6 +21,7 @@ from .ariston import (
     DeviceProperties,
     GasEnergyUnit,
     GasType,
+    PropertyType,
 )
 
 
@@ -36,7 +37,6 @@ DEFAULT_ENERGY_SCAN_INTERVAL_MINUTES: final = 60
 DEFAULT_EXTRA_ENERGY_FEATURES: final = False
 
 ATTR_TARGET_TEMP_STEP = "target_temp_step"
-ATTR_EXPIRES_ON = "expires_on"
 
 ARISTON_SENSOR_TYPES: tuple[SensorEntityDescription, ...] = (
     SensorEntityDescription(
@@ -54,16 +54,23 @@ ARISTON_SENSOR_TYPES: tuple[SensorEntityDescription, ...] = (
     ),
 )
 
-ARISTON_BINARY_SENSOR_TYPES: tuple[BinarySensorEntityDescription, ...] = (
-    BinarySensorEntityDescription(
+
+@dataclass
+class AristonBinarySensorEntityDescription(BinarySensorEntityDescription):
+    extra_states: list = field(default_factory=list)
+
+
+ARISTON_BINARY_SENSOR_TYPES: tuple[AristonBinarySensorEntityDescription, ...] = (
+    AristonBinarySensorEntityDescription(
         key=DeviceProperties.IS_FLAME_ON,
         name=f"{NAME} is flame on",
         icon="mdi:fire",
     ),
-    BinarySensorEntityDescription(
+    AristonBinarySensorEntityDescription(
         key=DeviceProperties.HOLIDAY,
         name=f"{NAME} holiday mode",
         icon="mdi:island",
+        extra_states=[PropertyType.EXPIRES_ON],
     ),
 )
 

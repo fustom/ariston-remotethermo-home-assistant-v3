@@ -155,14 +155,14 @@ class AristonWaterHeater(AristonEntity, WaterHeaterEntity):
             self.name,
         )
 
-        await self.coordinator.device.set_item_by_id(
+        await self.coordinator.device.async_set_item_by_id(
             DeviceProperties.DHW_TEMP, temperature
         )
         self.async_write_ha_state()
 
     async def async_set_operation_mode(self, operation_mode):
         """Set operation mode."""
-        await self.coordinator.device.set_item_by_id(
+        await self.coordinator.device.async_set_item_by_id(
             DeviceProperties.DHW_MODE,
             self.coordinator.device.get_item_by_id(
                 DeviceProperties.DHW_MODE, PropertyType.OPT_TEXTS
