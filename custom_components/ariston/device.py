@@ -138,3 +138,19 @@ class AristonDevice:
                     None if holiday_end_date is None else holiday_end_date
                 )
                 break
+
+    def are_device_features_available(
+        self, device_features, extra_energy_feature
+    ) -> bool:
+        """Checks features availability"""
+        if extra_energy_feature and not self.extra_energy_features:
+            return False
+
+        if device_features is None:
+            return True
+
+        for device_feature in device_features:
+            if self.features[device_feature] is not True:
+                return False
+
+        return True

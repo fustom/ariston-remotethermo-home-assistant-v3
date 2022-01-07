@@ -22,7 +22,7 @@ from .const import (
     DOMAIN,
     AristonBinarySensorEntityDescription,
 )
-from .coordinator import DeviceDataUpdateCoordinator
+from .coordinator import DeviceDataUpdateCoordinator, DeviceEnergyUpdateCoordinator
 from .ariston import (
     DeviceAttribute,
     DeviceProperties,
@@ -46,13 +46,15 @@ async def async_setup_entry(
     hass: HomeAssistant, entry: ConfigEntry, async_add_entities
 ) -> None:
     """Set up the Ariston binary sensors from config entry."""
-    coordinator: DeviceDataUpdateCoordinator = hass.data[DOMAIN][entry.unique_id][
-        COORDINATOR
-    ]
-
     ariston_binary_sensors: list[AristonBinarySensor] = []
     for description in ARISTON_BINARY_SENSOR_TYPES:
-        ariston_binary_sensors.append(AristonBinarySensor(coordinator, description))
+        coordinator: DeviceDataUpdateCoordinator or DeviceEnergyUpdateCoordinator = (
+            hass.data[DOMAIN][entry.unique_id][description.coordinator]
+        )
+        if coordinator.device.are_device_features_available(
+            description.device_features, description.extra_energy_feature
+        ):
+            ariston_binary_sensors.append(AristonBinarySensor(coordinator, description))
 
     async_add_entities(ariston_binary_sensors)
 
@@ -86,7 +88,7 @@ class AristonBinarySensor(AristonEntity, BinarySensorEntity):
 
     def __init__(
         self,
-        coordinator: DeviceDataUpdateCoordinator,
+        coordinator: DeviceDataUpdateCoordinator or DeviceEnergyUpdateCoordinator,
         description: AristonBinarySensorEntityDescription,
     ) -> None:
         super().__init__(coordinator)
@@ -112,6 +114,9 @@ class AristonBinarySensor(AristonEntity, BinarySensorEntity):
     def extra_state_attributes(self):
         """Return the holiday end date."""
         state_attributes = {}
+
+        if self.entity_description.extra_states is None:
+            return None
 
         for extra_state in self.entity_description.extra_states:
             state_attribute = self.coordinator.device.get_item_by_id(

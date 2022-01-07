@@ -1,5 +1,6 @@
 """Constants for the Ariston integration."""
-from dataclasses import dataclass, field
+from abc import ABC
+from dataclasses import dataclass
 from enum import IntFlag
 from typing import final
 
@@ -13,11 +14,12 @@ from homeassistant.components.sensor import (
 )
 from homeassistant.components.switch import SwitchEntityDescription
 from homeassistant.const import ENERGY_KILO_WATT_HOUR
-from homeassistant.helpers.entity import EntityCategory
+from homeassistant.helpers.entity import EntityCategory, EntityDescription
 
 from .ariston import (
     ConsumptionProperties,
     Currency,
+    DeviceFeatures,
     DeviceProperties,
     GasEnergyUnit,
     GasType,
@@ -38,26 +40,70 @@ DEFAULT_EXTRA_ENERGY_FEATURES: final = False
 
 ATTR_TARGET_TEMP_STEP = "target_temp_step"
 
-ARISTON_SENSOR_TYPES: tuple[SensorEntityDescription, ...] = (
-    SensorEntityDescription(
+
+@dataclass
+class AristonBaseEntityDescription(EntityDescription, ABC):
+    """An abstract class that describes Ariston entites"""
+
+    device_features: list[DeviceFeatures] or None = None
+    coordinator: str = COORDINATOR
+    extra_energy_feature: bool = False
+
+
+@dataclass
+class AristonBinarySensorEntityDescription(
+    BinarySensorEntityDescription, AristonBaseEntityDescription
+):
+    """A class that describes binary sensor entities."""
+
+    extra_states: list[str] or None = None
+
+
+@dataclass
+class AristonSwitchEntityDescription(
+    SwitchEntityDescription, AristonBaseEntityDescription
+):
+    """A class that describes switch entities."""
+
+
+@dataclass
+class AristonNumberEntityDescription(
+    NumberEntityDescription, AristonBaseEntityDescription
+):
+    """A class that describes switch entities."""
+
+
+@dataclass
+class AristonSensorEntityDescription(
+    SensorEntityDescription, AristonBaseEntityDescription
+):
+    """A class that describes sensor entities."""
+
+
+@dataclass
+class AristonSelectEntityDescription(
+    SelectEntityDescription, AristonBaseEntityDescription
+):
+    """A class that describes select entities."""
+
+    enum_class: IntFlag or None = 0
+
+
+ARISTON_SENSOR_TYPES: tuple[AristonSensorEntityDescription, ...] = (
+    AristonSensorEntityDescription(
         key=DeviceProperties.HEATING_CIRCUIT_PRESSURE,
         name=f"{NAME} heating circuit pressure",
         device_class=SensorDeviceClass.PRESSURE,
         entity_category=EntityCategory.DIAGNOSTIC,
         state_class=SensorStateClass.MEASUREMENT,
     ),
-    SensorEntityDescription(
+    AristonSensorEntityDescription(
         key=DeviceProperties.CH_FLOW_SETPOINT_TEMP,
         name=f"{NAME} CH flow setpoint temp",
         device_class=SensorDeviceClass.TEMPERATURE,
         state_class=SensorStateClass.MEASUREMENT,
     ),
 )
-
-
-@dataclass
-class AristonBinarySensorEntityDescription(BinarySensorEntityDescription):
-    extra_states: list = field(default_factory=list)
 
 
 ARISTON_BINARY_SENSOR_TYPES: tuple[AristonBinarySensorEntityDescription, ...] = (
@@ -70,20 +116,22 @@ ARISTON_BINARY_SENSOR_TYPES: tuple[AristonBinarySensorEntityDescription, ...] = 
         key=DeviceProperties.HOLIDAY,
         name=f"{NAME} holiday mode",
         icon="mdi:island",
-        extra_states=[PropertyType.EXPIRES_ON],
+        extra_states={PropertyType.EXPIRES_ON},
     ),
 )
 
-ARISTON_SWITCH_TYPES: tuple[SwitchEntityDescription, ...] = (
-    SwitchEntityDescription(
+
+ARISTON_SWITCH_TYPES: tuple[AristonSwitchEntityDescription, ...] = (
+    AristonSwitchEntityDescription(
         key=DeviceProperties.AUTOMATIC_THERMOREGULATION,
         name=f"{NAME} automatic thermoregulation",
         icon="mdi:radiator",
+        device_features={DeviceFeatures.AUTO_THERMO_REG},
     ),
 )
 
-ARISTON_NUMBER_TYPES: tuple[NumberEntityDescription, ...] = (
-    NumberEntityDescription(
+ARISTON_NUMBER_TYPES: tuple[AristonNumberEntityDescription, ...] = (
+    AristonNumberEntityDescription(
         key=ConsumptionProperties.ELEC_COST,
         name=f"{NAME} elec cost",
         icon="mdi:currency-sign",
@@ -92,8 +140,11 @@ ARISTON_NUMBER_TYPES: tuple[NumberEntityDescription, ...] = (
         # min_value=0,
         # max_value=sys.maxsize,
         # step=0.01,
+        device_features={DeviceFeatures.HAS_METERING},
+        coordinator=ENERGY_COORDINATOR,
+        extra_energy_feature=True,
     ),
-    NumberEntityDescription(
+    AristonNumberEntityDescription(
         key=ConsumptionProperties.GAS_COST,
         name=f"{NAME} gas cost",
         icon="mdi:currency-sign",
@@ -102,15 +153,11 @@ ARISTON_NUMBER_TYPES: tuple[NumberEntityDescription, ...] = (
         # min_value=0,
         # max_value=sys.maxsize,
         # step=0.01,
+        device_features={DeviceFeatures.HAS_METERING},
+        coordinator=ENERGY_COORDINATOR,
+        extra_energy_feature=True,
     ),
 )
-
-
-@dataclass
-class AristonSelectEntityDescription(SelectEntityDescription):
-    """A class that describes select entities."""
-
-    enum_class: IntFlag or None = 0
 
 
 ARISTON_SELECT_TYPES: tuple[AristonSelectEntityDescription, ...] = (
@@ -121,6 +168,9 @@ ARISTON_SELECT_TYPES: tuple[AristonSelectEntityDescription, ...] = (
         device_class=SensorDeviceClass.MONETARY,
         entity_category=EntityCategory.CONFIG,
         enum_class=Currency,
+        device_features={DeviceFeatures.HAS_METERING},
+        coordinator=ENERGY_COORDINATOR,
+        extra_energy_feature=True,
     ),
     AristonSelectEntityDescription(
         key=ConsumptionProperties.GAS_TYPE,
@@ -128,6 +178,9 @@ ARISTON_SELECT_TYPES: tuple[AristonSelectEntityDescription, ...] = (
         icon="mdi:gas-cylinder",
         entity_category=EntityCategory.CONFIG,
         enum_class=GasType,
+        device_features={DeviceFeatures.HAS_METERING},
+        coordinator=ENERGY_COORDINATOR,
+        extra_energy_feature=True,
     ),
     AristonSelectEntityDescription(
         key=ConsumptionProperties.GAS_ENERGY_UNIT,
@@ -135,67 +188,84 @@ ARISTON_SELECT_TYPES: tuple[AristonSelectEntityDescription, ...] = (
         icon="mdi:cube-scan",
         entity_category=EntityCategory.CONFIG,
         enum_class=GasEnergyUnit,
+        device_features={DeviceFeatures.HAS_METERING},
+        coordinator=ENERGY_COORDINATOR,
+        extra_energy_feature=True,
     ),
 )
 
-ARISTON_GAS_CONSUMPTION_HEATING_LAST_TWO_HOURS_TYPE = SensorEntityDescription(
-    key="0",
-    name=f"{NAME} gas consumption for heating last two hours",
-    icon="mdi:cash",
-    entity_category=EntityCategory.DIAGNOSTIC,
-    state_class=SensorStateClass.TOTAL,
-    device_class=SensorDeviceClass.ENERGY,
-    native_unit_of_measurement=ENERGY_KILO_WATT_HOUR,
-)
-
-ARISTON_GAS_CONSUMPTION_WATER_LAST_TWO_HOURS_TYPE = SensorEntityDescription(
-    key="4",
-    name=f"{NAME} gas consumption for water last two hours",
-    icon="mdi:cash",
-    entity_category=EntityCategory.DIAGNOSTIC,
-    state_class=SensorStateClass.TOTAL,
-    device_class=SensorDeviceClass.ENERGY,
-    native_unit_of_measurement=ENERGY_KILO_WATT_HOUR,
-)
-
-ARISTON_HEATING_CONSUMPTION_LAST_MONTH_SENSORS_TYPES: tuple[
-    SensorEntityDescription, ...
+ARISTON_GAS_CONSUMPTION_LAST_TWO_HOURS_TYPE: tuple[
+    AristonSensorEntityDescription, ...
 ] = (
-    SensorEntityDescription(
+    AristonSensorEntityDescription(
+        key="0",
+        name=f"{NAME} gas consumption for heating last two hours",
+        icon="mdi:cash",
+        entity_category=EntityCategory.DIAGNOSTIC,
+        state_class=SensorStateClass.TOTAL,
+        device_class=SensorDeviceClass.ENERGY,
+        native_unit_of_measurement=ENERGY_KILO_WATT_HOUR,
+        device_features={DeviceFeatures.HAS_METERING},
+        coordinator=ENERGY_COORDINATOR,
+    ),
+    AristonSensorEntityDescription(
+        key="4",
+        name=f"{NAME} gas consumption for water last two hours",
+        icon="mdi:cash",
+        entity_category=EntityCategory.DIAGNOSTIC,
+        state_class=SensorStateClass.TOTAL,
+        device_class=SensorDeviceClass.ENERGY,
+        native_unit_of_measurement=ENERGY_KILO_WATT_HOUR,
+        device_features={DeviceFeatures.HAS_METERING, DeviceFeatures.HAS_BOILER},
+        coordinator=ENERGY_COORDINATOR,
+    ),
+)
+
+ARISTON_CONSUMPTION_LAST_MONTH_SENSORS_TYPES: tuple[
+    AristonSensorEntityDescription, ...
+] = (
+    AristonSensorEntityDescription(
         key="0|gas",
         name=f"{NAME} gas consumption for heating last month",
         icon="mdi:cash",
         entity_category=EntityCategory.DIAGNOSTIC,
         device_class=SensorDeviceClass.ENERGY,
         native_unit_of_measurement=ENERGY_KILO_WATT_HOUR,
+        device_features={DeviceFeatures.HAS_METERING},
+        coordinator=ENERGY_COORDINATOR,
+        extra_energy_feature=True,
     ),
-    SensorEntityDescription(
+    AristonSensorEntityDescription(
         key="0|elect",
         name=f"{NAME} electricity consumption for heating last month",
         icon="mdi:cash",
         entity_category=EntityCategory.DIAGNOSTIC,
         device_class=SensorDeviceClass.ENERGY,
         native_unit_of_measurement=ENERGY_KILO_WATT_HOUR,
+        device_features={DeviceFeatures.HAS_METERING},
+        coordinator=ENERGY_COORDINATOR,
+        extra_energy_feature=True,
     ),
-)
-
-ARISTON_WATER_CONSUMPTION_LAST_MONTH_SENSORS_TYPES: tuple[
-    SensorEntityDescription, ...
-] = (
-    SensorEntityDescription(
+    AristonSensorEntityDescription(
         key="1|gas",
         name=f"{NAME} gas consumption for water last month",
         icon="mdi:cash",
         entity_category=EntityCategory.DIAGNOSTIC,
         device_class=SensorDeviceClass.ENERGY,
         native_unit_of_measurement=ENERGY_KILO_WATT_HOUR,
+        device_features={DeviceFeatures.HAS_METERING, DeviceFeatures.HAS_BOILER},
+        coordinator=ENERGY_COORDINATOR,
+        extra_energy_feature=True,
     ),
-    SensorEntityDescription(
+    AristonSensorEntityDescription(
         key="1|elect",
         name=f"{NAME} electricity consumption for water last month",
         icon="mdi:cash",
         entity_category=EntityCategory.DIAGNOSTIC,
         device_class=SensorDeviceClass.ENERGY,
         native_unit_of_measurement=ENERGY_KILO_WATT_HOUR,
+        device_features={DeviceFeatures.HAS_METERING, DeviceFeatures.HAS_BOILER},
+        coordinator=ENERGY_COORDINATOR,
+        extra_energy_feature=True,
     ),
 )

@@ -8,26 +8,19 @@ from datetime import datetime, timedelta
 
 from homeassistant.core import HomeAssistant
 from homeassistant.config_entries import ConfigEntry
-from homeassistant.components.sensor import (
-    SensorEntity,
-    SensorEntityDescription,
-)
+from homeassistant.components.sensor import SensorEntity
 
 from .entity import AristonEntity
 from .ariston import (
     DeviceAttribute,
-    DeviceFeatures,
     PropertyType,
 )
 from .const import (
-    ARISTON_HEATING_CONSUMPTION_LAST_MONTH_SENSORS_TYPES,
-    ARISTON_WATER_CONSUMPTION_LAST_MONTH_SENSORS_TYPES,
-    ARISTON_GAS_CONSUMPTION_HEATING_LAST_TWO_HOURS_TYPE,
-    ARISTON_GAS_CONSUMPTION_WATER_LAST_TWO_HOURS_TYPE,
+    ARISTON_CONSUMPTION_LAST_MONTH_SENSORS_TYPES,
+    ARISTON_GAS_CONSUMPTION_LAST_TWO_HOURS_TYPE,
     ARISTON_SENSOR_TYPES,
-    COORDINATOR,
     DOMAIN,
-    ENERGY_COORDINATOR,
+    AristonSensorEntityDescription,
 )
 from .coordinator import DeviceDataUpdateCoordinator, DeviceEnergyUpdateCoordinator
 
@@ -39,46 +32,36 @@ async def async_setup_entry(
     hass: HomeAssistant, entry: ConfigEntry, async_add_entities
 ) -> None:
     """Set up the Ariston sensors from config entry."""
-    coordinator: DeviceDataUpdateCoordinator = hass.data[DOMAIN][entry.unique_id][
-        COORDINATOR
-    ]
+    ariston_sensors = []
 
-    ariston_sensors: list[AristonSensor] = []
-    for description in ARISTON_SENSOR_TYPES:
-        ariston_sensors.append(
-            AristonSensor(
-                coordinator,
-                description,
-            )
+    def add_sensor(
+        description: AristonSensorEntityDescription,
+        sensor_class: AristonSensor
+        or AristonGasConsumptionLastTwoHoursSensor
+        or AristonEnergyLastMonthSensor,
+    ):
+        """Add new sensor instance to the sensors list if available"""
+        coordinator: DeviceDataUpdateCoordinator or DeviceEnergyUpdateCoordinator = (
+            hass.data[DOMAIN][entry.unique_id][description.coordinator]
         )
-
-    if coordinator.device.features[DeviceFeatures.HAS_METERING]:
-        energy_coordinator: DeviceEnergyUpdateCoordinator = hass.data[DOMAIN][
-            entry.unique_id
-        ][ENERGY_COORDINATOR]
-        ariston_sensors.append(
-            AristonGasConsumptionLastTwoHours(
-                energy_coordinator, ARISTON_GAS_CONSUMPTION_HEATING_LAST_TWO_HOURS_TYPE
-            )
-        )
-        if coordinator.device.extra_energy_features:
-            for description in ARISTON_HEATING_CONSUMPTION_LAST_MONTH_SENSORS_TYPES:
-                ariston_sensors.append(
-                    AristonGasEnergyLastMonthSensor(energy_coordinator, description)
-                )
-
-        if coordinator.device.features[DeviceFeatures.HAS_BOILER]:
+        if coordinator.device.are_device_features_available(
+            description.device_features, description.extra_energy_feature
+        ):
             ariston_sensors.append(
-                AristonGasConsumptionLastTwoHours(
-                    energy_coordinator,
-                    ARISTON_GAS_CONSUMPTION_WATER_LAST_TWO_HOURS_TYPE,
+                sensor_class(
+                    coordinator,
+                    description,
                 )
             )
-            if coordinator.device.extra_energy_features:
-                for description in ARISTON_WATER_CONSUMPTION_LAST_MONTH_SENSORS_TYPES:
-                    ariston_sensors.append(
-                        AristonGasEnergyLastMonthSensor(energy_coordinator, description)
-                    )
+
+    for description in ARISTON_SENSOR_TYPES:
+        add_sensor(description, AristonSensor)
+
+    for description in ARISTON_GAS_CONSUMPTION_LAST_TWO_HOURS_TYPE:
+        add_sensor(description, AristonGasConsumptionLastTwoHoursSensor)
+
+    for description in ARISTON_CONSUMPTION_LAST_MONTH_SENSORS_TYPES:
+        add_sensor(description, AristonEnergyLastMonthSensor)
 
     async_add_entities(ariston_sensors)
 
@@ -88,8 +71,8 @@ class AristonSensor(AristonEntity, SensorEntity):
 
     def __init__(
         self,
-        coordinator: DeviceDataUpdateCoordinator,
-        description: SensorEntityDescription,
+        coordinator: DeviceDataUpdateCoordinator or DeviceEnergyUpdateCoordinator,
+        description: AristonSensorEntityDescription,
     ) -> None:
         """Initialize the sensor."""
         # Pass coordinator to CoordinatorEntity.
@@ -120,13 +103,13 @@ class AristonSensor(AristonEntity, SensorEntity):
         )
 
 
-class AristonGasConsumptionLastTwoHours(AristonEntity, SensorEntity):
+class AristonGasConsumptionLastTwoHoursSensor(AristonEntity, SensorEntity):
     """Class for specific ariston energy sensors"""
 
     def __init__(
         self,
-        coordinator: DeviceEnergyUpdateCoordinator,
-        description: SensorEntityDescription,
+        coordinator: DeviceDataUpdateCoordinator or DeviceEnergyUpdateCoordinator,
+        description: AristonSensorEntityDescription,
     ) -> None:
         """Initialize the sensor."""
         # Pass coordinator to CoordinatorEntity.
@@ -164,13 +147,13 @@ class AristonGasConsumptionLastTwoHours(AristonEntity, SensorEntity):
         return self.reset_datetime
 
 
-class AristonGasEnergyLastMonthSensor(AristonEntity, SensorEntity):
+class AristonEnergyLastMonthSensor(AristonEntity, SensorEntity):
     """Class for specific ariston energy sensors"""
 
     def __init__(
         self,
-        coordinator: DeviceEnergyUpdateCoordinator,
-        description: SensorEntityDescription,
+        coordinator: DeviceDataUpdateCoordinator or DeviceEnergyUpdateCoordinator,
+        description: AristonSensorEntityDescription,
     ) -> None:
         """Initialize the sensor."""
         # Pass coordinator to CoordinatorEntity.
