@@ -2,9 +2,10 @@
 from __future__ import annotations
 
 import logging
+import copy
 
 from .entity import AristonEntity
-from .const import COORDINATOR, DOMAIN
+from .const import ARISTON_CLIMATE_TYPE, COORDINATOR, DOMAIN
 from .coordinator import DeviceDataUpdateCoordinator
 from .ariston import (
     DeviceAttribute,
@@ -64,10 +65,11 @@ class AristonBoiler(AristonEntity, ClimateEntity):
         coordinator: DeviceDataUpdateCoordinator,
     ) -> None:
         """Initialize the boiler"""
-        # Pass coordinator to CoordinatorEntity.
-        super().__init__(coordinator)
+        description = copy.deepcopy(ARISTON_CLIMATE_TYPE)
+        for extra_state in description.extra_states:
+            extra_state["Zone"] = zone
+        super().__init__(coordinator, description)
 
-        self.coordinator = coordinator
         self.zone: int = zone
 
     @property

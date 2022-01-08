@@ -50,10 +50,9 @@ class AristonSelect(AristonEntity, SelectEntity):
         coordinator: DeviceDataUpdateCoordinator or DeviceEnergyUpdateCoordinator,
         description: AristonSelectEntityDescription,
     ) -> None:
-        super().__init__(coordinator)
+        super().__init__(coordinator, description)
 
         self.entity_description: AristonSelectEntityDescription = description
-        self.coordinator = coordinator
 
     @property
     def unique_id(self):

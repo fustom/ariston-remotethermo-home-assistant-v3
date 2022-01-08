@@ -47,10 +47,7 @@ class AristonNumber(AristonEntity, NumberEntity):
         coordinator: DeviceDataUpdateCoordinator or DeviceEnergyUpdateCoordinator,
         description: AristonNumberEntityDescription,
     ) -> None:
-        super().__init__(coordinator)
-
-        self.entity_description = description
-        self.coordinator = coordinator
+        super().__init__(coordinator, description)
 
     @property
     def unique_id(self):

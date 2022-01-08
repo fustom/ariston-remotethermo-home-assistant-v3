@@ -2,6 +2,7 @@
 from __future__ import annotations
 
 import logging
+
 import homeassistant.util.dt as dt_util
 
 from datetime import datetime, timedelta
@@ -75,11 +76,7 @@ class AristonSensor(AristonEntity, SensorEntity):
         description: AristonSensorEntityDescription,
     ) -> None:
         """Initialize the sensor."""
-        # Pass coordinator to CoordinatorEntity.
-        super().__init__(coordinator)
-
-        self.entity_description = description
-        self.coordinator = coordinator
+        super().__init__(coordinator, description)
 
     @property
     def unique_id(self):
@@ -112,11 +109,8 @@ class AristonGasConsumptionLastTwoHoursSensor(AristonEntity, SensorEntity):
         description: AristonSensorEntityDescription,
     ) -> None:
         """Initialize the sensor."""
-        # Pass coordinator to CoordinatorEntity.
-        super().__init__(coordinator)
+        super().__init__(coordinator, description)
 
-        self.entity_description = description
-        self.coordinator = coordinator
         self.current_consumptions_sequences = coordinator.device.consumptions_sequences
         self.reset_datetime = None
 
@@ -156,11 +150,7 @@ class AristonEnergyLastMonthSensor(AristonEntity, SensorEntity):
         description: AristonSensorEntityDescription,
     ) -> None:
         """Initialize the sensor."""
-        # Pass coordinator to CoordinatorEntity.
-        super().__init__(coordinator)
-
-        self.entity_description = description
-        self.coordinator = coordinator
+        super().__init__(coordinator, description)
 
     @property
     def unique_id(self):

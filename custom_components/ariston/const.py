@@ -5,6 +5,7 @@ from enum import IntFlag
 from typing import final
 
 from homeassistant.components.binary_sensor import BinarySensorEntityDescription
+from homeassistant.components.climate import ClimateEntityDescription
 from homeassistant.components.number import NumberEntityDescription
 from homeassistant.components.select import SelectEntityDescription
 from homeassistant.components.sensor import (
@@ -13,6 +14,7 @@ from homeassistant.components.sensor import (
     SensorStateClass,
 )
 from homeassistant.components.switch import SwitchEntityDescription
+from homeassistant.components.water_heater import WaterHeaterEntityEntityDescription
 from homeassistant.const import ENERGY_KILO_WATT_HOUR
 from homeassistant.helpers.entity import EntityCategory, EntityDescription
 
@@ -24,6 +26,7 @@ from .ariston import (
     GasEnergyUnit,
     GasType,
     PropertyType,
+    ThermostatProperties,
 )
 
 
@@ -39,6 +42,9 @@ DEFAULT_ENERGY_SCAN_INTERVAL_MINUTES: final = 60
 DEFAULT_EXTRA_ENERGY_FEATURES: final = False
 
 ATTR_TARGET_TEMP_STEP = "target_temp_step"
+ATTR_HEAT_REQUEST = "heat_request"
+ATTR_ECONOMY_TEMP = "economy_temp"
+ATTR_HOLIDAY = "holiday"
 
 
 @dataclass
@@ -48,6 +54,24 @@ class AristonBaseEntityDescription(EntityDescription, ABC):
     device_features: list[DeviceFeatures] or None = None
     coordinator: str = COORDINATOR
     extra_energy_feature: bool = False
+    extra_states: list[
+        dict["Property":str], dict["Type":str], dict["Zone":int], dict["Attribute":str]
+    ] or None = None
+    zone: int = 0
+
+
+@dataclass
+class AristonClimateEntityDescription(
+    ClimateEntityDescription, AristonBaseEntityDescription
+):
+    """A class that describes climate entities."""
+
+
+@dataclass
+class AristonWaterHeaterEntityDescription(
+    WaterHeaterEntityEntityDescription, AristonBaseEntityDescription
+):
+    """A class that describes climate entities."""
 
 
 @dataclass
@@ -55,8 +79,6 @@ class AristonBinarySensorEntityDescription(
     BinarySensorEntityDescription, AristonBaseEntityDescription
 ):
     """A class that describes binary sensor entities."""
-
-    extra_states: list[str] or None = None
 
 
 @dataclass
@@ -89,6 +111,34 @@ class AristonSelectEntityDescription(
     enum_class: IntFlag or None = 0
 
 
+ARISTON_CLIMATE_TYPE = AristonClimateEntityDescription(
+    key="AristonClimate",
+    extra_states=[
+        {
+            "Property": ThermostatProperties.ZONE_HEAT_REQUEST,
+            "Value": PropertyType.VALUE,
+            "Attribute": ATTR_HEAT_REQUEST,
+        },
+        {
+            "Property": ThermostatProperties.ZONE_ECONOMY_TEMP,
+            "Value": PropertyType.VALUE,
+            "Attribute": ATTR_ECONOMY_TEMP,
+        },
+    ],
+)
+
+ARISTON_WATER_HEATER_TYPE = AristonWaterHeaterEntityDescription(
+    key="AristonWaterHeater",
+    extra_states=[
+        {
+            "Property": DeviceProperties.DHW_TEMP,
+            "Value": PropertyType.STEP,
+            "Zone": 0,
+            "Attribute": ATTR_TARGET_TEMP_STEP,
+        }
+    ],
+)
+
 ARISTON_SENSOR_TYPES: tuple[AristonSensorEntityDescription, ...] = (
     AristonSensorEntityDescription(
         key=DeviceProperties.HEATING_CIRCUIT_PRESSURE,
@@ -116,7 +166,14 @@ ARISTON_BINARY_SENSOR_TYPES: tuple[AristonBinarySensorEntityDescription, ...] = 
         key=DeviceProperties.HOLIDAY,
         name=f"{NAME} holiday mode",
         icon="mdi:island",
-        extra_states={PropertyType.EXPIRES_ON},
+        extra_states=[
+            {
+                "Property": DeviceProperties.HOLIDAY,
+                "Value": PropertyType.EXPIRES_ON,
+                "Zone": 0,
+                "Attribute": ATTR_HOLIDAY,
+            }
+        ],
     ),
 )
 

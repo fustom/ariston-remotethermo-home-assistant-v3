@@ -66,7 +66,7 @@ async def async_setup_entry(
         device_registry = dr.async_get(hass)
         device = device_registry.devices[device_id]
 
-        entry = hass.config_entries.async_get_entry(list(device.config_entries)[0])
+        entry = hass.config_entries.async_get_entry(next(iter(device.config_entries)))
         coordinator: DeviceDataUpdateCoordinator = hass.data[DOMAIN][entry.unique_id][
             COORDINATOR
         ]
@@ -91,10 +91,7 @@ class AristonBinarySensor(AristonEntity, BinarySensorEntity):
         coordinator: DeviceDataUpdateCoordinator or DeviceEnergyUpdateCoordinator,
         description: AristonBinarySensorEntityDescription,
     ) -> None:
-        super().__init__(coordinator)
-
-        self.entity_description: AristonBinarySensorEntityDescription = description
-        self.coordinator = coordinator
+        super().__init__(coordinator, description)
 
     @property
     def unique_id(self):
@@ -109,20 +106,3 @@ class AristonBinarySensor(AristonEntity, BinarySensorEntity):
         return self.coordinator.device.get_item_by_id(
             self.entity_description.key, PropertyType.VALUE
         )
-
-    @property
-    def extra_state_attributes(self):
-        """Return the holiday end date."""
-        state_attributes = {}
-
-        if self.entity_description.extra_states is None:
-            return None
-
-        for extra_state in self.entity_description.extra_states:
-            state_attribute = self.coordinator.device.get_item_by_id(
-                self.entity_description.key, extra_state
-            )
-            if state_attribute is not None:
-                state_attributes[extra_state] = state_attribute
-
-        return state_attributes

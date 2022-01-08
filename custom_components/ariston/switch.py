@@ -47,11 +47,7 @@ class AristonSwitch(AristonEntity, SwitchEntity):
         description: AristonSwitchEntityDescription,
     ) -> None:
         """Initialize the switch."""
-        # Pass coordinator to CoordinatorEntity.
-        super().__init__(coordinator)
-
-        self.entity_description = description
-        self.coordinator = coordinator
+        super().__init__(coordinator, description)
 
     @property
     def unique_id(self):

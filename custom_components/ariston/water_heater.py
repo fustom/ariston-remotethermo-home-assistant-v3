@@ -5,7 +5,7 @@ import logging
 
 from .entity import AristonEntity
 from .ariston import DeviceAttribute, DeviceFeatures, DeviceProperties, PropertyType
-from .const import ATTR_TARGET_TEMP_STEP, COORDINATOR, DOMAIN
+from .const import ARISTON_WATER_HEATER_TYPE, COORDINATOR, DOMAIN
 from .coordinator import DeviceDataUpdateCoordinator
 
 from homeassistant.core import HomeAssistant
@@ -41,11 +41,7 @@ class AristonWaterHeater(AristonEntity, WaterHeaterEntity):
         coordinator: DeviceDataUpdateCoordinator,
     ) -> None:
         """Initialize the water heater."""
-
-        # Pass coordinator to CoordinatorEntity.
-        super().__init__(coordinator)
-
-        self.coordinator = coordinator
+        super().__init__(coordinator, ARISTON_WATER_HEATER_TYPE)
 
     @property
     def name(self) -> str:
@@ -97,15 +93,6 @@ class AristonWaterHeater(AristonEntity, WaterHeaterEntity):
         return 1 / 10 ** self.coordinator.device.get_item_by_id(
             DeviceProperties.DHW_TEMP, PropertyType.DECIMALS
         )
-
-    @property
-    def extra_state_attributes(self):
-        """Return the supported step of target temperature."""
-        step = self.coordinator.device.get_item_by_id(
-            DeviceProperties.DHW_TEMP, PropertyType.STEP
-        )
-
-        return {ATTR_TARGET_TEMP_STEP: step}
 
     @property
     def temperature_unit(self):
