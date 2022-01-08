@@ -1,0 +1,60 @@
+create_vacation:
+  name: Create vacation
+  description: >-
+    Create a vacation on the selected device. If end date is not specified, the
+    vacation is going to be deleted.
+  fields:
+    device_id:
+      name: Device
+      description: Ariston device on which to create the vacation.
+      required: true
+      selector:
+        device:
+          integration: ariston
+    end_date:
+      name: End date
+      description: Date the vacation ends in the YYYY-mm-dd format.
+      selector:
+        text:
+set_item_by_id:
+  name: Set item by id
+  fields:
+    device_id:
+      name: Device
+      description: Ariston device on which to set item.
+      required: true
+      selector:
+        device:
+          integration: ariston
+    item_id:
+      name: Device or thermostat property
+      required: true
+      selector:
+        select:
+          options:
+            - "AutomaticThermoregulation"
+            - "DhwMode"
+            - "DhwTemp"
+            - "PlantMode"
+            - "AntilegionellaOnOff"
+            - "AntilegionellaTemp"
+            - "AntilegionellaFreq"
+            - "ZoneComfortTemp"
+            - "ZoneEconomyTemp"
+            - "ZoneMode"
+            - "ZoneDeroga"
+    zone:
+      name: Thermostat zone
+      description: Number of the zone. Set 0 if device.
+      required: true
+      selector:
+        number:
+          min: 0
+          max: 100
+    value:
+      name: Value
+      description: Value of the setting.
+      required: true
+      example: "1"
+      selector:
+        text:

@@ -3,6 +3,8 @@ from __future__ import annotations
 
 import logging
 
+import voluptuous as vol
+
 from .ariston import AristonAPI, DeviceFeatures
 from .coordinator import DeviceDataUpdateCoordinator, DeviceEnergyUpdateCoordinator
 from .const import (
@@ -20,11 +22,16 @@ from .device import AristonDevice
 from homeassistant.config_entries import ConfigEntry
 from homeassistant.core import HomeAssistant
 from homeassistant.const import (
+    ATTR_DEVICE_ID,
     CONF_SCAN_INTERVAL,
     Platform,
     CONF_USERNAME,
     CONF_PASSWORD,
     CONF_DEVICE,
+)
+from homeassistant.helpers import (
+    config_validation as cv,
+    device_registry as dr,
 )
 
 _LOGGER = logging.getLogger(__name__)
@@ -37,6 +44,20 @@ PLATFORMS: list[str] = [
     Platform.SELECT,
     Platform.NUMBER,
 ]
+
+SERVICE_SET_ITEM_BY_ID = "set_item_by_id"
+ATTR_ITEM_ID = "item_id"
+ATTR_ZONE = "zone"
+ATTR_VALUE = "value"
+
+SET_ITEM_BY_ID_SCHEMA = vol.Schema(
+    {
+        vol.Required(ATTR_DEVICE_ID): cv.string,
+        vol.Required(ATTR_ITEM_ID): cv.string,
+        vol.Required(ATTR_ZONE): cv.positive_int,
+        vol.Required(ATTR_VALUE): cv.positive_float,
+    }
+)
 
 
 async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
@@ -89,6 +110,29 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
     hass.config_entries.async_setup_platforms(entry, platforms)
 
     entry.async_on_unload(entry.add_update_listener(update_listener))
+
+    async def async_set_item_by_id_service(service_call):
+        """Create a vacation on the target device."""
+        device_id = service_call.data[ATTR_DEVICE_ID]
+        item_id = service_call.data.get(ATTR_ITEM_ID)
+        zone = service_call.data.get(ATTR_ZONE)
+        value = service_call.data.get(ATTR_VALUE)
+
+        device_registry = dr.async_get(hass)
+        device = device_registry.devices[device_id]
+
+        entry = hass.config_entries.async_get_entry(next(iter(device.config_entries)))
+        coordinator: DeviceDataUpdateCoordinator = hass.data[DOMAIN][entry.unique_id][
+            COORDINATOR
+        ]
+        await coordinator.device.async_set_item_by_id(item_id, value, zone)
+
+    hass.services.async_register(
+        DOMAIN,
+        SERVICE_SET_ITEM_BY_ID,
+        async_set_item_by_id_service,
+        schema=SET_ITEM_BY_ID_SCHEMA,
+    )
 
     return True
 
