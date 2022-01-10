@@ -56,7 +56,9 @@ class AristonDevice(ABC):
         self.consumptions_sequences = await self.api.async_get_consumptions_sequences(
             self.attributes.get(DeviceAttribute.GW),
             self.attributes.get(DeviceAttribute.SYS) == SystemType.GALEVO,
-            self.features.get(DeviceFeatures.HAS_BOILER),
+            # TODO
+            self.features.get(DeviceFeatures.HAS_BOILER)
+            or self.attributes.get(DeviceAttribute.SYS) == SystemType.VELIS,
             self.features.get(DeviceFeatures.HAS_SLP),
         )
 

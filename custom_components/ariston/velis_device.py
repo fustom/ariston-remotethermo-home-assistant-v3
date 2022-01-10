@@ -51,22 +51,24 @@ class AristonVelisDevice(AristonDevice):
         return "°C"
 
     def get_water_heater_mode_opertation_texts(self) -> list:
-        return VelisPlantMode.name
+        return [flag.name for flag in VelisPlantMode]
 
     def get_water_heater_mode_options(self) -> list:
-        return VelisPlantMode.value
+        return [flag.value for flag in VelisPlantMode]
 
     def get_water_heater_mode_value(self) -> int:
         return self.data.get(VelisDeviceProperties.MODE)
 
     async def async_set_water_heater_temperature(self, temperature: float):
-        self.api.async_set_velis_temperature(
+        await self.api.async_set_velis_temperature(
             self.attributes.get(DeviceAttribute.GW),
             self.data.get(VelisDeviceProperties.ECO),
             temperature,
         )
+        self.data[VelisDeviceProperties.REQ_TEMP] = temperature
 
     async def async_set_water_heater_operation_mode(self, operation_mode):
-        self.api.async_set_velis_mode(
+        await self.api.async_set_velis_mode(
             self.attributes.get(DeviceAttribute.GW), VelisPlantMode(operation_mode)
         )
+        self.data[VelisDeviceProperties.MODE] = VelisPlantMode(operation_mode)

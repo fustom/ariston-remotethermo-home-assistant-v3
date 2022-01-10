@@ -50,11 +50,13 @@ class AristonEntity(CoordinatorEntity, ABC):
             return None
 
         for extra_state in self.entity_description.extra_states:
-            state_attribute = self.device.get_item_by_id(
-                extra_state["Property"], extra_state["Value"], extra_state["Zone"]
-            )
-            if state_attribute is not None:
-                state_attributes[extra_state["Attribute"]] = state_attribute
+            # TODO
+            if self.device.attributes(DeviceAttribute.SYS) == SystemType.GALEVO:
+                state_attribute = self.device.get_item_by_id(
+                    extra_state["Property"], extra_state["Value"], extra_state["Zone"]
+                )
+                if state_attribute is not None:
+                    state_attributes[extra_state["Attribute"]] = state_attribute
 
         return state_attributes
 
