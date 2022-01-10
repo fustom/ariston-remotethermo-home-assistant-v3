@@ -69,11 +69,16 @@ class AristonConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
             _LOGGER.exception("Unexpected exception")
             errors["base"] = "unknown"
         else:
-            cloud_devices = await self.api.async_get_devices()
+            cloud_devices = []
+            cloud_devices.extend(await self.api.async_get_detailed_devices())
+            cloud_devices.extend(await self.api.async_get_detailed_velis_devices())
+
+            if len(cloud_devices) == 0:
+                errors["base"] = "no device found"
             if len(cloud_devices) == 1:
                 cloud_device = cloud_devices[0]
                 existing_entry = await self.async_set_unique_id(
-                    cloud_device[DeviceAttribute.GW_ID], raise_on_progress=False
+                    cloud_device[DeviceAttribute.GW], raise_on_progress=False
                 )
                 if existing_entry:
                     data = existing_entry.data.copy()
@@ -84,20 +89,21 @@ class AristonConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
                     return self.async_abort(reason="reauth_successful")
 
                 return self.async_create_entry(
-                    title=cloud_device[DeviceAttribute.PLANT_NAME],
+                    title=cloud_device[DeviceAttribute.NAME],
                     data={
                         CONF_USERNAME: self.cloud_username,
                         CONF_PASSWORD: self.cloud_password,
                         CONF_DEVICE: cloud_device,
                     },
                 )
-            for device in cloud_devices:
-                name = device[DeviceAttribute.PLANT_NAME]
-                model = device[DeviceAttribute.GW_SERIAL]
-                list_name = f"{name} - {model}"
-                self.cloud_devices[list_name] = device
+            if len(cloud_devices) > 1:
+                for device in cloud_devices:
+                    name = device[DeviceAttribute.NAME]
+                    model = device[DeviceAttribute.SN]
+                    list_name = f"{name} - {model}"
+                    self.cloud_devices[list_name] = device
 
-            return await self.async_step_select()
+                return await self.async_step_select()
 
         return self.async_show_form(
             step_id="user", data_schema=STEP_USER_DATA_SCHEMA, errors=errors
@@ -109,7 +115,7 @@ class AristonConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
         if user_input is not None:
             cloud_device = self.cloud_devices[user_input["select_device"]]
             return self.async_create_entry(
-                title=cloud_device[DeviceAttribute.PLANT_NAME],
+                title=cloud_device[DeviceAttribute.NAME],
                 data={
                     CONF_USERNAME: self.cloud_username,
                     CONF_PASSWORD: self.cloud_password,

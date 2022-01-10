@@ -4,9 +4,13 @@ from __future__ import annotations
 import logging
 
 from .entity import AristonEntity
-from .ariston import DeviceAttribute, DeviceFeatures, DeviceProperties, PropertyType
-from .const import ARISTON_WATER_HEATER_TYPE, COORDINATOR, DOMAIN
-from .coordinator import DeviceDataUpdateCoordinator
+from .ariston import DeviceAttribute, DeviceFeatures
+from .const import (
+    ARISTON_WATER_HEATER_TYPE,
+    DOMAIN,
+    AristonWaterHeaterEntityDescription,
+)
+from .coordinator import DeviceDataUpdateCoordinator, DeviceEnergyUpdateCoordinator
 
 from homeassistant.core import HomeAssistant
 from homeassistant.config_entries import ConfigEntry
@@ -26,10 +30,18 @@ async def async_setup_entry(
     hass: HomeAssistant, entry: ConfigEntry, async_add_entities
 ):
     """Set up the Ariston water heater device from config entry."""
-    coordinator: DeviceDataUpdateCoordinator = hass.data[DOMAIN][entry.unique_id][
-        COORDINATOR
-    ]
-    async_add_entities([AristonWaterHeater(coordinator)])
+    description = ARISTON_WATER_HEATER_TYPE
+    coordinator: DeviceDataUpdateCoordinator or DeviceEnergyUpdateCoordinator = (
+        hass.data[DOMAIN][entry.unique_id][description.coordinator]
+    )
+
+    if coordinator.device.are_device_features_available(
+        description.device_features,
+        description.extra_energy_feature,
+        description.system_types,
+    ):
+        async_add_entities([AristonWaterHeater(coordinator, description)])
+
     return
 
 
@@ -39,20 +51,21 @@ class AristonWaterHeater(AristonEntity, WaterHeaterEntity):
     def __init__(
         self,
         coordinator: DeviceDataUpdateCoordinator,
+        description: AristonWaterHeaterEntityDescription,
     ) -> None:
         """Initialize the water heater."""
-        super().__init__(coordinator, ARISTON_WATER_HEATER_TYPE)
+        super().__init__(coordinator, description)
 
     @property
     def name(self) -> str:
         """Return the name of the device."""
-        return self.coordinator.device.attributes[DeviceAttribute.PLANT_NAME]
+        return self.coordinator.device.attributes.get(DeviceAttribute.NAME)
 
     @property
     def unique_id(self) -> str:
         """Return a unique id for the device."""
         return (
-            f"{self.coordinator.device.attributes[DeviceAttribute.GW_ID]}-water_heater"
+            f"{self.coordinator.device.attributes.get(DeviceAttribute.GW)}-water_heater"
         )
 
     @property
@@ -62,73 +75,53 @@ class AristonWaterHeater(AristonEntity, WaterHeaterEntity):
     @property
     def current_temperature(self):
         """Return the temperature"""
-        return self.coordinator.device.get_item_by_id(
-            DeviceProperties.DHW_TEMP, PropertyType.VALUE
-        )
+        return self.coordinator.device.get_water_heater_current_temperature()
 
     @property
     def min_temp(self):
         """Return the minimum temperature."""
-        return self.coordinator.device.get_item_by_id(
-            DeviceProperties.DHW_TEMP, PropertyType.MIN
-        )
+        return self.coordinator.device.get_water_heater_minimum_temperature()
 
     @property
     def target_temperature(self):
         """Return the temperature we try to reach."""
-        return self.coordinator.device.get_item_by_id(
-            DeviceProperties.DHW_TEMP, PropertyType.VALUE
-        )
+        return self.coordinator.device.get_water_heater_target_temperature()
 
     @property
     def max_temp(self):
         """Return the maximum temperature."""
-        return self.coordinator.device.get_item_by_id(
-            DeviceProperties.DHW_TEMP, PropertyType.MAX
-        )
+        return self.coordinator.device.get_water_heater_maximum_temperature()
 
     @property
     def precision(self) -> float:
         """Return the precision of temperature for the device."""
-        return 1 / 10 ** self.coordinator.device.get_item_by_id(
-            DeviceProperties.DHW_TEMP, PropertyType.DECIMALS
-        )
+        return 1 / 10 ** self.coordinator.device.get_water_heater_decimals()
 
     @property
     def temperature_unit(self):
         """Return the unit of measurement."""
-        return self.coordinator.device.get_item_by_id(
-            DeviceProperties.DHW_TEMP, PropertyType.UNIT
-        )
+        return self.coordinator.device.get_water_heater_temperature_unit()
 
     @property
     def supported_features(self) -> int:
         """Return the supported features for this device integration."""
-        if self.coordinator.device.features[DeviceFeatures.DHW_MODE_CHANGEABLE]:
+        if self.coordinator.device.features.get(DeviceFeatures.DHW_MODE_CHANGEABLE):
             return SUPPORT_TARGET_TEMPERATURE | SUPPORT_OPERATION_MODE
         return SUPPORT_TARGET_TEMPERATURE
 
     @property
     def operation_list(self):
         """List of available operation modes."""
-        return self.coordinator.device.get_item_by_id(
-            DeviceProperties.DHW_MODE, PropertyType.OPT_TEXTS
-        )
+        return self.coordinator.device.get_water_heater_mode_opertation_texts()
 
     @property
     def current_operation(self):
         """Return current operation"""
-        res = self.coordinator.device.get_item_by_id(
-            DeviceProperties.DHW_MODE, PropertyType.OPTIONS
-        ).index(
-            self.coordinator.device.get_item_by_id(
-                DeviceProperties.DHW_MODE, PropertyType.VALUE
-            )
+        res = self.coordinator.device.get_water_heater_mode_options().index(
+            self.coordinator.device.get_water_heater_mode_value()
         )
 
-        return self.coordinator.device.get_item_by_id(
-            DeviceProperties.DHW_MODE, PropertyType.OPT_TEXTS
-        )[res]
+        return self.coordinator.device.get_water_heater_mode_opertation_texts()[res]
 
     async def async_set_temperature(self, **kwargs):
         """Set new target temperature."""
@@ -142,17 +135,12 @@ class AristonWaterHeater(AristonEntity, WaterHeaterEntity):
             self.name,
         )
 
-        await self.coordinator.device.async_set_item_by_id(
-            DeviceProperties.DHW_TEMP, temperature
-        )
+        await self.coordinator.device.async_set_water_heater_temperature(temperature)
         self.async_write_ha_state()
 
     async def async_set_operation_mode(self, operation_mode):
         """Set operation mode."""
-        await self.coordinator.device.async_set_item_by_id(
-            DeviceProperties.DHW_MODE,
-            self.coordinator.device.get_item_by_id(
-                DeviceProperties.DHW_MODE, PropertyType.OPT_TEXTS
-            ).index(operation_mode),
+        await self.coordinator.device.async_set_water_heater_operation_mode(
+            operation_mode
         )
         self.async_write_ha_state()

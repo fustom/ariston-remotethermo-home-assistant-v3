@@ -13,6 +13,7 @@ from .const import (
     ENERGY_COORDINATOR,
 )
 from .device import AristonDevice
+from .velis_device import AristonVelisDevice
 from .ariston import DeviceAttribute
 
 _LOGGER = logging.getLogger(__name__)
@@ -24,14 +25,14 @@ class DeviceDataUpdateCoordinator(DataUpdateCoordinator):
     def __init__(
         self,
         hass: HomeAssistant,
-        device: AristonDevice,
+        device: AristonDevice or AristonVelisDevice,
         scan_interval_seconds: int,
     ) -> None:
         """Initialize the data update coordinator."""
         super().__init__(
             hass,
             _LOGGER,
-            name=f"{DOMAIN}-{device.attributes[DeviceAttribute.PLANT_NAME]}-{COORDINATOR}",
+            name=f"{DOMAIN}-{device.attributes.get(DeviceAttribute.NAME)}-{COORDINATOR}",
             update_interval=timedelta(seconds=scan_interval_seconds),
         )
 
@@ -47,14 +48,14 @@ class DeviceEnergyUpdateCoordinator(DataUpdateCoordinator):
     def __init__(
         self,
         hass: HomeAssistant,
-        device: AristonDevice,
+        device: AristonDevice or AristonVelisDevice,
         energy_interval_minutes: int,
     ) -> None:
         """Initialize the data update coordinator."""
         super().__init__(
             hass,
             _LOGGER,
-            name=f"{DOMAIN}-{device.attributes[DeviceAttribute.PLANT_NAME]}-{ENERGY_COORDINATOR}",
+            name=f"{DOMAIN}-{device.attributes.get(DeviceAttribute.NAME)}-{ENERGY_COORDINATOR}",
             update_interval=timedelta(minutes=energy_interval_minutes),
         )
 

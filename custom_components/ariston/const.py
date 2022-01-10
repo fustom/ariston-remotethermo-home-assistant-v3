@@ -26,6 +26,7 @@ from .ariston import (
     GasEnergyUnit,
     GasType,
     PropertyType,
+    SystemType,
     ThermostatProperties,
 )
 
@@ -58,6 +59,7 @@ class AristonBaseEntityDescription(EntityDescription, ABC):
         dict["Property":str], dict["Type":str], dict["Zone":int], dict["Attribute":str]
     ] or None = None
     zone: int = 0
+    system_types: list[SystemType] or None = None
 
 
 @dataclass
@@ -125,6 +127,7 @@ ARISTON_CLIMATE_TYPE = AristonClimateEntityDescription(
             "Attribute": ATTR_ECONOMY_TEMP,
         },
     ],
+    system_types=[SystemType.GALEVO],
 )
 
 ARISTON_WATER_HEATER_TYPE = AristonWaterHeaterEntityDescription(
@@ -137,6 +140,8 @@ ARISTON_WATER_HEATER_TYPE = AristonWaterHeaterEntityDescription(
             "Attribute": ATTR_TARGET_TEMP_STEP,
         }
     ],
+    device_features={DeviceFeatures.HAS_BOILER},
+    system_types=[SystemType.GALEVO, SystemType.VELIS],
 )
 
 ARISTON_SENSOR_TYPES: tuple[AristonSensorEntityDescription, ...] = (
@@ -146,12 +151,14 @@ ARISTON_SENSOR_TYPES: tuple[AristonSensorEntityDescription, ...] = (
         device_class=SensorDeviceClass.PRESSURE,
         entity_category=EntityCategory.DIAGNOSTIC,
         state_class=SensorStateClass.MEASUREMENT,
+        system_types=[SystemType.GALEVO],
     ),
     AristonSensorEntityDescription(
         key=DeviceProperties.CH_FLOW_SETPOINT_TEMP,
         name=f"{NAME} CH flow setpoint temp",
         device_class=SensorDeviceClass.TEMPERATURE,
         state_class=SensorStateClass.MEASUREMENT,
+        system_types=[SystemType.GALEVO],
     ),
 )
 
@@ -161,6 +168,7 @@ ARISTON_BINARY_SENSOR_TYPES: tuple[AristonBinarySensorEntityDescription, ...] = 
         key=DeviceProperties.IS_FLAME_ON,
         name=f"{NAME} is flame on",
         icon="mdi:fire",
+        system_types=[SystemType.GALEVO],
     ),
     AristonBinarySensorEntityDescription(
         key=DeviceProperties.HOLIDAY,
@@ -174,6 +182,7 @@ ARISTON_BINARY_SENSOR_TYPES: tuple[AristonBinarySensorEntityDescription, ...] = 
                 "Attribute": ATTR_HOLIDAY,
             }
         ],
+        system_types=[SystemType.GALEVO],
     ),
 )
 
@@ -184,6 +193,7 @@ ARISTON_SWITCH_TYPES: tuple[AristonSwitchEntityDescription, ...] = (
         name=f"{NAME} automatic thermoregulation",
         icon="mdi:radiator",
         device_features={DeviceFeatures.AUTO_THERMO_REG},
+        system_types=[SystemType.GALEVO],
     ),
 )
 
@@ -200,6 +210,7 @@ ARISTON_NUMBER_TYPES: tuple[AristonNumberEntityDescription, ...] = (
         device_features={DeviceFeatures.HAS_METERING},
         coordinator=ENERGY_COORDINATOR,
         extra_energy_feature=True,
+        system_types=[SystemType.GALEVO],
     ),
     AristonNumberEntityDescription(
         key=ConsumptionProperties.GAS_COST,
@@ -213,6 +224,7 @@ ARISTON_NUMBER_TYPES: tuple[AristonNumberEntityDescription, ...] = (
         device_features={DeviceFeatures.HAS_METERING},
         coordinator=ENERGY_COORDINATOR,
         extra_energy_feature=True,
+        system_types=[SystemType.GALEVO],
     ),
 )
 
@@ -228,6 +240,7 @@ ARISTON_SELECT_TYPES: tuple[AristonSelectEntityDescription, ...] = (
         device_features={DeviceFeatures.HAS_METERING},
         coordinator=ENERGY_COORDINATOR,
         extra_energy_feature=True,
+        system_types=[SystemType.GALEVO],
     ),
     AristonSelectEntityDescription(
         key=ConsumptionProperties.GAS_TYPE,
@@ -238,6 +251,7 @@ ARISTON_SELECT_TYPES: tuple[AristonSelectEntityDescription, ...] = (
         device_features={DeviceFeatures.HAS_METERING},
         coordinator=ENERGY_COORDINATOR,
         extra_energy_feature=True,
+        system_types=[SystemType.GALEVO],
     ),
     AristonSelectEntityDescription(
         key=ConsumptionProperties.GAS_ENERGY_UNIT,
@@ -248,6 +262,7 @@ ARISTON_SELECT_TYPES: tuple[AristonSelectEntityDescription, ...] = (
         device_features={DeviceFeatures.HAS_METERING},
         coordinator=ENERGY_COORDINATOR,
         extra_energy_feature=True,
+        system_types=[SystemType.GALEVO],
     ),
 )
 
@@ -264,6 +279,7 @@ ARISTON_GAS_CONSUMPTION_LAST_TWO_HOURS_TYPE: tuple[
         native_unit_of_measurement=ENERGY_KILO_WATT_HOUR,
         device_features={DeviceFeatures.HAS_METERING},
         coordinator=ENERGY_COORDINATOR,
+        system_types=[SystemType.GALEVO],
     ),
     AristonSensorEntityDescription(
         key="4",
@@ -275,6 +291,7 @@ ARISTON_GAS_CONSUMPTION_LAST_TWO_HOURS_TYPE: tuple[
         native_unit_of_measurement=ENERGY_KILO_WATT_HOUR,
         device_features={DeviceFeatures.HAS_METERING, DeviceFeatures.HAS_BOILER},
         coordinator=ENERGY_COORDINATOR,
+        system_types=[SystemType.GALEVO],
     ),
 )
 
@@ -291,6 +308,7 @@ ARISTON_CONSUMPTION_LAST_MONTH_SENSORS_TYPES: tuple[
         device_features={DeviceFeatures.HAS_METERING},
         coordinator=ENERGY_COORDINATOR,
         extra_energy_feature=True,
+        system_types=[SystemType.GALEVO],
     ),
     AristonSensorEntityDescription(
         key="0|elect",
@@ -302,6 +320,7 @@ ARISTON_CONSUMPTION_LAST_MONTH_SENSORS_TYPES: tuple[
         device_features={DeviceFeatures.HAS_METERING},
         coordinator=ENERGY_COORDINATOR,
         extra_energy_feature=True,
+        system_types=[SystemType.GALEVO],
     ),
     AristonSensorEntityDescription(
         key="1|gas",
@@ -313,6 +332,7 @@ ARISTON_CONSUMPTION_LAST_MONTH_SENSORS_TYPES: tuple[
         device_features={DeviceFeatures.HAS_METERING, DeviceFeatures.HAS_BOILER},
         coordinator=ENERGY_COORDINATOR,
         extra_energy_feature=True,
+        system_types=[SystemType.GALEVO],
     ),
     AristonSensorEntityDescription(
         key="1|elect",
@@ -324,5 +344,6 @@ ARISTON_CONSUMPTION_LAST_MONTH_SENSORS_TYPES: tuple[
         device_features={DeviceFeatures.HAS_METERING, DeviceFeatures.HAS_BOILER},
         coordinator=ENERGY_COORDINATOR,
         extra_energy_feature=True,
+        system_types=[SystemType.GALEVO],
     ),
 )

@@ -13,7 +13,6 @@ from homeassistant.components.sensor import SensorEntity
 
 from .entity import AristonEntity
 from .ariston import (
-    DeviceAttribute,
     PropertyType,
 )
 from .const import (
@@ -46,7 +45,9 @@ async def async_setup_entry(
             hass.data[DOMAIN][entry.unique_id][description.coordinator]
         )
         if coordinator.device.are_device_features_available(
-            description.device_features, description.extra_energy_feature
+            description.device_features,
+            description.extra_energy_feature,
+            description.system_types,
         ):
             ariston_sensors.append(
                 sensor_class(
@@ -79,13 +80,6 @@ class AristonSensor(AristonEntity, SensorEntity):
         super().__init__(coordinator, description)
 
     @property
-    def unique_id(self):
-        """Return the unique id."""
-        return (
-            f"{self.coordinator.device.attributes[DeviceAttribute.GW_ID]}-{self.name}"
-        )
-
-    @property
     def native_value(self):
         """Return value of sensor."""
         return self.coordinator.device.get_item_by_id(
@@ -113,13 +107,6 @@ class AristonGasConsumptionLastTwoHoursSensor(AristonEntity, SensorEntity):
 
         self.current_consumptions_sequences = coordinator.device.consumptions_sequences
         self.reset_datetime = None
-
-    @property
-    def unique_id(self):
-        """Return the unique id."""
-        return (
-            f"{self.coordinator.device.attributes[DeviceAttribute.GW_ID]}-{self.name}"
-        )
 
     @property
     def native_value(self):
@@ -153,15 +140,8 @@ class AristonEnergyLastMonthSensor(AristonEntity, SensorEntity):
         super().__init__(coordinator, description)
 
     @property
-    def unique_id(self):
-        """Return the unique id."""
-        return (
-            f"{self.coordinator.device.attributes[DeviceAttribute.GW_ID]}-{self.name}"
-        )
-
-    @property
     def native_value(self):
         values = self.entity_description.key.split("|")
-        return self.coordinator.device.energy_account["LastMonth"][int(values[0])][
+        return self.coordinator.device.energy_account.get("LastMonth")[int(values[0])][
             values[1]
         ]

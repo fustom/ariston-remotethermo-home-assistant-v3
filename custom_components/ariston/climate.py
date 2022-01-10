@@ -50,21 +50,21 @@ async def async_setup_entry(
         COORDINATOR
     ]
     devs = []
-    for zone in coordinator.device.features[DeviceFeatures.ZONES]:
-        ariston_zone = AristonBoiler(zone[ZoneAttribute.NUM], coordinator)
+    for zone in coordinator.device.features.get(DeviceFeatures.ZONES):
+        ariston_zone = AristonThermostat(zone[ZoneAttribute.NUM], coordinator)
         devs.append(ariston_zone)
     async_add_entities(devs)
 
 
-class AristonBoiler(AristonEntity, ClimateEntity):
-    """Ariston Boiler Device."""
+class AristonThermostat(AristonEntity, ClimateEntity):
+    """Ariston Thermostat Device."""
 
     def __init__(
         self,
         zone: int,
         coordinator: DeviceDataUpdateCoordinator,
     ) -> None:
-        """Initialize the boiler"""
+        """Initialize the thermostat"""
         description = copy.deepcopy(ARISTON_CLIMATE_TYPE)
         for extra_state in description.extra_states:
             extra_state["Zone"] = zone
@@ -75,18 +75,18 @@ class AristonBoiler(AristonEntity, ClimateEntity):
     @property
     def name(self) -> str:
         """Return the name of the device."""
-        return f"{self.coordinator.device.attributes[DeviceAttribute.PLANT_NAME]}"
+        return f"{self.coordinator.device.attributes.get(DeviceAttribute.NAME)}"
 
     @property
     def unique_id(self) -> str:
         """Return a unique id for the device."""
         return (
-            f"{self.coordinator.device.attributes[DeviceAttribute.GW_ID]}_{self.zone}"
+            f"{self.coordinator.device.attributes.get(DeviceAttribute.GW)}_{self.zone}"
         )
 
     @property
     def icon(self):
-        """Return the name of the Climate device."""
+        """Return the icon of the thermostat device."""
         if PlantMode(
             self.coordinator.device.get_item_by_id(
                 DeviceProperties.PLANT_MODE, PropertyType.VALUE
