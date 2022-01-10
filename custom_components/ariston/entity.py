@@ -51,7 +51,7 @@ class AristonEntity(CoordinatorEntity, ABC):
 
         for extra_state in self.entity_description.extra_states:
             # TODO
-            if self.device.attributes(DeviceAttribute.SYS) == SystemType.GALEVO:
+            if self.device.attributes.get(DeviceAttribute.SYS) == SystemType.GALEVO:
                 state_attribute = self.device.get_item_by_id(
                     extra_state["Property"], extra_state["Value"], extra_state["Zone"]
                 )
