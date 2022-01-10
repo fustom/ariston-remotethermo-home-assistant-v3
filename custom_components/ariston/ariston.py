@@ -11,11 +11,13 @@ from enum import IntFlag, unique
 ARISTON_API_URL: final = "https://www.ariston-net.remotethermo.com/api/v2/"
 ARISTON_LOGIN: final = "accounts/login"
 ARISTON_REMOTE: final = "remote"
+ARISTON_VELIS: final = "velis"
 ARISTON_PLANTS: final = "plants"
 ARISTON_LITE: final = "lite"
 ARISTON_DATA_ITEMS: final = "dataItems"
 ARISTON_ZONES: final = "zones"
 ARISTON_PLANT_DATA: final = "plantData"
+ARISTON_MED_PLANT_DATA: final = "medPlantData"
 ARISTON_REPORTS: final = "reports"
 ARISTON_TIME_PROGS: final = "timeProgs"
 
@@ -124,15 +126,72 @@ class Currency(IntFlag):
     USD = 20
 
 
+@unique
+class SystemType(IntFlag):
+    """System type enum"""
+
+    GALILEO1 = 1
+    GALILEO2 = 2
+    GALEVO = 3
+    VELIS = 4
+    BSB = 5
+
+
+@unique
+class VelisPlantMode(IntFlag):
+    """Velis plant mode enum"""
+
+    MANUAL = 1
+    PROGRAM = 5
+    NIGHT = 8
+
+
 class DeviceAttribute:
     """Constants for device attributes"""
 
-    GW_FW_VER: final = "gwFwVer"
-    GW_ID: final = "gwId"
-    GW_LINK: final = "gwLink"
-    GW_SERIAL: final = "gwSerial"
-    GW_SYS_TYPE: final = "gwSysType"
-    PLANT_NAME: final = "plantName"
+    GW: final = "gw"  # gwId
+    HPMP_SYS: final = "hpmpSys"
+    IS_OFFLINE_48H: final = "isOffline48H"
+    LNK: final = "lnk"  # gwLink
+    LOC: final = "loc"  # location
+    CONSUMPTION_SETTINGS: final = "consumptionsSettings"
+    GEOFENCE_CONFIG: final = "geofenceConfig"
+    MQTT_API_VERSION: final = "mqttApiVersion"  # mqttApiVersion
+    NAME: final = "name"  # plantName
+    SN: final = "sn"  # gwSerial
+    SYS: final = "sys"  # gwSysType
+    TC_BY_GUEST: final = "tcByGuest"  # controlledByGuest
+    UTC_OFT: final = "utcOft"
+    WEATHER_PROVIDER: final = "weatherProvider"
+
+
+class GalevoDeviceAttribute(DeviceAttribute):
+    """Constants for galevo device attributes"""
+
+    ZONES: final = "zones"
+    SOLAR: final = "solar"
+    CONV_BOILER: final = "convBoiler"
+    HYBRID_SYS: final = "hybridSys"
+    DHW_PROG_SUPPORTED: final = "dhwProgSupported"
+    VIRTUAL_ZONES: final = "virtualZones"
+    HAS_VMC: final = "hasVmc"
+    HAS_EXT_TP: final = "hasExtTP"  # extendedTimeProg
+    HAS_BOILER: final = "hasBoiler"
+    PILOT_SUPPORTED: final = "pilotSupported"
+    UMSYS: final = "umsys"
+    IS_VMC_R2: final = "isVmcR2"
+    IS_EVO2: final = "isEvo2"
+    FW_VER: final = "fwVer"
+
+
+class VelisDeviceAttribute(DeviceAttribute):
+    """Constants for velis device attributes"""
+
+    NOTIFY_ON_CONDENSATE_TANK_FULL: final = "notifyOnCondensateTankFull"
+    NOTIFY_ON_ERRORS: final = "notifyOnErrors"
+    NOTIFY_ON_READY_SHOWERS: final = "notifyOnReadyShowers"
+    WHE_MODEL_TYPE: final = "wheModelType"
+    WHE_TYPE: final = "wheType"
 
 
 class ZoneAttribute:
@@ -179,6 +238,34 @@ class DeviceFeatures:
     VIRTUAL_ZONES: final = "virtualZones"
     ZONES: final = "zones"
     WEATHER_PROVIDER: final = "weatherProvider"
+
+
+class VelisDeviceProperties:
+    """Contants for Velis device properties"""
+
+    ANTI_LEG: final = "antiLeg"
+    AV_SHW: final = "avShw"
+    ECO: final = "eco"
+    GW: final = "gw"
+    HEAT_REQ: final = "heatReq"
+    MODE: final = "mode"
+    ON: final = "on"
+    PROC_REQ_TEMP: final = "procReqTemp"
+    PWR_OPT: final = "pwrOpt"
+    REQ_TEMP: final = "reqTemp"
+    RM_TM: final = "rmTm"
+    TEMP: final = "temp"
+
+
+class MedDeviceSettings:
+    """Constatns for Velis device settings"""
+
+    MED_ANTILEGIONELLA_ON_OFF: final = "MedAntilegionellaOnOff"
+    MED_HEATING_RATE: final = "MedHeatingRate"
+    MED_MAX_SETPOINT_TEMPERATURE: final = "MedMaxSetpointTemperature"
+    MED_MAX_SETPOINT_TEMPERATURE_MAX: final = "MedMaxSetpointTemperatureMax"
+    MED_MAX_SETPOINT_TEMPERATURE_MIN: final = "MedMaxSetpointTemperatureMin"
+    WHE_MARKET: final = "WheMarket"
 
 
 class DeviceProperties:
@@ -259,11 +346,15 @@ class AristonAPI:
 
         return True
 
-    async def async_get_detailed_devices(self) -> dict[str, Any]:
+    async def async_get_detailed_devices(self) -> list:
         """Get detailed cloud devices"""
         return await self.get(f"{ARISTON_API_URL}{ARISTON_REMOTE}/{ARISTON_PLANTS}")
 
-    async def async_get_devices(self) -> dict[str, Any]:
+    async def async_get_detailed_velis_devices(self) -> list:
+        """Get detailed cloud devices"""
+        return await self.get(f"{ARISTON_API_URL}{ARISTON_VELIS}/{ARISTON_PLANTS}")
+
+    async def async_get_devices(self) -> list:
         """Get cloud devices"""
         return await self.get(
             f"{ARISTON_API_URL}{ARISTON_REMOTE}/{ARISTON_PLANTS}/{ARISTON_LITE}"
@@ -282,11 +373,11 @@ class AristonAPI:
         )
 
     async def async_get_consumptions_sequences(
-        self, gw_id: str, has_boiler: bool, has_slp: bool
+        self, gw_id: str, has_heat: bool, has_boiler: bool, has_slp: bool
     ) -> dict[str, Any]:
         """Get consumption sequences for the device"""
         return await self.get(
-            f"{ARISTON_API_URL}{ARISTON_REMOTE}/{ARISTON_REPORTS}/{gw_id}/consSequencesApi8?usages=Ch{'%2CDhw' if has_boiler else ''}&hasSlp={has_slp}"
+            f"{ARISTON_API_URL}{ARISTON_REMOTE}/{ARISTON_REPORTS}/{gw_id}/consSequencesApi8?usages={'Ch' if has_heat else ''}{'%2C' if has_heat and has_boiler else ''}{'Dhw' if has_boiler else ''}&hasSlp={has_slp}"
         )
 
     async def async_get_consumptions_settings(self, gw_id: str) -> dict[str, Any]:
@@ -344,6 +435,19 @@ class AristonAPI:
             },
         )
 
+    async def async_get_med_plant_data(self, gw_id) -> dict[str, Any]:
+        """Get Velis properties"""
+
+        return await self.get(
+            f"{ARISTON_API_URL}{ARISTON_VELIS}/{ARISTON_MED_PLANT_DATA}/{gw_id}"
+        )
+
+    async def async_get_med_plant_settings(self, gw_id) -> dict[str, Any]:
+        """Get Velis settings"""
+        return await self.get(
+            f"{ARISTON_API_URL}{ARISTON_VELIS}/{ARISTON_MED_PLANT_DATA}/{gw_id}/plantSettings?wheType=PowerRussis"
+        )
+
     async def async_set_property(
         self,
         gw_id: str,
@@ -367,6 +471,29 @@ class AristonAPI:
                     }
                 ],
                 "features": features,
+            },
+        )
+
+    async def async_set_velis_mode(self, gw_id: str, value: VelisPlantMode) -> None:
+        """Set Velis mode"""
+        return await self.post(
+            f"{ARISTON_API_URL}{ARISTON_VELIS}/{ARISTON_MED_PLANT_DATA}/{gw_id}/mode",
+            {
+                "new": value.value,
+                # "old": old_value
+            },
+        )
+
+    async def async_set_velis_temperature(
+        self, gw_id: str, eco: bool, value: float
+    ) -> None:
+        """Set Velis temperature"""
+        return await self.post(
+            f"{ARISTON_API_URL}{ARISTON_VELIS}/{ARISTON_MED_PLANT_DATA}/{gw_id}/temperature",
+            {
+                "eco": eco,
+                "new": value,
+                # "old": old_value
             },
         )
 

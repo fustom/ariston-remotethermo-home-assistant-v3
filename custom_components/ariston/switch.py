@@ -8,7 +8,7 @@ from homeassistant.config_entries import ConfigEntry
 from homeassistant.components.switch import SwitchEntity
 
 from .entity import AristonEntity
-from .ariston import DeviceAttribute, PropertyType
+from .ariston import PropertyType
 from .const import ARISTON_SWITCH_TYPES, DOMAIN, AristonSwitchEntityDescription
 from .coordinator import DeviceDataUpdateCoordinator, DeviceEnergyUpdateCoordinator
 
@@ -26,7 +26,9 @@ async def async_setup_entry(
             hass.data[DOMAIN][entry.unique_id][description.coordinator]
         )
         if coordinator.device.are_device_features_available(
-            description.device_features, description.extra_energy_feature
+            description.device_features,
+            description.extra_energy_feature,
+            description.system_types,
         ):
             ariston_switches.append(
                 AristonSwitch(
@@ -48,13 +50,6 @@ class AristonSwitch(AristonEntity, SwitchEntity):
     ) -> None:
         """Initialize the switch."""
         super().__init__(coordinator, description)
-
-    @property
-    def unique_id(self):
-        """Return the unique id."""
-        return (
-            f"{self.coordinator.device.attributes[DeviceAttribute.GW_ID]}-{self.name}"
-        )
 
     @property
     def is_on(self):

@@ -24,7 +24,6 @@ from .const import (
 )
 from .coordinator import DeviceDataUpdateCoordinator, DeviceEnergyUpdateCoordinator
 from .ariston import (
-    DeviceAttribute,
     DeviceProperties,
     PropertyType,
 )
@@ -52,7 +51,9 @@ async def async_setup_entry(
             hass.data[DOMAIN][entry.unique_id][description.coordinator]
         )
         if coordinator.device.are_device_features_available(
-            description.device_features, description.extra_energy_feature
+            description.device_features,
+            description.extra_energy_feature,
+            description.system_types,
         ):
             ariston_binary_sensors.append(AristonBinarySensor(coordinator, description))
 
@@ -60,8 +61,8 @@ async def async_setup_entry(
 
     async def async_create_vacation_service(service_call):
         """Create a vacation on the target device."""
-        device_id = service_call.data[ATTR_DEVICE_ID]
-        end_date = service_call.data.get(ATTR_END_DATE, None)
+        device_id = service_call.data.get(ATTR_DEVICE_ID)
+        end_date = service_call.data.get(ATTR_END_DATE)
 
         device_registry = dr.async_get(hass)
         device = device_registry.devices[device_id]
@@ -92,13 +93,6 @@ class AristonBinarySensor(AristonEntity, BinarySensorEntity):
         description: AristonBinarySensorEntityDescription,
     ) -> None:
         super().__init__(coordinator, description)
-
-    @property
-    def unique_id(self):
-        """Return the unique id."""
-        return (
-            f"{self.coordinator.device.attributes[DeviceAttribute.GW_ID]}-{self.name}"
-        )
 
     @property
     def is_on(self):
