@@ -59,14 +59,12 @@ class AristonWaterHeater(AristonEntity, WaterHeaterEntity):
     @property
     def name(self) -> str:
         """Return the name of the device."""
-        return self.coordinator.device.attributes.get(DeviceAttribute.NAME)
+        return self.device.attributes.get(DeviceAttribute.NAME)
 
     @property
     def unique_id(self) -> str:
         """Return a unique id for the device."""
-        return (
-            f"{self.coordinator.device.attributes.get(DeviceAttribute.GW)}-water_heater"
-        )
+        return f"{self.device.attributes.get(DeviceAttribute.GW)}-water_heater"
 
     @property
     def icon(self):
@@ -75,53 +73,53 @@ class AristonWaterHeater(AristonEntity, WaterHeaterEntity):
     @property
     def current_temperature(self):
         """Return the temperature"""
-        return self.coordinator.device.get_water_heater_current_temperature()
+        return self.device.get_water_heater_current_temperature()
 
     @property
     def min_temp(self):
         """Return the minimum temperature."""
-        return self.coordinator.device.get_water_heater_minimum_temperature()
+        return self.device.get_water_heater_minimum_temperature()
 
     @property
     def target_temperature(self):
         """Return the temperature we try to reach."""
-        return self.coordinator.device.get_water_heater_target_temperature()
+        return self.device.get_water_heater_target_temperature()
 
     @property
     def max_temp(self):
         """Return the maximum temperature."""
-        return self.coordinator.device.get_water_heater_maximum_temperature()
+        return self.device.get_water_heater_maximum_temperature()
 
     @property
     def precision(self) -> float:
         """Return the precision of temperature for the device."""
-        return 1 / 10 ** self.coordinator.device.get_water_heater_decimals()
+        return 1 / 10 ** self.device.get_water_heater_decimals()
 
     @property
     def temperature_unit(self):
         """Return the unit of measurement."""
-        return self.coordinator.device.get_water_heater_temperature_unit()
+        return self.device.get_water_heater_temperature_unit()
 
     @property
     def supported_features(self) -> int:
         """Return the supported features for this device integration."""
-        if self.coordinator.device.features.get(DeviceFeatures.DHW_MODE_CHANGEABLE):
+        if self.device.features.get(DeviceFeatures.DHW_MODE_CHANGEABLE):
             return SUPPORT_TARGET_TEMPERATURE | SUPPORT_OPERATION_MODE
         return SUPPORT_TARGET_TEMPERATURE
 
     @property
     def operation_list(self):
         """List of available operation modes."""
-        return self.coordinator.device.get_water_heater_mode_opertation_texts()
+        return self.device.get_water_heater_mode_opertation_texts()
 
     @property
     def current_operation(self):
         """Return current operation"""
-        res = self.coordinator.device.get_water_heater_mode_options().index(
-            self.coordinator.device.get_water_heater_mode_value()
+        res = self.device.get_water_heater_mode_options().index(
+            self.device.get_water_heater_mode_value()
         )
 
-        return self.coordinator.device.get_water_heater_mode_opertation_texts()[res]
+        return self.device.get_water_heater_mode_opertation_texts()[res]
 
     async def async_set_temperature(self, **kwargs):
         """Set new target temperature."""
@@ -135,12 +133,10 @@ class AristonWaterHeater(AristonEntity, WaterHeaterEntity):
             self.name,
         )
 
-        await self.coordinator.device.async_set_water_heater_temperature(temperature)
+        await self.device.async_set_water_heater_temperature(temperature)
         self.async_write_ha_state()
 
     async def async_set_operation_mode(self, operation_mode):
         """Set operation mode."""
-        await self.coordinator.device.async_set_water_heater_operation_mode(
-            operation_mode
-        )
+        await self.device.async_set_water_heater_operation_mode(operation_mode)
         self.async_write_ha_state()

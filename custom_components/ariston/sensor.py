@@ -82,14 +82,14 @@ class AristonSensor(AristonEntity, SensorEntity):
     @property
     def native_value(self):
         """Return value of sensor."""
-        return self.coordinator.device.get_item_by_id(
+        return self.device.get_item_by_id(
             self.entity_description.key, PropertyType.VALUE
         )
 
     @property
     def native_unit_of_measurement(self):
         """Return the nateive unit of measurement"""
-        return self.coordinator.device.get_item_by_id(
+        return self.device.get_item_by_id(
             self.entity_description.key, PropertyType.UNIT
         )
 
@@ -111,17 +111,12 @@ class AristonGasConsumptionLastTwoHoursSensor(AristonEntity, SensorEntity):
     @property
     def native_value(self):
         """Set last_reset value if sequence is modified. Then return the last two hours value."""
-        if (
-            self.current_consumptions_sequences
-            != self.coordinator.device.consumptions_sequences
-        ):
+        if self.current_consumptions_sequences != self.device.consumptions_sequences:
             self.reset_datetime = dt_util.utcnow() - timedelta(hours=1)
-            self.current_consumptions_sequences = (
-                self.coordinator.device.consumptions_sequences
-            )
-        return self.coordinator.device.consumptions_sequences[
-            int(self.entity_description.key)
-        ]["v"][-1]
+            self.current_consumptions_sequences = self.device.consumptions_sequences
+        return self.device.consumptions_sequences[int(self.entity_description.key)][
+            "v"
+        ][-1]
 
     @property
     def last_reset(self) -> datetime | None:
@@ -142,6 +137,4 @@ class AristonEnergyLastMonthSensor(AristonEntity, SensorEntity):
     @property
     def native_value(self):
         values = self.entity_description.key.split("|")
-        return self.coordinator.device.energy_account.get("LastMonth")[int(values[0])][
-            values[1]
-        ]
+        return self.device.energy_account.get("LastMonth")[int(values[0])][values[1]]

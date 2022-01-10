@@ -97,6 +97,6 @@ class AristonBinarySensor(AristonEntity, BinarySensorEntity):
     @property
     def is_on(self):
         """Return True if the binary sensor is on."""
-        return self.coordinator.device.get_item_by_id(
+        return self.device.get_item_by_id(
             self.entity_description.key, PropertyType.VALUE
         )

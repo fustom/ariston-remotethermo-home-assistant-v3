@@ -42,10 +42,10 @@ DEFAULT_SCAN_INTERVAL_SECONDS: final = 60
 DEFAULT_ENERGY_SCAN_INTERVAL_MINUTES: final = 60
 DEFAULT_EXTRA_ENERGY_FEATURES: final = False
 
-ATTR_TARGET_TEMP_STEP = "target_temp_step"
-ATTR_HEAT_REQUEST = "heat_request"
-ATTR_ECONOMY_TEMP = "economy_temp"
-ATTR_HOLIDAY = "holiday"
+ATTR_TARGET_TEMP_STEP: final = "target_temp_step"
+ATTR_HEAT_REQUEST: final = "heat_request"
+ATTR_ECONOMY_TEMP: final = "economy_temp"
+ATTR_HOLIDAY: final = "holiday"
 
 
 @dataclass

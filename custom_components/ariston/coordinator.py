@@ -12,7 +12,7 @@ from .const import (
     DOMAIN,
     ENERGY_COORDINATOR,
 )
-from .device import AristonDevice
+from .galevo_device import AristonGalevoDevice
 from .velis_device import AristonVelisDevice
 from .ariston import DeviceAttribute
 
@@ -25,7 +25,7 @@ class DeviceDataUpdateCoordinator(DataUpdateCoordinator):
     def __init__(
         self,
         hass: HomeAssistant,
-        device: AristonDevice or AristonVelisDevice,
+        device: AristonGalevoDevice or AristonVelisDevice,
         scan_interval_seconds: int,
     ) -> None:
         """Initialize the data update coordinator."""
@@ -48,7 +48,7 @@ class DeviceEnergyUpdateCoordinator(DataUpdateCoordinator):
     def __init__(
         self,
         hass: HomeAssistant,
-        device: AristonDevice or AristonVelisDevice,
+        device: AristonGalevoDevice or AristonVelisDevice,
         energy_interval_minutes: int,
     ) -> None:
         """Initialize the data update coordinator."""
