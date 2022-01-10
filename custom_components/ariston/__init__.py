@@ -81,7 +81,9 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
         SystemType.GALEVO,
         SystemType.VELIS,
     ]:
-        _LOGGER.error("Your device is currently not supported. Contact a developer")
+        _LOGGER.error(
+            "Your device is currently not supported. Contact with the developer"
+        )
         return False
 
     if entry.data[CONF_DEVICE].get(DeviceAttribute.SYS) == SystemType.GALEVO:

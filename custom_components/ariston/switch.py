@@ -54,20 +54,16 @@ class AristonSwitch(AristonEntity, SwitchEntity):
     @property
     def is_on(self):
         """Return true if switch is on."""
-        return self.coordinator.device.get_item_by_id(
+        return self.device.get_item_by_id(
             self.entity_description.key, PropertyType.VALUE
         )
 
     async def async_turn_on(self, **kwargs) -> None:
         """Turn the switch on."""
-        await self.coordinator.device.async_set_item_by_id(
-            self.entity_description.key, 1.0
-        )
+        await self.device.async_set_item_by_id(self.entity_description.key, 1.0)
         self.async_write_ha_state()
 
     async def async_turn_off(self, **kwargs) -> None:
         """Turn the device off."""
-        await self.coordinator.device.async_set_item_by_id(
-            self.entity_description.key, 0.0
-        )
+        await self.device.async_set_item_by_id(self.entity_description.key, 0.0)
         self.async_write_ha_state()

@@ -53,9 +53,7 @@ class AristonNumber(AristonEntity, NumberEntity):
     @property
     def value(self):
         """Return the current value"""
-        return self.coordinator.device.consumptions_settings.get(
-            self.entity_description.key
-        )
+        return self.device.consumptions_settings.get(self.entity_description.key)
 
     # Should be removed after HA release the new NumberEntityDescription (https://github.com/home-assistant/core/pull/61100/)
     @property
@@ -74,6 +72,6 @@ class AristonNumber(AristonEntity, NumberEntity):
 
     async def async_set_value(self, value: float):
         """Update the current value."""
-        await self.coordinator.device.async_set_consumptions_settings(
+        await self.device.async_set_consumptions_settings(
             self.entity_description.key, value
         )

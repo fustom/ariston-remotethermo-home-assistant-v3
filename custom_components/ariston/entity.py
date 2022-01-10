@@ -27,24 +27,18 @@ class AristonEntity(CoordinatorEntity, ABC):
         """Initialize the entity."""
         super().__init__(coordinator)
 
-        self.coordinator = coordinator
+        self.device = coordinator.device
         self.entity_description: AristonBaseEntityDescription = description
 
     @property
     def device_info(self) -> DeviceInfo:
         """Return device specific attributes."""
         return DeviceInfo(
-            identifiers={
-                (DOMAIN, self.coordinator.device.attributes.get(DeviceAttribute.SN))
-            },
+            identifiers={(DOMAIN, self.device.attributes.get(DeviceAttribute.SN))},
             manufacturer=DOMAIN,
-            name=self.coordinator.device.attributes.get(DeviceAttribute.NAME),
-            sw_version=self.coordinator.device.attributes.get(
-                GalevoDeviceAttribute.FW_VER
-            ),
-            model=SystemType(
-                self.coordinator.device.attributes.get(DeviceAttribute.SYS)
-            ).name,
+            name=self.device.attributes.get(DeviceAttribute.NAME),
+            sw_version=self.device.attributes.get(GalevoDeviceAttribute.FW_VER),
+            model=SystemType(self.device.attributes.get(DeviceAttribute.SYS)).name,
         )
 
     @property
@@ -56,7 +50,7 @@ class AristonEntity(CoordinatorEntity, ABC):
             return None
 
         for extra_state in self.entity_description.extra_states:
-            state_attribute = self.coordinator.device.get_item_by_id(
+            state_attribute = self.device.get_item_by_id(
                 extra_state["Property"], extra_state["Value"], extra_state["Zone"]
             )
             if state_attribute is not None:
@@ -67,6 +61,4 @@ class AristonEntity(CoordinatorEntity, ABC):
     @property
     def unique_id(self):
         """Return the unique id."""
-        return (
-            f"{self.coordinator.device.attributes.get(DeviceAttribute.GW)}-{self.name}"
-        )
+        return f"{self.device.attributes.get(DeviceAttribute.GW)}-{self.name}"

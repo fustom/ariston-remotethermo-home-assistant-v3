@@ -59,9 +59,7 @@ class AristonSelect(AristonEntity, SelectEntity):
     def current_option(self):
         """Return current selected option."""
         return self.entity_description.enum_class(
-            self.coordinator.device.consumptions_settings.get(
-                self.entity_description.key
-            )
+            self.device.consumptions_settings.get(self.entity_description.key)
         ).name
 
     @property
@@ -70,7 +68,7 @@ class AristonSelect(AristonEntity, SelectEntity):
         return [c.name for c in self.entity_description.enum_class]
 
     async def async_select_option(self, option: str):
-        await self.coordinator.device.async_set_consumptions_settings(
+        await self.device.async_set_consumptions_settings(
             self.entity_description.key,
             self.entity_description.enum_class[option],
         )
