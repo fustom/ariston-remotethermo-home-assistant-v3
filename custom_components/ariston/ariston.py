@@ -453,7 +453,7 @@ class AristonAPI:
         gw_id: str,
         zone_id: int,
         features: dict[str, Any],
-        device_property: str,
+        device_property: DeviceProperties or ThermostatProperties,
         value: float,
         prev_value: float,
         umsys: str,

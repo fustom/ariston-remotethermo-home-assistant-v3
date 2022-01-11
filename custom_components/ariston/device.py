@@ -11,6 +11,8 @@ from .ariston import (
     ConsumptionProperties,
     DeviceAttribute,
     DeviceFeatures,
+    DeviceProperties,
+    PropertyType,
     SystemType,
 )
 
@@ -98,13 +100,6 @@ class AristonDevice(ABC):
             return True
 
         for device_feature in device_features:
-            # TODO: remove this
-            if (
-                device_feature is DeviceFeatures.HAS_BOILER
-                and self.attributes.get(DeviceAttribute.SYS) == SystemType.VELIS
-            ):
-                continue
-
             if self.features.get(device_feature) is not True:
                 return False
 

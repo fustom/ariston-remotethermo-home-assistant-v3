@@ -105,7 +105,7 @@ class AristonGasConsumptionLastTwoHoursSensor(AristonEntity, SensorEntity):
         """Initialize the sensor."""
         super().__init__(coordinator, description)
 
-        self.current_consumptions_sequences = coordinator.device.consumptions_sequences
+        self.current_consumptions_sequences = self.device.consumptions_sequences
         self.reset_datetime = None
 
     @property

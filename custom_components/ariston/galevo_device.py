@@ -10,6 +10,7 @@ from .ariston import (
     DeviceAttribute,
     DeviceProperties,
     PropertyType,
+    ThermostatProperties,
 )
 
 _LOGGER = logging.getLogger(__name__)
@@ -61,7 +62,7 @@ class AristonGalevoDevice(AristonDevice):
         return next(
             item.get(item_value)
             for item in self.data.get("items")
-            if item.get("id") == item_id and item[PropertyType.ZONE] == zone_number
+            if item.get("id") == item_id and item.get(PropertyType.ZONE) == zone_number
         )
 
     async def async_set_water_heater_temperature(self, temperature: float):
@@ -76,7 +77,10 @@ class AristonGalevoDevice(AristonDevice):
         )
 
     async def async_set_item_by_id(
-        self, item_id: str, value: float, zone_number: int = 0
+        self,
+        item_id: DeviceProperties or ThermostatProperties,
+        value: float,
+        zone_number: int = 0,
     ):
         """Set item attribute on device"""
         current_value = self.get_item_by_id(item_id, PropertyType.VALUE, zone_number)
