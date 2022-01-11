@@ -6,7 +6,7 @@ import logging
 from .entity import AristonEntity
 from .ariston import DeviceAttribute, DeviceFeatures
 from .const import (
-    ARISTON_WATER_HEATER_TYPE,
+    ARISTON_WATER_HEATER_TYPES,
     DOMAIN,
     AristonWaterHeaterEntityDescription,
 )
@@ -30,17 +30,20 @@ async def async_setup_entry(
     hass: HomeAssistant, entry: ConfigEntry, async_add_entities
 ):
     """Set up the Ariston water heater device from config entry."""
-    description = ARISTON_WATER_HEATER_TYPE
-    coordinator: DeviceDataUpdateCoordinator or DeviceEnergyUpdateCoordinator = (
-        hass.data[DOMAIN][entry.unique_id][description.coordinator]
-    )
+    ariston_water_heaters: list[AristonWaterHeater] = []
+    for description in ARISTON_WATER_HEATER_TYPES:
+        coordinator: DeviceDataUpdateCoordinator or DeviceEnergyUpdateCoordinator = (
+            hass.data[DOMAIN][entry.unique_id][description.coordinator]
+        )
 
-    if coordinator.device.are_device_features_available(
-        description.device_features,
-        description.extra_energy_feature,
-        description.system_types,
-    ):
-        async_add_entities([AristonWaterHeater(coordinator, description)])
+        if coordinator.device.are_device_features_available(
+            description.device_features,
+            description.extra_energy_feature,
+            description.system_types,
+        ):
+            ariston_water_heaters.append(AristonWaterHeater(coordinator, description))
+
+    async_add_entities(ariston_water_heaters)
 
     return
 
