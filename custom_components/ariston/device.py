@@ -45,15 +45,12 @@ class AristonDevice(ABC):
     def get_water_heater_temperature_step(self) -> str:
         raise NotImplementedError
 
-    @abstractmethod
     def get_zone_heat_request_value(self, zone_number: int) -> str:
         raise NotImplementedError
 
-    @abstractmethod
     def get_zone_economy_temp_value(self, zone_number: int) -> str:
         raise NotImplementedError
 
-    @abstractmethod
     def get_zone_number(self, zone_number: int) -> str:
         raise NotImplementedError
 
