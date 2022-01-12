@@ -9,7 +9,12 @@ from abc import ABC
 from homeassistant.helpers.entity import DeviceInfo
 from homeassistant.helpers.update_coordinator import CoordinatorEntity
 
-from .const import DOMAIN, AristonBaseEntityDescription
+from .const import (
+    DOMAIN,
+    EXTRA_STATE_ATTRIBUTE,
+    EXTRA_STATE_METHOD_NAME,
+    AristonBaseEntityDescription,
+)
 from .ariston import DeviceAttribute, GalevoDeviceAttribute, SystemType
 from .coordinator import DeviceDataUpdateCoordinator, DeviceEnergyUpdateCoordinator
 
@@ -23,12 +28,14 @@ class AristonEntity(CoordinatorEntity, ABC):
         self,
         coordinator: DeviceDataUpdateCoordinator or DeviceEnergyUpdateCoordinator,
         description: AristonBaseEntityDescription,
+        zone: int = None,
     ) -> None:
         """Initialize the entity."""
         super().__init__(coordinator)
 
         self.device = coordinator.device
         self.entity_description: AristonBaseEntityDescription = description
+        self.zone = zone
 
     @property
     def device_info(self) -> DeviceInfo:
@@ -50,13 +57,12 @@ class AristonEntity(CoordinatorEntity, ABC):
             return None
 
         for extra_state in self.entity_description.extra_states:
-            # TODO
-            if self.device.attributes.get(DeviceAttribute.SYS) == SystemType.GALEVO:
-                state_attribute = self.device.get_item_by_id(
-                    extra_state["Property"], extra_state["Value"], extra_state["Zone"]
+            method_name = extra_state.get(EXTRA_STATE_METHOD_NAME)
+            if method_name is not None:
+                method = getattr(self.device, method_name)
+                state_attributes[extra_state.get(EXTRA_STATE_ATTRIBUTE)] = (
+                    method() if self.zone is None else method(self.zone)
                 )
-                if state_attribute is not None:
-                    state_attributes[extra_state["Attribute"]] = state_attribute
 
         return state_attributes
 

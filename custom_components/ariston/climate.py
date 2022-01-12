@@ -2,7 +2,6 @@
 from __future__ import annotations
 
 import logging
-import copy
 
 from .entity import AristonEntity
 from .const import ARISTON_CLIMATE_TYPE, COORDINATOR, DOMAIN
@@ -63,12 +62,7 @@ class AristonThermostat(AristonEntity, ClimateEntity):
         coordinator: DeviceDataUpdateCoordinator,
     ) -> None:
         """Initialize the thermostat"""
-        description = copy.deepcopy(ARISTON_CLIMATE_TYPE)
-        for extra_state in description.extra_states:
-            extra_state["Zone"] = zone
-        super().__init__(coordinator, description)
-
-        self.zone: int = zone
+        super().__init__(coordinator, ARISTON_CLIMATE_TYPE, zone)
 
     @property
     def name(self) -> str:

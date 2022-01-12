@@ -70,7 +70,10 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
     )
     reponse = await api.async_connect()
     if not reponse:
-        _LOGGER.error("Failed to connect to Ariston")
+        _LOGGER.error(
+            "Failed to connect to Ariston with device: %s",
+            entry.data[CONF_DEVICE].get(DeviceAttribute.NAME),
+        )
         return False
 
     extra_energy_features = entry.options.get(
