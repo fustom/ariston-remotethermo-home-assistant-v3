@@ -46,6 +46,9 @@ class AristonGalevoDevice(AristonDevice):
     def get_water_heater_temperature_unit(self) -> str:
         return self.get_item_by_id(DeviceProperties.DHW_TEMP, PropertyType.UNIT)
 
+    def get_water_heater_temperature_step(self) -> str:
+        return self.get_item_by_id(DeviceProperties.DHW_TEMP, PropertyType.STEP)
+
     def get_water_heater_mode_opertation_texts(self) -> list:
         return self.get_item_by_id(DeviceProperties.DHW_MODE, PropertyType.OPT_TEXTS)
 
@@ -54,6 +57,22 @@ class AristonGalevoDevice(AristonDevice):
 
     def get_water_heater_mode_value(self) -> int:
         return self.get_item_by_id(DeviceProperties.DHW_MODE, PropertyType.VALUE)
+
+    def get_zone_heat_request_value(self, zone_number: int) -> str:
+        return self.get_item_by_id(
+            ThermostatProperties.ZONE_HEAT_REQUEST, PropertyType.VALUE, zone_number
+        )
+
+    def get_zone_economy_temp_value(self, zone_number: int) -> str:
+        return self.get_item_by_id(
+            ThermostatProperties.ZONE_ECONOMY_TEMP, PropertyType.VALUE, zone_number
+        )
+
+    def get_zone_number(self, zone_number: int) -> str:
+        return zone_number
+
+    def get_holiday_expires_on(self) -> str:
+        return self.get_item_by_id(DeviceProperties.HOLIDAY, PropertyType.EXPIRES_ON)
 
     def get_item_by_id(
         self, item_id: DeviceProperties, item_value: PropertyType, zone_number: int = 0

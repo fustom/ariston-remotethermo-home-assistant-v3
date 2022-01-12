@@ -25,10 +25,9 @@ from .ariston import (
     DeviceProperties,
     GasEnergyUnit,
     GasType,
-    PropertyType,
     SystemType,
-    ThermostatProperties,
 )
+from .device import AristonDevice
 
 
 DOMAIN: final = "ariston"
@@ -46,6 +45,10 @@ ATTR_TARGET_TEMP_STEP: final = "target_temp_step"
 ATTR_HEAT_REQUEST: final = "heat_request"
 ATTR_ECONOMY_TEMP: final = "economy_temp"
 ATTR_HOLIDAY: final = "holiday"
+ATTR_ZONE: final = "zone_number"
+
+EXTRA_STATE_ATTRIBUTE: final = "Attribute"
+EXTRA_STATE_METHOD_NAME: final = "MethodName"
 
 
 @dataclass
@@ -56,7 +59,8 @@ class AristonBaseEntityDescription(EntityDescription, ABC):
     coordinator: str = COORDINATOR
     extra_energy_feature: bool = False
     extra_states: list[
-        dict["Property":str], dict["Type":str], dict["Zone":int], dict["Attribute":str]
+        dict[EXTRA_STATE_ATTRIBUTE:str],
+        dict[EXTRA_STATE_METHOD_NAME:str],
     ] or None = None
     zone: int = 0
     system_types: list[SystemType] or None = None
@@ -117,14 +121,16 @@ ARISTON_CLIMATE_TYPE = AristonClimateEntityDescription(
     key="AristonClimate",
     extra_states=[
         {
-            "Property": ThermostatProperties.ZONE_HEAT_REQUEST,
-            "Value": PropertyType.VALUE,
-            "Attribute": ATTR_HEAT_REQUEST,
+            EXTRA_STATE_ATTRIBUTE: ATTR_HEAT_REQUEST,
+            EXTRA_STATE_METHOD_NAME: AristonDevice.get_zone_heat_request_value.__name__,
         },
         {
-            "Property": ThermostatProperties.ZONE_ECONOMY_TEMP,
-            "Value": PropertyType.VALUE,
-            "Attribute": ATTR_ECONOMY_TEMP,
+            EXTRA_STATE_ATTRIBUTE: ATTR_ECONOMY_TEMP,
+            EXTRA_STATE_METHOD_NAME: AristonDevice.get_zone_economy_temp_value.__name__,
+        },
+        {
+            EXTRA_STATE_ATTRIBUTE: ATTR_ZONE,
+            EXTRA_STATE_METHOD_NAME: AristonDevice.get_zone_number.__name__,
         },
     ],
     system_types=[SystemType.GALEVO],
@@ -135,10 +141,8 @@ ARISTON_WATER_HEATER_TYPES: tuple[AristonWaterHeaterEntityDescription, ...] = (
         key="AristonWaterHeater",
         extra_states=[
             {
-                "Property": DeviceProperties.DHW_TEMP,
-                "Value": PropertyType.STEP,
-                "Zone": 0,
-                "Attribute": ATTR_TARGET_TEMP_STEP,
+                EXTRA_STATE_ATTRIBUTE: ATTR_TARGET_TEMP_STEP,
+                EXTRA_STATE_METHOD_NAME: AristonDevice.get_water_heater_temperature_step.__name__,
             }
         ],
         device_features=[DeviceFeatures.HAS_BOILER],
@@ -182,10 +186,8 @@ ARISTON_BINARY_SENSOR_TYPES: tuple[AristonBinarySensorEntityDescription, ...] = 
         icon="mdi:island",
         extra_states=[
             {
-                "Property": DeviceProperties.HOLIDAY,
-                "Value": PropertyType.EXPIRES_ON,
-                "Zone": 0,
-                "Attribute": ATTR_HOLIDAY,
+                EXTRA_STATE_ATTRIBUTE: ATTR_HOLIDAY,
+                EXTRA_STATE_METHOD_NAME: AristonDevice.get_holiday_expires_on.__name__,
             }
         ],
         system_types=[SystemType.GALEVO],

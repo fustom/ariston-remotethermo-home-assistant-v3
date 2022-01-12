@@ -44,6 +44,9 @@ class AristonVelisDevice(AristonDevice):
     def get_water_heater_target_temperature(self) -> float:
         return self.data.get(VelisDeviceProperties.REQ_TEMP)
 
+    def get_water_heater_temperature_step(self) -> str:
+        return 1
+
     def get_water_heater_decimals(self) -> int:
         return 0
 

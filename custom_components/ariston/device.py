@@ -3,7 +3,7 @@ from __future__ import annotations
 
 import logging
 
-from abc import ABC
+from abc import ABC, abstractmethod
 from typing import Any
 
 from .ariston import (
@@ -11,8 +11,6 @@ from .ariston import (
     ConsumptionProperties,
     DeviceAttribute,
     DeviceFeatures,
-    DeviceProperties,
-    PropertyType,
     SystemType,
 )
 
@@ -42,6 +40,26 @@ class AristonDevice(ABC):
         self.consumptions_sequences: list = []
         self.data: dict = {}
         self.plant_settings: dict = {}
+
+    @abstractmethod
+    def get_water_heater_temperature_step(self) -> str:
+        raise NotImplementedError
+
+    @abstractmethod
+    def get_zone_heat_request_value(self, zone_number: int) -> str:
+        raise NotImplementedError
+
+    @abstractmethod
+    def get_zone_economy_temp_value(self, zone_number: int) -> str:
+        raise NotImplementedError
+
+    @abstractmethod
+    def get_zone_number(self, zone_number: int) -> str:
+        raise NotImplementedError
+
+    @abstractmethod
+    def get_holiday_expires_on(self) -> str:
+        raise NotImplementedError
 
     async def async_get_features(self) -> None:
         """Get device features wrapper"""
