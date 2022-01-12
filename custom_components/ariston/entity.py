@@ -60,9 +60,11 @@ class AristonEntity(CoordinatorEntity, ABC):
             method_name = extra_state.get(EXTRA_STATE_METHOD_NAME)
             if method_name is not None:
                 method = getattr(self.device, method_name)
-                state_attributes[extra_state.get(EXTRA_STATE_ATTRIBUTE)] = (
-                    method() if self.zone is None else method(self.zone)
-                )
+                state_attribute = method() if self.zone is None else method(self.zone)
+                if state_attribute is not None:
+                    state_attributes[
+                        extra_state.get(EXTRA_STATE_ATTRIBUTE)
+                    ] = state_attribute
 
         return state_attributes
 
