@@ -18,6 +18,7 @@ ARISTON_DATA_ITEMS: final = "dataItems"
 ARISTON_ZONES: final = "zones"
 ARISTON_PLANT_DATA: final = "plantData"
 ARISTON_MED_PLANT_DATA: final = "medPlantData"
+ARISTON_SE_PLANT_DATA: final = "sePlantData"
 ARISTON_REPORTS: final = "reports"
 ARISTON_TIME_PROGS: final = "timeProgs"
 
@@ -258,7 +259,7 @@ class VelisDeviceProperties:
 
 
 class MedDeviceSettings:
-    """Constatns for Velis device settings"""
+    """Constatns for Med device settings"""
 
     MED_ANTILEGIONELLA_ON_OFF: final = "MedAntilegionellaOnOff"
     MED_HEATING_RATE: final = "MedHeatingRate"
@@ -266,6 +267,29 @@ class MedDeviceSettings:
     MED_MAX_SETPOINT_TEMPERATURE_MAX: final = "MedMaxSetpointTemperatureMax"
     MED_MAX_SETPOINT_TEMPERATURE_MIN: final = "MedMaxSetpointTemperatureMin"
     WHE_MARKET: final = "WheMarket"
+
+
+class SeDeviceSettings:
+    """Constatns for Se device settings"""
+
+    SE_ANTILEGIONELLA_ON_OFF: final = "SeAntilegionellaOnOff"
+    SE_ANTI_COOLING_ON_OFF: final = "SeAntiCoolingOnOff"
+    SE_NIGHT_MODE_ON_OFF: final = "SeNightModeOnOff"
+    SE_PERMANENT_BOOST_ON_OFF: final = "SePermanentBoostOnOff"
+    SE_MAX_SETPOINT_TEMPERATURE: final = "SeMaxSetpointTemperature"
+    SE_MAX_SETPOINT_TEMPERATURE_MAX: final = "SeMaxSetpointTemperatureMax"
+    SE_MAX_SETPOINT_TEMPERATURE_MIN: final = "SeMaxSetpointTemperatureMin"
+    SE_ANTI_COOLING_TEMPERATURE: final = "SeAntiCoolingTemperature"
+    SE_ANTI_COOLING_TEMPERATURE_MAX: final = "SeAntiCoolingTemperatureMin"
+    SE_ANTI_COOLING_TEMPERATURE_MIN: final = "SeAntiCoolingTemperatureMax"
+    SE_MAX_GREEN_SETPOINT_TEMPERATURE: final = "SeMaxGreenSetpointTemperature"
+    SE_HEATING_RATE: final = "SeHeatingRate"
+    SE_NIGHT_BEGIN_AS_MINUTES: final = "SeNightBeginAsMinutes"
+    SE_NIGHT_BEGIN_MIN_AS_MINUTES: final = "SeNightBeginMinAsMinutes"
+    SE_NIGHT_BEGIN_MAX_AS_MINUTES: final = "SeNightBeginMaxAsMinutes"
+    SE_NIGHT_END_AS_MINUTES: final = "SeNightEndAsMinutes"
+    SE_NIGHT_END_MIN_AS_MINUTES: final = "SeNightEndMinAsMinutes"
+    SE_NIGHT_END_MAX_AS_MINUTES: final = "SeNightEndMaxAsMinutes"
 
 
 class DeviceProperties:
@@ -447,6 +471,19 @@ class AristonAPI:
         """Get Velis settings"""
         return await self.get(
             f"{ARISTON_API_URL}{ARISTON_VELIS}/{ARISTON_MED_PLANT_DATA}/{gw_id}/plantSettings?wheType=PowerRussis"
+        )
+
+    async def async_get_se_plant_data(self, gw_id) -> dict[str, Any]:
+        """Get Velis properties"""
+
+        return await self.get(
+            f"{ARISTON_API_URL}{ARISTON_VELIS}/{ARISTON_SE_PLANT_DATA}/{gw_id}"
+        )
+
+    async def async_get_se_plant_settings(self, gw_id) -> dict[str, Any]:
+        """Get Velis settings"""
+        return await self.get(
+            f"{ARISTON_API_URL}{ARISTON_VELIS}/{ARISTON_SE_PLANT_DATA}/{gw_id}/plantSettings"
         )
 
     async def async_set_property(
