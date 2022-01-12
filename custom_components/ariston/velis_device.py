@@ -72,6 +72,9 @@ class AristonVelisDevice(AristonDevice):
 
     async def async_set_water_heater_operation_mode(self, operation_mode):
         await self.api.async_set_velis_mode(
-            self.attributes.get(DeviceAttribute.GW), VelisPlantMode(operation_mode)
+            self.attributes.get(DeviceAttribute.GW), VelisPlantMode[operation_mode]
         )
-        self.data[VelisDeviceProperties.MODE] = VelisPlantMode(operation_mode)
+        self.data[VelisDeviceProperties.MODE] = VelisPlantMode[operation_mode].value
+
+    def get_holiday_expires_on(self) -> str:
+        raise NotImplementedError
