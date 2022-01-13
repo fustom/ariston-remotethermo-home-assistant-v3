@@ -1,5 +1,6 @@
 """Constants for the Ariston integration."""
 from abc import ABC
+from collections.abc import Callable
 from dataclasses import dataclass
 from enum import IntFlag
 from typing import final
@@ -48,7 +49,7 @@ ATTR_HOLIDAY: final = "holiday"
 ATTR_ZONE: final = "zone_number"
 
 EXTRA_STATE_ATTRIBUTE: final = "Attribute"
-EXTRA_STATE_METHOD_NAME: final = "MethodName"
+EXTRA_STATE_BASE_DEVICE_METHOD: final = "BaseDeviceMethod"
 
 
 @dataclass
@@ -60,7 +61,7 @@ class AristonBaseEntityDescription(EntityDescription, ABC):
     extra_energy_feature: bool = False
     extra_states: list[
         dict[EXTRA_STATE_ATTRIBUTE:str],
-        dict[EXTRA_STATE_METHOD_NAME:str],
+        dict[EXTRA_STATE_BASE_DEVICE_METHOD:Callable],
     ] or None = None
     zone: int = 0
     system_types: list[SystemType] or None = None
@@ -122,15 +123,15 @@ ARISTON_CLIMATE_TYPE = AristonClimateEntityDescription(
     extra_states=[
         {
             EXTRA_STATE_ATTRIBUTE: ATTR_HEAT_REQUEST,
-            EXTRA_STATE_METHOD_NAME: AristonDevice.get_zone_heat_request_value.__name__,
+            EXTRA_STATE_BASE_DEVICE_METHOD: AristonDevice.get_zone_heat_request_value,
         },
         {
             EXTRA_STATE_ATTRIBUTE: ATTR_ECONOMY_TEMP,
-            EXTRA_STATE_METHOD_NAME: AristonDevice.get_zone_economy_temp_value.__name__,
+            EXTRA_STATE_BASE_DEVICE_METHOD: AristonDevice.get_zone_economy_temp_value,
         },
         {
             EXTRA_STATE_ATTRIBUTE: ATTR_ZONE,
-            EXTRA_STATE_METHOD_NAME: AristonDevice.get_zone_number.__name__,
+            EXTRA_STATE_BASE_DEVICE_METHOD: AristonDevice.get_zone_number,
         },
     ],
     system_types=[SystemType.GALEVO],
@@ -142,7 +143,7 @@ ARISTON_WATER_HEATER_TYPES: tuple[AristonWaterHeaterEntityDescription, ...] = (
         extra_states=[
             {
                 EXTRA_STATE_ATTRIBUTE: ATTR_TARGET_TEMP_STEP,
-                EXTRA_STATE_METHOD_NAME: AristonDevice.get_water_heater_temperature_step.__name__,
+                EXTRA_STATE_BASE_DEVICE_METHOD: AristonDevice.get_water_heater_temperature_step,
             }
         ],
         device_features=[DeviceFeatures.HAS_BOILER],
@@ -187,7 +188,7 @@ ARISTON_BINARY_SENSOR_TYPES: tuple[AristonBinarySensorEntityDescription, ...] = 
         extra_states=[
             {
                 EXTRA_STATE_ATTRIBUTE: ATTR_HOLIDAY,
-                EXTRA_STATE_METHOD_NAME: AristonDevice.get_holiday_expires_on.__name__,
+                EXTRA_STATE_BASE_DEVICE_METHOD: AristonDevice.get_holiday_expires_on,
             }
         ],
         system_types=[SystemType.GALEVO],
