@@ -19,6 +19,8 @@ from homeassistant.components.water_heater import WaterHeaterEntityEntityDescrip
 from homeassistant.const import ENERGY_KILO_WATT_HOUR
 from homeassistant.helpers.entity import EntityCategory, EntityDescription
 
+from .galevo_device import AristonGalevoDevice
+from .velis_device import AristonVelisDevice
 from .ariston import (
     ConsumptionProperties,
     Currency,
@@ -27,8 +29,8 @@ from .ariston import (
     GasEnergyUnit,
     GasType,
     SystemType,
+    VelisDeviceProperties,
 )
-from .device import AristonDevice
 
 
 DOMAIN: final = "ariston"
@@ -49,7 +51,7 @@ ATTR_HOLIDAY: final = "holiday"
 ATTR_ZONE: final = "zone_number"
 
 EXTRA_STATE_ATTRIBUTE: final = "Attribute"
-EXTRA_STATE_BASE_DEVICE_METHOD: final = "BaseDeviceMethod"
+EXTRA_STATE_DEVICE_METHOD: final = "DeviceMethod"
 
 
 @dataclass
@@ -61,7 +63,7 @@ class AristonBaseEntityDescription(EntityDescription, ABC):
     extra_energy_feature: bool = False
     extra_states: list[
         dict[EXTRA_STATE_ATTRIBUTE:str],
-        dict[EXTRA_STATE_BASE_DEVICE_METHOD:Callable],
+        dict[EXTRA_STATE_DEVICE_METHOD:Callable],
     ] or None = None
     zone: int = 0
     system_types: list[SystemType] or None = None
@@ -94,6 +96,9 @@ class AristonSwitchEntityDescription(
 ):
     """A class that describes switch entities."""
 
+    setter: Callable = None
+    getter: Callable = None
+
 
 @dataclass
 class AristonNumberEntityDescription(
@@ -123,15 +128,15 @@ ARISTON_CLIMATE_TYPE = AristonClimateEntityDescription(
     extra_states=[
         {
             EXTRA_STATE_ATTRIBUTE: ATTR_HEAT_REQUEST,
-            EXTRA_STATE_BASE_DEVICE_METHOD: AristonDevice.get_zone_heat_request_value,
+            EXTRA_STATE_DEVICE_METHOD: AristonGalevoDevice.get_zone_heat_request_value,
         },
         {
             EXTRA_STATE_ATTRIBUTE: ATTR_ECONOMY_TEMP,
-            EXTRA_STATE_BASE_DEVICE_METHOD: AristonDevice.get_zone_economy_temp_value,
+            EXTRA_STATE_DEVICE_METHOD: AristonGalevoDevice.get_zone_economy_temp_value,
         },
         {
             EXTRA_STATE_ATTRIBUTE: ATTR_ZONE,
-            EXTRA_STATE_BASE_DEVICE_METHOD: AristonDevice.get_zone_number,
+            EXTRA_STATE_DEVICE_METHOD: AristonGalevoDevice.get_zone_number,
         },
     ],
     system_types=[SystemType.GALEVO],
@@ -143,7 +148,7 @@ ARISTON_WATER_HEATER_TYPES: tuple[AristonWaterHeaterEntityDescription, ...] = (
         extra_states=[
             {
                 EXTRA_STATE_ATTRIBUTE: ATTR_TARGET_TEMP_STEP,
-                EXTRA_STATE_BASE_DEVICE_METHOD: AristonDevice.get_water_heater_temperature_step,
+                EXTRA_STATE_DEVICE_METHOD: AristonGalevoDevice.get_water_heater_temperature_step,
             }
         ],
         device_features=[DeviceFeatures.HAS_BOILER],
@@ -151,6 +156,12 @@ ARISTON_WATER_HEATER_TYPES: tuple[AristonWaterHeaterEntityDescription, ...] = (
     ),
     AristonWaterHeaterEntityDescription(
         key="AristonWaterHeater",
+        extra_states=[
+            {
+                EXTRA_STATE_ATTRIBUTE: ATTR_TARGET_TEMP_STEP,
+                EXTRA_STATE_DEVICE_METHOD: AristonVelisDevice.get_water_heater_temperature_step,
+            }
+        ],
         system_types=[SystemType.VELIS],
     ),
 )
@@ -188,7 +199,7 @@ ARISTON_BINARY_SENSOR_TYPES: tuple[AristonBinarySensorEntityDescription, ...] = 
         extra_states=[
             {
                 EXTRA_STATE_ATTRIBUTE: ATTR_HOLIDAY,
-                EXTRA_STATE_BASE_DEVICE_METHOD: AristonDevice.get_holiday_expires_on,
+                EXTRA_STATE_DEVICE_METHOD: AristonGalevoDevice.get_holiday_expires_on,
             }
         ],
         system_types=[SystemType.GALEVO],
@@ -202,7 +213,17 @@ ARISTON_SWITCH_TYPES: tuple[AristonSwitchEntityDescription, ...] = (
         name=f"{NAME} automatic thermoregulation",
         icon="mdi:radiator",
         device_features=[DeviceFeatures.AUTO_THERMO_REG],
+        setter=AristonGalevoDevice.async_set_automatic_thermoregulation,
+        getter=AristonGalevoDevice.get_automatic_thermoregulation,
         system_types=[SystemType.GALEVO],
+    ),
+    AristonSwitchEntityDescription(
+        key=VelisDeviceProperties.ECO,
+        name=f"{NAME} eco mode",
+        icon="mdi:leaf",
+        setter=AristonVelisDevice.async_set_eco_mode,
+        getter=AristonVelisDevice.get_water_heater_eco_value,
+        system_types=[SystemType.VELIS],
     ),
 )
 

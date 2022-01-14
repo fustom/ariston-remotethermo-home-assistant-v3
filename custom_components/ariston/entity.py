@@ -12,7 +12,7 @@ from homeassistant.helpers.update_coordinator import CoordinatorEntity
 from .const import (
     DOMAIN,
     EXTRA_STATE_ATTRIBUTE,
-    EXTRA_STATE_BASE_DEVICE_METHOD,
+    EXTRA_STATE_DEVICE_METHOD,
     AristonBaseEntityDescription,
 )
 from .ariston import DeviceAttribute, GalevoDeviceAttribute, SystemType
@@ -57,12 +57,12 @@ class AristonEntity(CoordinatorEntity, ABC):
             return None
 
         for extra_state in self.entity_description.extra_states:
-            base_device_method = extra_state.get(EXTRA_STATE_BASE_DEVICE_METHOD)
+            device_method = extra_state.get(EXTRA_STATE_DEVICE_METHOD)
 
-            if base_device_method is None:
+            if device_method is None:
                 continue
 
-            method = getattr(self.device, base_device_method.__name__)
+            method = getattr(self.device, device_method.__name__)
             state_attribute = method() if self.zone is None else method(self.zone)
 
             if state_attribute is None:
