@@ -96,7 +96,7 @@ class AristonWaterHeater(AristonEntity, WaterHeaterEntity):
     @property
     def precision(self) -> float:
         """Return the precision of temperature for the device."""
-        return 1 / 10 ** self.device.get_water_heater_decimals()
+        return 1 / 10 ** self.device.get_water_heater_temperature_decimals()
 
     @property
     def temperature_unit(self):

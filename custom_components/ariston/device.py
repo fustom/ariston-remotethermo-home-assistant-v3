@@ -1,17 +1,18 @@
 """Device class for Ariston module."""
 from __future__ import annotations
+from ast import Raise
 
 import logging
 
-from abc import ABC
+from abc import ABC, abstractmethod
 from typing import Any
 
 from .ariston import (
     AristonAPI,
     ConsumptionProperties,
+    CustomDeviceFeatures,
     DeviceAttribute,
     DeviceFeatures,
-    SystemType,
 )
 
 _LOGGER = logging.getLogger(__name__)
@@ -47,6 +48,11 @@ class AristonDevice(ABC):
             self.attributes.get(DeviceAttribute.GW)
         )
 
+    @abstractmethod
+    def get_water_heater_temperature_step(self) -> None:
+        """Abstract method for get water heater temperature step"""
+        Raise(NotImplementedError)
+
     async def async_update_energy(self) -> None:
         """Update the device energy settings from the cloud"""
 
@@ -55,10 +61,8 @@ class AristonDevice(ABC):
         # v: first element is the latest, last element is the newest"""
         self.consumptions_sequences = await self.api.async_get_consumptions_sequences(
             self.attributes.get(DeviceAttribute.GW),
-            self.attributes.get(DeviceAttribute.SYS) == SystemType.GALEVO,
-            # TODO
-            self.features.get(DeviceFeatures.HAS_BOILER)
-            or self.attributes.get(DeviceAttribute.SYS) == SystemType.VELIS,
+            self.features.get(CustomDeviceFeatures.HAS_CH),
+            self.features.get(CustomDeviceFeatures.HAS_DHW),
             self.features.get(DeviceFeatures.HAS_SLP),
         )
 
