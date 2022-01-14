@@ -21,9 +21,11 @@ from homeassistant.helpers.entity import EntityCategory, EntityDescription
 
 from .galevo_device import AristonGalevoDevice
 from .velis_device import AristonVelisDevice
+from .device import AristonDevice
 from .ariston import (
     ConsumptionProperties,
     Currency,
+    CustomDeviceFeatures,
     DeviceFeatures,
     DeviceProperties,
     GasEnergyUnit,
@@ -148,21 +150,11 @@ ARISTON_WATER_HEATER_TYPES: tuple[AristonWaterHeaterEntityDescription, ...] = (
         extra_states=[
             {
                 EXTRA_STATE_ATTRIBUTE: ATTR_TARGET_TEMP_STEP,
-                EXTRA_STATE_DEVICE_METHOD: AristonGalevoDevice.get_water_heater_temperature_step,
+                EXTRA_STATE_DEVICE_METHOD: AristonDevice.get_water_heater_temperature_step,
             }
         ],
-        device_features=[DeviceFeatures.HAS_BOILER],
-        system_types=[SystemType.GALEVO],
-    ),
-    AristonWaterHeaterEntityDescription(
-        key="AristonWaterHeater",
-        extra_states=[
-            {
-                EXTRA_STATE_ATTRIBUTE: ATTR_TARGET_TEMP_STEP,
-                EXTRA_STATE_DEVICE_METHOD: AristonVelisDevice.get_water_heater_temperature_step,
-            }
-        ],
-        system_types=[SystemType.VELIS],
+        device_features=[CustomDeviceFeatures.HAS_DHW],
+        system_types=[SystemType.GALEVO, SystemType.VELIS],
     ),
 )
 
@@ -319,7 +311,7 @@ ARISTON_GAS_CONSUMPTION_LAST_TWO_HOURS_TYPE: tuple[
         state_class=SensorStateClass.TOTAL,
         device_class=SensorDeviceClass.ENERGY,
         native_unit_of_measurement=ENERGY_KILO_WATT_HOUR,
-        device_features=[DeviceFeatures.HAS_METERING, DeviceFeatures.HAS_BOILER],
+        device_features=[DeviceFeatures.HAS_METERING, CustomDeviceFeatures.HAS_DHW],
         coordinator=ENERGY_COORDINATOR,
         system_types=[SystemType.GALEVO],
     ),
@@ -371,7 +363,7 @@ ARISTON_CONSUMPTION_LAST_MONTH_SENSORS_TYPES: tuple[
         entity_category=EntityCategory.DIAGNOSTIC,
         device_class=SensorDeviceClass.ENERGY,
         native_unit_of_measurement=ENERGY_KILO_WATT_HOUR,
-        device_features=[DeviceFeatures.HAS_METERING, DeviceFeatures.HAS_BOILER],
+        device_features=[DeviceFeatures.HAS_METERING, CustomDeviceFeatures.HAS_DHW],
         coordinator=ENERGY_COORDINATOR,
         extra_energy_feature=True,
         system_types=[SystemType.GALEVO],
@@ -383,7 +375,7 @@ ARISTON_CONSUMPTION_LAST_MONTH_SENSORS_TYPES: tuple[
         entity_category=EntityCategory.DIAGNOSTIC,
         device_class=SensorDeviceClass.ENERGY,
         native_unit_of_measurement=ENERGY_KILO_WATT_HOUR,
-        device_features=[DeviceFeatures.HAS_METERING, DeviceFeatures.HAS_BOILER],
+        device_features=[DeviceFeatures.HAS_METERING, CustomDeviceFeatures.HAS_DHW],
         coordinator=ENERGY_COORDINATOR,
         extra_energy_feature=True,
         system_types=[SystemType.GALEVO],

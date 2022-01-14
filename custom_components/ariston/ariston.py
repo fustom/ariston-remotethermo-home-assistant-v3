@@ -204,6 +204,13 @@ class ZoneAttribute:
     GEOFENCE_DEROGA: final = "geofenceDeroga"
 
 
+class CustomDeviceFeatures:
+    """Constants for custom device features"""
+
+    HAS_CH: final = "hasCh"
+    HAS_DHW: final = "hasDhw"
+
+
 class DeviceFeatures:
     """Constants for device features"""
 
@@ -397,11 +404,11 @@ class AristonAPI:
         )
 
     async def async_get_consumptions_sequences(
-        self, gw_id: str, has_heat: bool, has_boiler: bool, has_slp: bool
+        self, gw_id: str, has_ch: bool, has_dhw: bool, has_slp: bool
     ) -> dict[str, Any]:
         """Get consumption sequences for the device"""
         return await self.get(
-            f"{ARISTON_API_URL}{ARISTON_REMOTE}/{ARISTON_REPORTS}/{gw_id}/consSequencesApi8?usages={'Ch' if has_heat else ''}{'%2C' if has_heat and has_boiler else ''}{'Dhw' if has_boiler else ''}&hasSlp={has_slp}"
+            f"{ARISTON_API_URL}{ARISTON_REMOTE}/{ARISTON_REPORTS}/{gw_id}/consSequencesApi8?usages={'Ch' if has_ch else ''}{'%2C' if has_ch and has_dhw else ''}{'Dhw' if has_dhw else ''}&hasSlp={has_slp}"
         )
 
     async def async_get_consumptions_settings(self, gw_id: str) -> dict[str, Any]:
