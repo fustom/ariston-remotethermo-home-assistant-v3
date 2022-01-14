@@ -74,6 +74,11 @@ class AristonGalevoDevice(AristonDevice):
     def get_holiday_expires_on(self) -> str:
         return self.get_item_by_id(DeviceProperties.HOLIDAY, PropertyType.EXPIRES_ON)
 
+    def get_automatic_thermoregulation(self) -> str:
+        return self.get_item_by_id(
+            DeviceProperties.AUTOMATIC_THERMOREGULATION, PropertyType.VALUE
+        )
+
     def get_item_by_id(
         self, item_id: DeviceProperties, item_value: PropertyType, zone_number: int = 0
     ):
@@ -85,14 +90,19 @@ class AristonGalevoDevice(AristonDevice):
         )
 
     async def async_set_water_heater_temperature(self, temperature: float):
-        self.async_set_item_by_id(DeviceProperties.DHW_TEMP, temperature)
+        await self.async_set_item_by_id(DeviceProperties.DHW_TEMP, temperature)
 
     async def async_set_water_heater_operation_mode(self, operation_mode):
-        self.async_set_item_by_id(
+        await self.async_set_item_by_id(
             DeviceProperties.DHW_MODE,
             self.get_item_by_id(
                 DeviceProperties.DHW_MODE, PropertyType.OPT_TEXTS
             ).index(operation_mode),
+        )
+
+    async def async_set_automatic_thermoregulation(self, auto_thermo: bool):
+        await self.async_set_item_by_id(
+            DeviceProperties.AUTOMATIC_THERMOREGULATION, 1.0 if auto_thermo else 0.0
         )
 
     async def async_set_item_by_id(

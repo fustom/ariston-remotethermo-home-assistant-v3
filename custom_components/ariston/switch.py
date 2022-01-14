@@ -8,7 +8,6 @@ from homeassistant.config_entries import ConfigEntry
 from homeassistant.components.switch import SwitchEntity
 
 from .entity import AristonEntity
-from .ariston import PropertyType
 from .const import ARISTON_SWITCH_TYPES, DOMAIN, AristonSwitchEntityDescription
 from .coordinator import DeviceDataUpdateCoordinator, DeviceEnergyUpdateCoordinator
 
@@ -54,16 +53,14 @@ class AristonSwitch(AristonEntity, SwitchEntity):
     @property
     def is_on(self):
         """Return true if switch is on."""
-        return self.device.get_item_by_id(
-            self.entity_description.key, PropertyType.VALUE
-        )
+        return getattr(self.device, self.entity_description.getter.__name__)()
 
     async def async_turn_on(self, **kwargs) -> None:
         """Turn the switch on."""
-        await self.device.async_set_item_by_id(self.entity_description.key, 1.0)
+        await getattr(self.device, self.entity_description.setter.__name__)(True)
         self.async_write_ha_state()
 
     async def async_turn_off(self, **kwargs) -> None:
         """Turn the device off."""
-        await self.device.async_set_item_by_id(self.entity_description.key, 0.0)
+        await getattr(self.device, self.entity_description.setter.__name__)(False)
         self.async_write_ha_state()
