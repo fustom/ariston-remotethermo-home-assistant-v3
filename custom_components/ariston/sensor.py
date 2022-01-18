@@ -12,9 +12,6 @@ from homeassistant.config_entries import ConfigEntry
 from homeassistant.components.sensor import SensorEntity
 
 from .entity import AristonEntity
-from .ariston import (
-    PropertyType,
-)
 from .const import (
     ARISTON_CONSUMPTION_LAST_MONTH_SENSORS_TYPES,
     ARISTON_GAS_CONSUMPTION_LAST_TWO_HOURS_TYPE,
@@ -82,16 +79,14 @@ class AristonSensor(AristonEntity, SensorEntity):
     @property
     def native_value(self):
         """Return value of sensor."""
-        return self.device.get_item_by_id(
-            self.entity_description.key, PropertyType.VALUE
-        )
+        return getattr(self.device, self.entity_description.get_native_value.__name__)()
 
     @property
     def native_unit_of_measurement(self):
         """Return the nateive unit of measurement"""
-        return self.device.get_item_by_id(
-            self.entity_description.key, PropertyType.UNIT
-        )
+        return getattr(
+            self.device, self.entity_description.get_native_unit_of_measurement.__name__
+        )()
 
 
 class AristonGasConsumptionLastTwoHoursSensor(AristonEntity, SensorEntity):

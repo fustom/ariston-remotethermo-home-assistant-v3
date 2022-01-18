@@ -104,6 +104,30 @@ class AristonGalevoDevice(AristonDevice):
             DeviceProperties.AUTOMATIC_THERMOREGULATION, PropertyType.VALUE
         )
 
+    def get_heating_circuit_pressure_value(self) -> str:
+        """Get heating circuit pressure value"""
+        return self.get_item_by_id(
+            DeviceProperties.HEATING_CIRCUIT_PRESSURE, PropertyType.VALUE
+        )
+
+    def get_heating_circuit_pressure_unit(self) -> str:
+        """Get heating circuit pressure unit"""
+        return self.get_item_by_id(
+            DeviceProperties.HEATING_CIRCUIT_PRESSURE, PropertyType.UNIT
+        )
+
+    def get_ch_flow_setpoint_temp_value(self) -> str:
+        """Get central heating flow setpoint temperature value"""
+        return self.get_item_by_id(
+            DeviceProperties.CH_FLOW_SETPOINT_TEMP, PropertyType.VALUE
+        )
+
+    def get_ch_flow_setpoint_temp_unit(self) -> str:
+        """Get central heating flow setpoint temperature unit"""
+        return self.get_item_by_id(
+            DeviceProperties.CH_FLOW_SETPOINT_TEMP, PropertyType.UNIT
+        )
+
     def get_item_by_id(
         self, item_id: DeviceProperties, item_value: PropertyType, zone_number: int = 0
     ):

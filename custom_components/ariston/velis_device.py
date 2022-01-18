@@ -84,6 +84,14 @@ class AristonVelisDevice(AristonDevice):
         """Get water heater eco value"""
         return self.data.get(VelisDeviceProperties.ECO)
 
+    def get_av_shw_value(self) -> int:
+        """Get average showers value"""
+        return self.data.get(VelisDeviceProperties.AV_SHW)
+
+    def get_av_shw_unit(self) -> int:
+        """Get average showers unit"""
+        return ""
+
     async def async_set_water_heater_temperature(self, temperature: float):
         """Set water heater temperature"""
         await self.api.async_set_velis_temperature(
