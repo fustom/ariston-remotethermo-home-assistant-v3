@@ -115,6 +115,9 @@ class AristonSensorEntityDescription(
 ):
     """A class that describes sensor entities."""
 
+    get_native_value: Callable = None
+    get_native_unit_of_measurement: Callable = None
+
 
 @dataclass
 class AristonSelectEntityDescription(
@@ -165,6 +168,8 @@ ARISTON_SENSOR_TYPES: tuple[AristonSensorEntityDescription, ...] = (
         device_class=SensorDeviceClass.PRESSURE,
         entity_category=EntityCategory.DIAGNOSTIC,
         state_class=SensorStateClass.MEASUREMENT,
+        get_native_value=AristonGalevoDevice.get_heating_circuit_pressure_value,
+        get_native_unit_of_measurement=AristonGalevoDevice.get_heating_circuit_pressure_unit,
         system_types=[SystemType.GALEVO],
     ),
     AristonSensorEntityDescription(
@@ -172,7 +177,18 @@ ARISTON_SENSOR_TYPES: tuple[AristonSensorEntityDescription, ...] = (
         name=f"{NAME} CH flow setpoint temp",
         device_class=SensorDeviceClass.TEMPERATURE,
         state_class=SensorStateClass.MEASUREMENT,
+        get_native_value=AristonGalevoDevice.get_ch_flow_setpoint_temp_value,
+        get_native_unit_of_measurement=AristonGalevoDevice.get_ch_flow_setpoint_temp_unit,
         system_types=[SystemType.GALEVO],
+    ),
+    AristonSensorEntityDescription(
+        key=VelisDeviceProperties.AV_SHW,
+        name=f"{NAME} average showers",
+        icon="mdi:shower-head",
+        state_class=SensorStateClass.MEASUREMENT,
+        get_native_value=AristonVelisDevice.get_av_shw_value,
+        get_native_unit_of_measurement=AristonVelisDevice.get_av_shw_unit,
+        system_types=[SystemType.VELIS],
     ),
 )
 
