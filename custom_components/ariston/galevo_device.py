@@ -11,8 +11,10 @@ from .ariston import (
     DeviceAttribute,
     DeviceFeatures,
     DeviceProperties,
+    PlantMode,
     PropertyType,
     ThermostatProperties,
+    ZoneMode,
 )
 
 _LOGGER = logging.getLogger(__name__)
@@ -40,95 +42,181 @@ class AristonGalevoDevice(AristonDevice):
 
     def get_water_heater_current_temperature(self) -> float:
         """Get water heater current temperature"""
-        return self.get_item_by_id(DeviceProperties.DHW_TEMP, PropertyType.VALUE)
+        return self._get_item_by_id(DeviceProperties.DHW_TEMP, PropertyType.VALUE)
 
     def get_water_heater_minimum_temperature(self) -> float:
         """Get water heater minimum temperature"""
-        return self.get_item_by_id(DeviceProperties.DHW_TEMP, PropertyType.MIN)
+        return self._get_item_by_id(DeviceProperties.DHW_TEMP, PropertyType.MIN)
 
     def get_water_heater_maximum_temperature(self) -> float:
         """Get water heater maximum temperature"""
-        return self.get_item_by_id(DeviceProperties.DHW_TEMP, PropertyType.MAX)
+        return self._get_item_by_id(DeviceProperties.DHW_TEMP, PropertyType.MAX)
 
     def get_water_heater_target_temperature(self) -> float:
         """Get water heater target temperature"""
-        return self.get_item_by_id(DeviceProperties.DHW_TEMP, PropertyType.VALUE)
+        return self._get_item_by_id(DeviceProperties.DHW_TEMP, PropertyType.VALUE)
 
     def get_water_heater_temperature_decimals(self) -> int:
         """Get water heater temperature decimals"""
-        return self.get_item_by_id(DeviceProperties.DHW_TEMP, PropertyType.DECIMALS)
+        return self._get_item_by_id(DeviceProperties.DHW_TEMP, PropertyType.DECIMALS)
 
     def get_water_heater_temperature_unit(self) -> str:
         """Get water heater temperature unit"""
-        return self.get_item_by_id(DeviceProperties.DHW_TEMP, PropertyType.UNIT)
+        return self._get_item_by_id(DeviceProperties.DHW_TEMP, PropertyType.UNIT)
 
     def get_water_heater_temperature_step(self) -> str:
         """Get water heater temperature step"""
-        return self.get_item_by_id(DeviceProperties.DHW_TEMP, PropertyType.STEP)
+        return self._get_item_by_id(DeviceProperties.DHW_TEMP, PropertyType.STEP)
 
-    def get_water_heater_mode_opertation_texts(self) -> list:
+    def get_water_heater_mode_opertation_texts(self) -> list[str]:
         """Get water heater operation mode texts"""
-        return self.get_item_by_id(DeviceProperties.DHW_MODE, PropertyType.OPT_TEXTS)
+        return self._get_item_by_id(DeviceProperties.DHW_MODE, PropertyType.OPT_TEXTS)
 
-    def get_water_heater_mode_options(self) -> list:
+    def get_water_heater_mode_options(self) -> list[int]:
         """Get water heater operation options"""
-        return self.get_item_by_id(DeviceProperties.DHW_MODE, PropertyType.OPTIONS)
+        return self._get_item_by_id(DeviceProperties.DHW_MODE, PropertyType.OPTIONS)
 
     def get_water_heater_mode_value(self) -> int:
         """Get water heater mode value"""
-        return self.get_item_by_id(DeviceProperties.DHW_MODE, PropertyType.VALUE)
+        return self._get_item_by_id(DeviceProperties.DHW_MODE, PropertyType.VALUE)
 
     def get_zone_heat_request_value(self, zone_number: int) -> str:
         """Get zone heat request value"""
-        return self.get_item_by_id(
+        return self._get_item_by_id(
             ThermostatProperties.ZONE_HEAT_REQUEST, PropertyType.VALUE, zone_number
         )
 
     def get_zone_economy_temp_value(self, zone_number: int) -> str:
         """Get zone economy temperature value"""
-        return self.get_item_by_id(
+        return self._get_item_by_id(
             ThermostatProperties.ZONE_ECONOMY_TEMP, PropertyType.VALUE, zone_number
         )
 
-    def get_zone_number(self, zone_number: int) -> str:
+    @staticmethod
+    def get_zone_number(zone_number: int) -> str:
         """Get zone number"""
         return zone_number
 
     def get_holiday_expires_on(self) -> str:
         """Get holiday expires on"""
-        return self.get_item_by_id(DeviceProperties.HOLIDAY, PropertyType.EXPIRES_ON)
+        return self._get_item_by_id(DeviceProperties.HOLIDAY, PropertyType.EXPIRES_ON)
 
     def get_automatic_thermoregulation(self) -> str:
         """Get automatic thermoregulation"""
-        return self.get_item_by_id(
+        return self._get_item_by_id(
             DeviceProperties.AUTOMATIC_THERMOREGULATION, PropertyType.VALUE
         )
 
     def get_heating_circuit_pressure_value(self) -> str:
         """Get heating circuit pressure value"""
-        return self.get_item_by_id(
+        return self._get_item_by_id(
             DeviceProperties.HEATING_CIRCUIT_PRESSURE, PropertyType.VALUE
         )
 
     def get_heating_circuit_pressure_unit(self) -> str:
         """Get heating circuit pressure unit"""
-        return self.get_item_by_id(
+        return self._get_item_by_id(
             DeviceProperties.HEATING_CIRCUIT_PRESSURE, PropertyType.UNIT
         )
 
     def get_ch_flow_setpoint_temp_value(self) -> str:
         """Get central heating flow setpoint temperature value"""
-        return self.get_item_by_id(
+        return self._get_item_by_id(
             DeviceProperties.CH_FLOW_SETPOINT_TEMP, PropertyType.VALUE
         )
 
     def get_ch_flow_setpoint_temp_unit(self) -> str:
         """Get central heating flow setpoint temperature unit"""
-        return self.get_item_by_id(
+        return self._get_item_by_id(
             DeviceProperties.CH_FLOW_SETPOINT_TEMP, PropertyType.UNIT
         )
 
-    def get_item_by_id(
+    def get_is_flame_on_value(self) -> bool:
+        """Get is flame on value"""
+        return self._get_item_by_id(DeviceProperties.IS_FLAME_ON, PropertyType.VALUE)
+
+    def get_holiday_mode_value(self) -> bool:
+        """Get holiday mode on value"""
+        return self._get_item_by_id(DeviceProperties.HOLIDAY, PropertyType.VALUE)
+
+    def get_zone_mode(self, zone) -> ZoneMode:
+        """Get zone mode on value"""
+        return ZoneMode(
+            self._get_item_by_id(
+                ThermostatProperties.ZONE_MODE, PropertyType.VALUE, zone
+            )
+        )
+
+    def get_zone_mode_options(self, zone) -> list[int]:
+        """Get zone mode on options"""
+        return self._get_item_by_id(
+            ThermostatProperties.ZONE_MODE, PropertyType.OPTIONS, zone
+        )
+
+    def get_plant_mode(self) -> PlantMode:
+        """Get plant mode on value"""
+        return PlantMode(
+            self._get_item_by_id(DeviceProperties.PLANT_MODE, PropertyType.VALUE)
+        )
+
+    def get_plant_mode_options(self) -> list[int]:
+        """Get plant mode on options"""
+        return self._get_item_by_id(DeviceProperties.PLANT_MODE, PropertyType.OPTIONS)
+
+    def get_plant_mode_opt_texts(self) -> list[str]:
+        """Get plant mode on option texts"""
+        return self._get_item_by_id(DeviceProperties.PLANT_MODE, PropertyType.OPT_TEXTS)
+
+    def get_plant_mode_text(self) -> str:
+        """Get plant mode on option texts"""
+        index = self.get_plant_mode_options().index(self.get_plant_mode())
+        return self._get_item_by_id(
+            DeviceProperties.PLANT_MODE, PropertyType.OPT_TEXTS
+        )[index]
+
+    def get_measured_temp_unit(self, zone) -> str:
+        """Get zone measured temp unit"""
+        return self._get_item_by_id(
+            ThermostatProperties.ZONE_MEASURED_TEMP, PropertyType.UNIT, zone
+        )
+
+    def get_measured_temp_decimals(self, zone) -> int:
+        """Get zone measured temp decimals"""
+        return self._get_item_by_id(
+            ThermostatProperties.ZONE_MEASURED_TEMP, PropertyType.DECIMALS, zone
+        )
+
+    def get_measured_temp_value(self, zone) -> int:
+        """Get zone measured temp value"""
+        return self._get_item_by_id(
+            ThermostatProperties.ZONE_MEASURED_TEMP, PropertyType.VALUE, zone
+        )
+
+    def get_comfort_temp_min(self, zone) -> int:
+        """Get zone comfort temp min"""
+        return self._get_item_by_id(
+            ThermostatProperties.ZONE_COMFORT_TEMP, PropertyType.MIN, zone
+        )
+
+    def get_comfort_temp_max(self, zone) -> int:
+        """Get zone comfort temp max"""
+        return self._get_item_by_id(
+            ThermostatProperties.ZONE_COMFORT_TEMP, PropertyType.MAX, zone
+        )
+
+    def get_comfort_temp_step(self, zone) -> int:
+        """Get zone comfort temp step"""
+        return self._get_item_by_id(
+            ThermostatProperties.ZONE_COMFORT_TEMP, PropertyType.STEP, zone
+        )
+
+    def get_comfort_temp_value(self, zone) -> int:
+        """Get zone comfort temp value"""
+        return self._get_item_by_id(
+            ThermostatProperties.ZONE_COMFORT_TEMP, PropertyType.VALUE, zone
+        )
+
+    def _get_item_by_id(
         self, item_id: DeviceProperties, item_value: PropertyType, zone_number: int = 0
     ):
         """Get item attribute from data"""
@@ -138,6 +226,14 @@ class AristonGalevoDevice(AristonDevice):
             if item.get("id") == item_id and item.get(PropertyType.ZONE) == zone_number
         )
 
+    def get_gas_consumption_for_heating_last_two_hours(self) -> int:
+        """Get gas consumption for heating last two hours"""
+        return self.consumptions_sequences[0]["v"][-1]
+
+    def get_gas_consumption_for_water_last_two_hours(self) -> int:
+        """Get gas consumption for water last two hours"""
+        return self.consumptions_sequences[4]["v"][-1]
+
     async def async_set_water_heater_temperature(self, temperature: float):
         """Set water heater temperature"""
         await self.async_set_item_by_id(DeviceProperties.DHW_TEMP, temperature)
@@ -146,7 +242,7 @@ class AristonGalevoDevice(AristonDevice):
         """Set water heater operation mode"""
         await self.async_set_item_by_id(
             DeviceProperties.DHW_MODE,
-            self.get_item_by_id(
+            self._get_item_by_id(
                 DeviceProperties.DHW_MODE, PropertyType.OPT_TEXTS
             ).index(operation_mode),
         )
@@ -157,6 +253,20 @@ class AristonGalevoDevice(AristonDevice):
             DeviceProperties.AUTOMATIC_THERMOREGULATION, 1.0 if auto_thermo else 0.0
         )
 
+    async def async_set_plant_mode(self, plant_mode: PlantMode):
+        """Set plant mode"""
+        await self.async_set_item_by_id(DeviceProperties.PLANT_MODE, plant_mode)
+
+    async def async_set_zone_mode(self, zone_mode: ZoneMode, zone):
+        """Set zone mode"""
+        await self.async_set_item_by_id(ThermostatProperties.ZONE_MODE, zone_mode, zone)
+
+    async def async_set_comfort_temp(self, temp: float, zone):
+        """Set comfort temp"""
+        await self.async_set_item_by_id(
+            ThermostatProperties.ZONE_COMFORT_TEMP, temp, zone
+        )
+
     async def async_set_item_by_id(
         self,
         item_id: DeviceProperties or ThermostatProperties,
@@ -164,7 +274,7 @@ class AristonGalevoDevice(AristonDevice):
         zone_number: int = 0,
     ):
         """Set item attribute on device"""
-        current_value = self.get_item_by_id(item_id, PropertyType.VALUE, zone_number)
+        current_value = self._get_item_by_id(item_id, PropertyType.VALUE, zone_number)
         await self.api.async_set_property(
             self.attributes.get(DeviceAttribute.GW),
             zone_number,

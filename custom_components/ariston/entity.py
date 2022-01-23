@@ -16,7 +16,7 @@ from .const import (
     AristonBaseEntityDescription,
 )
 from .ariston import DeviceAttribute, GalevoDeviceAttribute, SystemType
-from .coordinator import DeviceDataUpdateCoordinator, DeviceEnergyUpdateCoordinator
+from .coordinator import DeviceDataUpdateCoordinator
 
 _LOGGER = logging.getLogger(__name__)
 
@@ -26,7 +26,7 @@ class AristonEntity(CoordinatorEntity, ABC):
 
     def __init__(
         self,
-        coordinator: DeviceDataUpdateCoordinator or DeviceEnergyUpdateCoordinator,
+        coordinator: DeviceDataUpdateCoordinator,
         description: AristonBaseEntityDescription,
         zone: int = None,
     ) -> None:

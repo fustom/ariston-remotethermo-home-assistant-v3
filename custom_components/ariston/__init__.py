@@ -6,7 +6,7 @@ import logging
 import voluptuous as vol
 
 from .ariston import AristonAPI, DeviceAttribute, DeviceFeatures, SystemType
-from .coordinator import DeviceDataUpdateCoordinator, DeviceEnergyUpdateCoordinator
+from .coordinator import DeviceDataUpdateCoordinator
 from .const import (
     COORDINATOR,
     DEFAULT_ENERGY_SCAN_INTERVAL_MINUTES,
@@ -105,14 +105,15 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
             extra_energy_features,
             hass.config.units.is_metric,
         )
-        await device.async_update_settings()
 
     await device.async_get_features()
 
     scan_interval_seconds = entry.options.get(
         CONF_SCAN_INTERVAL, DEFAULT_SCAN_INTERVAL_SECONDS
     )
-    coordinator = DeviceDataUpdateCoordinator(hass, device, scan_interval_seconds)
+    coordinator = DeviceDataUpdateCoordinator(
+        hass, device, scan_interval_seconds, COORDINATOR, device.async_update_state
+    )
 
     hass.data.setdefault(DOMAIN, {}).setdefault(
         entry.unique_id, {COORDINATOR: {}, ENERGY_COORDINATOR: {}}
@@ -125,8 +126,12 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
         energy_interval_minutes = entry.options.get(
             ENERGY_SCAN_INTERVAL, DEFAULT_ENERGY_SCAN_INTERVAL_MINUTES
         )
-        energy_coordinator = DeviceEnergyUpdateCoordinator(
-            hass, device, energy_interval_minutes
+        energy_coordinator = DeviceDataUpdateCoordinator(
+            hass,
+            device,
+            energy_interval_minutes * 60,
+            ENERGY_COORDINATOR,
+            device.async_update_energy,
         )
         hass.data[DOMAIN][entry.unique_id][ENERGY_COORDINATOR] = energy_coordinator
         await energy_coordinator.async_config_entry_first_refresh()
@@ -135,28 +140,32 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
 
     entry.async_on_unload(entry.add_update_listener(update_listener))
 
-    async def async_set_item_by_id_service(service_call):
-        """Create a vacation on the target device."""
-        device_id = service_call.data.get(ATTR_DEVICE_ID)
-        item_id = service_call.data.get(ATTR_ITEM_ID)
-        zone = service_call.data.get(ATTR_ZONE)
-        value = service_call.data.get(ATTR_VALUE)
+    if device.attributes.get(DeviceAttribute.SYS) == SystemType.GALEVO:
 
-        device_registry = dr.async_get(hass)
-        device = device_registry.devices[device_id]
+        async def async_set_item_by_id_service(service_call):
+            """Create a vacation on the target device."""
+            device_id = service_call.data.get(ATTR_DEVICE_ID)
+            item_id = service_call.data.get(ATTR_ITEM_ID)
+            zone = service_call.data.get(ATTR_ZONE)
+            value = service_call.data.get(ATTR_VALUE)
 
-        entry = hass.config_entries.async_get_entry(next(iter(device.config_entries)))
-        coordinator: DeviceDataUpdateCoordinator = hass.data[DOMAIN][entry.unique_id][
-            COORDINATOR
-        ]
-        await coordinator.device.async_set_item_by_id(item_id, value, zone)
+            device_registry = dr.async_get(hass)
+            device = device_registry.devices[device_id]
 
-    hass.services.async_register(
-        DOMAIN,
-        SERVICE_SET_ITEM_BY_ID,
-        async_set_item_by_id_service,
-        schema=SET_ITEM_BY_ID_SCHEMA,
-    )
+            entry = hass.config_entries.async_get_entry(
+                next(iter(device.config_entries))
+            )
+            coordinator: DeviceDataUpdateCoordinator = hass.data[DOMAIN][
+                entry.unique_id
+            ][COORDINATOR]
+            await coordinator.device.async_set_item_by_id(item_id, value, zone)
+
+        hass.services.async_register(
+            DOMAIN,
+            SERVICE_SET_ITEM_BY_ID,
+            async_set_item_by_id_service,
+            schema=SET_ITEM_BY_ID_SCHEMA,
+        )
 
     return True
 
