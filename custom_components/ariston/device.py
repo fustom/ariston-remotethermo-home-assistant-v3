@@ -2,6 +2,7 @@
 from __future__ import annotations
 from ast import Raise
 
+import datetime as dt
 import logging
 
 from abc import ABC, abstractmethod
@@ -10,9 +11,12 @@ from typing import Any
 from .ariston import (
     AristonAPI,
     ConsumptionProperties,
+    Currency,
     CustomDeviceFeatures,
     DeviceAttribute,
     DeviceFeatures,
+    GasEnergyUnit,
+    GasType,
 )
 
 _LOGGER = logging.getLogger(__name__)
@@ -41,6 +45,7 @@ class AristonDevice(ABC):
         self.consumptions_sequences: list = []
         self.data: dict = {}
         self.plant_settings: dict = {}
+        self.consumption_sequence_last_changed_utc: dt = None
 
     async def async_get_features(self) -> None:
         """Get device features wrapper"""
@@ -49,9 +54,93 @@ class AristonDevice(ABC):
         )
 
     @abstractmethod
+    async def async_update_state(self) -> None:
+        """Update the device states from the cloud"""
+        Raise(NotImplementedError)
+
+    @abstractmethod
     def get_water_heater_temperature_step(self) -> None:
         """Abstract method for get water heater temperature step"""
         Raise(NotImplementedError)
+
+    def get_elect_cost(self) -> float:
+        """Get electric consumption cost"""
+        return self.consumptions_settings.get(ConsumptionProperties.ELEC_COST)
+
+    def get_gas_cost(self) -> float:
+        """Get gas consumption cost"""
+        return self.consumptions_settings.get(ConsumptionProperties.GAS_COST)
+
+    def get_gas_type(self) -> str:
+        """Get gas type"""
+        return GasType(
+            self.consumptions_settings.get(ConsumptionProperties.GAS_TYPE)
+        ).name
+
+    @staticmethod
+    def get_gas_types() -> list[str]:
+        """Get all gas types"""
+        return [c.name for c in GasType]
+
+    async def async_set_gas_type(self, selected: str):
+        """Set gas type"""
+        await self.async_set_consumptions_settings(
+            ConsumptionProperties.GAS_TYPE, GasType[selected]
+        )
+
+    def get_currency(self) -> str:
+        """Get gas type"""
+        return Currency(
+            self.consumptions_settings.get(ConsumptionProperties.CURRENCY)
+        ).name
+
+    @staticmethod
+    def get_currencies() -> list[str]:
+        """Get all currency"""
+        return [c.name for c in Currency]
+
+    async def async_set_currency(self, selected: str):
+        """Set currency"""
+        await self.async_set_consumptions_settings(
+            ConsumptionProperties.CURRENCY, Currency[selected]
+        )
+
+    def get_gas_energy_unit(self) -> str:
+        """Get gas energy unit"""
+        return GasEnergyUnit(
+            self.consumptions_settings.get(ConsumptionProperties.GAS_ENERGY_UNIT)
+        ).name
+
+    @staticmethod
+    def get_gas_energy_units() -> list[str]:
+        """Get all gas energy unit"""
+        return [c.name for c in GasEnergyUnit]
+
+    async def async_set_gas_energy_unit(self, selected: str):
+        """Set gas energy unit"""
+        await self.async_set_consumptions_settings(
+            ConsumptionProperties.GAS_ENERGY_UNIT, GasEnergyUnit[selected]
+        )
+
+    def get_gas_consumption_for_heating_last_month(self) -> int:
+        """Get gas consumption for heating last month"""
+        return self.energy_account.get("LastMonth")[0]["gas"]
+
+    def get_electricity_consumption_for_heating_last_month(self) -> int:
+        """Get electricity consumption for heating last month"""
+        return self.energy_account.get("LastMonth")[0]["elect"]
+
+    def get_gas_consumption_for_water_last_month(self) -> int:
+        """Get gas consumption for water last month"""
+        return self.energy_account.get("LastMonth")[1]["gas"]
+
+    def get_electricity_consumption_for_water_last_month(self) -> int:
+        """Get electricity consumption for water last month"""
+        return self.energy_account.get("LastMonth")[1]["elect"]
+
+    def get_consumption_sequence_last_changed_utc(self) -> dt:
+        """Get consumption sequence last changed in utc"""
+        return self.consumption_sequence_last_changed_utc
 
     async def async_update_energy(self) -> None:
         """Update the device energy settings from the cloud"""
@@ -59,12 +148,21 @@ class AristonDevice(ABC):
         # k=1: heating k=2: water
         # p=1: 12*2 hours p=2: 7*1 day p=3: 15*2 days p=4: 12*? year
         # v: first element is the latest, last element is the newest"""
+        old_consumptions_sequences = self.consumptions_sequences
         self.consumptions_sequences = await self.api.async_get_consumptions_sequences(
             self.attributes.get(DeviceAttribute.GW),
             self.features.get(CustomDeviceFeatures.HAS_CH),
             self.features.get(CustomDeviceFeatures.HAS_DHW),
             self.features.get(DeviceFeatures.HAS_SLP),
         )
+
+        if (
+            old_consumptions_sequences is not None
+            and old_consumptions_sequences != self.consumptions_sequences
+        ):
+            self.consumption_sequence_last_changed_utc = dt.datetime.now(
+                dt.timezone.utc
+            ) - dt.timedelta(hours=1)
 
         if self.extra_energy_features:
             # These settings only for official clients
@@ -77,8 +175,20 @@ class AristonDevice(ABC):
                 self.attributes.get(DeviceAttribute.GW)
             )
 
+    async def async_set_elect_cost(self, value: float):
+        """Set electric cost"""
+        await self.async_set_consumptions_settings(
+            ConsumptionProperties.ELEC_COST, value
+        )
+
+    async def async_set_gas_cost(self, value: float):
+        """Set gas cost"""
+        await self.async_set_consumptions_settings(
+            ConsumptionProperties.GAS_COST, value
+        )
+
     async def async_set_consumptions_settings(
-        self, consumption_property: ConsumptionProperties, value: int
+        self, consumption_property: ConsumptionProperties, value: float
     ):
         """Set consumption settings"""
         new_settings = self.consumptions_settings.copy()

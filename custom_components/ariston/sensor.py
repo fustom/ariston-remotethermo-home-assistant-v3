@@ -3,9 +3,7 @@ from __future__ import annotations
 
 import logging
 
-import homeassistant.util.dt as dt_util
-
-from datetime import datetime, timedelta
+from datetime import datetime
 
 from homeassistant.core import HomeAssistant
 from homeassistant.config_entries import ConfigEntry
@@ -13,13 +11,11 @@ from homeassistant.components.sensor import SensorEntity
 
 from .entity import AristonEntity
 from .const import (
-    ARISTON_CONSUMPTION_LAST_MONTH_SENSORS_TYPES,
-    ARISTON_GAS_CONSUMPTION_LAST_TWO_HOURS_TYPE,
     ARISTON_SENSOR_TYPES,
     DOMAIN,
     AristonSensorEntityDescription,
 )
-from .coordinator import DeviceDataUpdateCoordinator, DeviceEnergyUpdateCoordinator
+from .coordinator import DeviceDataUpdateCoordinator
 
 
 _LOGGER = logging.getLogger(__name__)
@@ -31,36 +27,21 @@ async def async_setup_entry(
     """Set up the Ariston sensors from config entry."""
     ariston_sensors = []
 
-    def add_sensor(
-        description: AristonSensorEntityDescription,
-        sensor_class: AristonSensor
-        or AristonGasConsumptionLastTwoHoursSensor
-        or AristonEnergyLastMonthSensor,
-    ):
-        """Add new sensor instance to the sensors list if available"""
-        coordinator: DeviceDataUpdateCoordinator or DeviceEnergyUpdateCoordinator = (
-            hass.data[DOMAIN][entry.unique_id][description.coordinator]
-        )
+    for description in ARISTON_SENSOR_TYPES:
+        coordinator: DeviceDataUpdateCoordinator = hass.data[DOMAIN][entry.unique_id][
+            description.coordinator
+        ]
         if coordinator.device.are_device_features_available(
             description.device_features,
             description.extra_energy_feature,
             description.system_types,
         ):
             ariston_sensors.append(
-                sensor_class(
+                AristonSensor(
                     coordinator,
                     description,
                 )
             )
-
-    for description in ARISTON_SENSOR_TYPES:
-        add_sensor(description, AristonSensor)
-
-    for description in ARISTON_GAS_CONSUMPTION_LAST_TWO_HOURS_TYPE:
-        add_sensor(description, AristonGasConsumptionLastTwoHoursSensor)
-
-    for description in ARISTON_CONSUMPTION_LAST_MONTH_SENSORS_TYPES:
-        add_sensor(description, AristonEnergyLastMonthSensor)
 
     async_add_entities(ariston_sensors)
 
@@ -70,7 +51,7 @@ class AristonSensor(AristonEntity, SensorEntity):
 
     def __init__(
         self,
-        coordinator: DeviceDataUpdateCoordinator or DeviceEnergyUpdateCoordinator,
+        coordinator: DeviceDataUpdateCoordinator,
         description: AristonSensorEntityDescription,
     ) -> None:
         """Initialize the sensor."""
@@ -84,52 +65,19 @@ class AristonSensor(AristonEntity, SensorEntity):
     @property
     def native_unit_of_measurement(self):
         """Return the nateive unit of measurement"""
-        return getattr(
-            self.device, self.entity_description.get_native_unit_of_measurement.__name__
-        )()
+        if self.entity_description.get_native_unit_of_measurement is not None:
+            return getattr(
+                self.device,
+                self.entity_description.get_native_unit_of_measurement.__name__,
+            )()
 
-
-class AristonGasConsumptionLastTwoHoursSensor(AristonEntity, SensorEntity):
-    """Class for specific ariston energy sensors"""
-
-    def __init__(
-        self,
-        coordinator: DeviceDataUpdateCoordinator or DeviceEnergyUpdateCoordinator,
-        description: AristonSensorEntityDescription,
-    ) -> None:
-        """Initialize the sensor."""
-        super().__init__(coordinator, description)
-
-        self.current_consumptions_sequences = self.device.consumptions_sequences
-        self.reset_datetime = None
-
-    @property
-    def native_value(self):
-        """Set last_reset value if sequence is modified. Then return the last two hours value."""
-        if self.current_consumptions_sequences != self.device.consumptions_sequences:
-            self.reset_datetime = dt_util.utcnow() - timedelta(hours=1)
-            self.current_consumptions_sequences = self.device.consumptions_sequences
-        return self.device.consumptions_sequences[int(self.entity_description.key)][
-            "v"
-        ][-1]
+        if self.entity_description.native_unit_of_measurement is not None:
+            return self.entity_description.native_unit_of_measurement
 
     @property
     def last_reset(self) -> datetime | None:
-        return self.reset_datetime
-
-
-class AristonEnergyLastMonthSensor(AristonEntity, SensorEntity):
-    """Class for specific ariston energy sensors"""
-
-    def __init__(
-        self,
-        coordinator: DeviceDataUpdateCoordinator or DeviceEnergyUpdateCoordinator,
-        description: AristonSensorEntityDescription,
-    ) -> None:
-        """Initialize the sensor."""
-        super().__init__(coordinator, description)
-
-    @property
-    def native_value(self):
-        values = self.entity_description.key.split("|")
-        return self.device.energy_account.get("LastMonth")[int(values[0])][values[1]]
+        if self.entity_description.get_last_reset is not None:
+            return getattr(
+                self.device,
+                self.entity_description.get_last_reset.__name__,
+            )

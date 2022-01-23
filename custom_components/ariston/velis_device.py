@@ -29,6 +29,7 @@ class AristonVelisDevice(AristonDevice):
         await super().async_get_features()
         self.features[CustomDeviceFeatures.HAS_CH] = False
         self.features[CustomDeviceFeatures.HAS_DHW] = True
+        await self.async_update_settings()
 
     async def async_update_settings(self) -> None:
         """Get device settings wrapper"""
@@ -60,19 +61,23 @@ class AristonVelisDevice(AristonDevice):
         """Get water heater temperature step"""
         return 1
 
-    def get_water_heater_temperature_decimals(self) -> int:
+    @staticmethod
+    def get_water_heater_temperature_decimals() -> int:
         """Get water heater temperature decimals"""
         return 0
 
-    def get_water_heater_temperature_unit(self) -> str:
+    @staticmethod
+    def get_water_heater_temperature_unit() -> str:
         """Get water heater temperature unit"""
         return "°C"
 
-    def get_water_heater_mode_opertation_texts(self) -> list:
+    @staticmethod
+    def get_water_heater_mode_opertation_texts() -> list:
         """Get water heater operation mode texts"""
         return [flag.name for flag in VelisPlantMode]
 
-    def get_water_heater_mode_options(self) -> list:
+    @staticmethod
+    def get_water_heater_mode_options() -> list:
         """Get water heater operation options"""
         return [flag.value for flag in VelisPlantMode]
 
@@ -88,9 +93,14 @@ class AristonVelisDevice(AristonDevice):
         """Get average showers value"""
         return self.data.get(VelisDeviceProperties.AV_SHW)
 
-    def get_av_shw_unit(self) -> int:
+    @staticmethod
+    def get_av_shw_unit() -> int:
         """Get average showers unit"""
         return ""
+
+    def get_electric_consumption_for_water_last_two_hours(self) -> int:
+        """Get electric consumption for water last two hours"""
+        return self.consumptions_sequences[0]["v"][-1]
 
     async def async_set_water_heater_temperature(self, temperature: float):
         """Set water heater temperature"""

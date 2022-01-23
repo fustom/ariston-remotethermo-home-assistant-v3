@@ -22,10 +22,11 @@ from .const import (
     DOMAIN,
     AristonBinarySensorEntityDescription,
 )
-from .coordinator import DeviceDataUpdateCoordinator, DeviceEnergyUpdateCoordinator
+from .coordinator import DeviceDataUpdateCoordinator
 from .ariston import (
+    DeviceAttribute,
     DeviceProperties,
-    PropertyType,
+    SystemType,
 )
 
 _LOGGER = logging.getLogger(__name__)
@@ -47,9 +48,9 @@ async def async_setup_entry(
     """Set up the Ariston binary sensors from config entry."""
     ariston_binary_sensors: list[AristonBinarySensor] = []
     for description in ARISTON_BINARY_SENSOR_TYPES:
-        coordinator: DeviceDataUpdateCoordinator or DeviceEnergyUpdateCoordinator = (
-            hass.data[DOMAIN][entry.unique_id][description.coordinator]
-        )
+        coordinator: DeviceDataUpdateCoordinator = hass.data[DOMAIN][entry.unique_id][
+            description.coordinator
+        ]
         if coordinator.device.are_device_features_available(
             description.device_features,
             description.extra_energy_feature,
@@ -59,29 +60,36 @@ async def async_setup_entry(
 
     async_add_entities(ariston_binary_sensors)
 
-    async def async_create_vacation_service(service_call):
-        """Create a vacation on the target device."""
-        device_id = service_call.data.get(ATTR_DEVICE_ID)
-        end_date = service_call.data.get(ATTR_END_DATE)
+    if coordinator.device.attributes.get(DeviceAttribute.SYS) == SystemType.GALEVO:
 
-        device_registry = dr.async_get(hass)
-        device = device_registry.devices[device_id]
+        async def async_create_vacation_service(service_call):
+            """Create a vacation on the target device."""
+            device_id = service_call.data.get(ATTR_DEVICE_ID)
+            end_date = service_call.data.get(ATTR_END_DATE)
 
-        entry = hass.config_entries.async_get_entry(next(iter(device.config_entries)))
-        coordinator: DeviceDataUpdateCoordinator = hass.data[DOMAIN][entry.unique_id][
-            COORDINATOR
-        ]
-        await coordinator.device.async_set_holiday(end_date)
-        for ariston_binary_sensor in ariston_binary_sensors:
-            if ariston_binary_sensor.entity_description.key is DeviceProperties.HOLIDAY:
-                ariston_binary_sensor.async_write_ha_state()
+            device_registry = dr.async_get(hass)
+            device = device_registry.devices[device_id]
 
-    hass.services.async_register(
-        DOMAIN,
-        SERVICE_CREATE_VACATION,
-        async_create_vacation_service,
-        schema=CREATE_VACATION_SCHEMA,
-    )
+            entry = hass.config_entries.async_get_entry(
+                next(iter(device.config_entries))
+            )
+            coordinator: DeviceDataUpdateCoordinator = hass.data[DOMAIN][
+                entry.unique_id
+            ][COORDINATOR]
+            await coordinator.device.async_set_holiday(end_date)
+            for ariston_binary_sensor in ariston_binary_sensors:
+                if (
+                    ariston_binary_sensor.entity_description.key
+                    is DeviceProperties.HOLIDAY
+                ):
+                    ariston_binary_sensor.async_write_ha_state()
+
+        hass.services.async_register(
+            DOMAIN,
+            SERVICE_CREATE_VACATION,
+            async_create_vacation_service,
+            schema=CREATE_VACATION_SCHEMA,
+        )
 
 
 class AristonBinarySensor(AristonEntity, BinarySensorEntity):
@@ -89,7 +97,7 @@ class AristonBinarySensor(AristonEntity, BinarySensorEntity):
 
     def __init__(
         self,
-        coordinator: DeviceDataUpdateCoordinator or DeviceEnergyUpdateCoordinator,
+        coordinator: DeviceDataUpdateCoordinator,
         description: AristonBinarySensorEntityDescription,
     ) -> None:
         super().__init__(coordinator, description)
@@ -97,6 +105,4 @@ class AristonBinarySensor(AristonEntity, BinarySensorEntity):
     @property
     def is_on(self):
         """Return True if the binary sensor is on."""
-        return self.device.get_item_by_id(
-            self.entity_description.key, PropertyType.VALUE
-        )
+        return getattr(self.device, self.entity_description.get_is_on.__name__)()
