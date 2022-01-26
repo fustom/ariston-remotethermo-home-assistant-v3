@@ -45,7 +45,7 @@ class AristonDevice(ABC):
         self.consumptions_sequences: list = []
         self.data: dict = {}
         self.plant_settings: dict = {}
-        self.consumption_sequence_last_changed_utc: dt = None
+        self.consumption_sequence_last_changed_utc: dt.datetime = None
 
     async def async_get_features(self) -> None:
         """Get device features wrapper"""
@@ -138,7 +138,7 @@ class AristonDevice(ABC):
         """Get electricity consumption for water last month"""
         return self.energy_account.get("LastMonth")[1]["elect"]
 
-    def get_consumption_sequence_last_changed_utc(self) -> dt:
+    def get_consumption_sequence_last_changed_utc(self) -> dt.datetime:
         """Get consumption sequence last changed in utc"""
         return self.consumption_sequence_last_changed_utc
 

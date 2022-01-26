@@ -257,7 +257,7 @@ ARISTON_SENSOR_TYPES: tuple[AristonSensorEntityDescription, ...] = (
         device_features=[DeviceFeatures.HAS_METERING],
         coordinator=ENERGY_COORDINATOR,
         get_native_value=AristonGalevoDevice.get_gas_consumption_for_heating_last_two_hours,
-        last_reset=AristonDevice.get_consumption_sequence_last_changed_utc,
+        get_last_reset=AristonDevice.get_consumption_sequence_last_changed_utc,
         system_types=[SystemType.GALEVO],
     ),
     AristonSensorEntityDescription(
@@ -271,7 +271,7 @@ ARISTON_SENSOR_TYPES: tuple[AristonSensorEntityDescription, ...] = (
         device_features=[DeviceFeatures.HAS_METERING, CustomDeviceFeatures.HAS_DHW],
         coordinator=ENERGY_COORDINATOR,
         get_native_value=AristonGalevoDevice.get_gas_consumption_for_water_last_two_hours,
-        last_reset=AristonDevice.get_consumption_sequence_last_changed_utc,
+        get_last_reset=AristonDevice.get_consumption_sequence_last_changed_utc,
         system_types=[SystemType.GALEVO],
     ),
     AristonSensorEntityDescription(
@@ -285,7 +285,7 @@ ARISTON_SENSOR_TYPES: tuple[AristonSensorEntityDescription, ...] = (
         device_features=[DeviceFeatures.HAS_METERING],
         coordinator=ENERGY_COORDINATOR,
         get_native_value=AristonVelisDevice.get_electric_consumption_for_water_last_two_hours,
-        last_reset=AristonDevice.get_consumption_sequence_last_changed_utc,
+        get_last_reset=AristonDevice.get_consumption_sequence_last_changed_utc,
         system_types=[SystemType.VELIS],
     ),
 )
