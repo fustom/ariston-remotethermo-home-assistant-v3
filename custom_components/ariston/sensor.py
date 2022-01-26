@@ -80,4 +80,4 @@ class AristonSensor(AristonEntity, SensorEntity):
             return getattr(
                 self.device,
                 self.entity_description.get_last_reset.__name__,
-            )
+            )()
