@@ -1,4 +1,6 @@
 """Constants for the Ariston integration."""
+import sys
+
 from abc import ABC
 from collections.abc import Callable
 from dataclasses import dataclass
@@ -339,10 +341,9 @@ ARISTON_NUMBER_TYPES: tuple[AristonNumberEntityDescription, ...] = (
         name=f"{NAME} elec cost",
         icon="mdi:currency-sign",
         entity_category=EntityCategory.CONFIG,
-        # Currently released HA NumberEntityDescription do not support these fields. Dev branch does.
-        # min_value=0,
-        # max_value=sys.maxsize,
-        # step=0.01,
+        min_value=0,
+        max_value=sys.maxsize,
+        step=0.01,
         device_features=[DeviceFeatures.HAS_METERING],
         coordinator=ENERGY_COORDINATOR,
         extra_energy_feature=True,
@@ -355,10 +356,9 @@ ARISTON_NUMBER_TYPES: tuple[AristonNumberEntityDescription, ...] = (
         name=f"{NAME} gas cost",
         icon="mdi:currency-sign",
         entity_category=EntityCategory.CONFIG,
-        # Currently released HA NumberEntityDescription do not support these fields. Dev branch does.
-        # min_value=0,
-        # max_value=sys.maxsize,
-        # step=0.01,
+        min_value=0,
+        max_value=sys.maxsize,
+        step=0.01,
         device_features=[DeviceFeatures.HAS_METERING],
         coordinator=ENERGY_COORDINATOR,
         extra_energy_feature=True,
