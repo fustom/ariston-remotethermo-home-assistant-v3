@@ -208,6 +208,7 @@ class ThermostatProperties:
     ZONE_HEAT_REQUEST: final = "ZoneHeatRequest"
     ZONE_ECONOMY_TEMP: final = "ZoneEconomyTemp"
     ZONE_DEROGA: final = "ZoneDeroga"
+    ZONE_VIRT_TEMP_OFFSET_HEAT: final = "VirtTempOffsetHeat"
 
 
 class ConsumptionProperties:
