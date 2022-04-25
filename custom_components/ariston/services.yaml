@@ -43,6 +43,7 @@ set_item_by_id:
             - "ZoneEconomyTemp"
             - "ZoneMode"
             - "ZoneDeroga"
+            - "VirtTempOffsetHeat"
     zone:
       name: Thermostat zone
       description: Number of the zone. Set 0 if device.
