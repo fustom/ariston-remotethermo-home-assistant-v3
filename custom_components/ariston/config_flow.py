@@ -47,6 +47,10 @@ class AristonConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
         self.cloud_password: str = None
         self.cloud_devices = {}
 
+    async def async_step_reauth(self, user_input=None):
+        """Perform reauth upon an API authentication error."""
+        return await self.async_step_user()
+
     async def async_step_user(
         self, user_input: dict[str, Any] | None = None
     ) -> FlowResult:
@@ -65,6 +69,10 @@ class AristonConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
             response = await self.api.async_connect()
             if not response:
                 errors["base"] = "invalid_auth"
+                return self.async_show_form(
+                    step_id="user", data_schema=STEP_USER_DATA_SCHEMA, errors=errors
+                )
+
         except Exception:  # pylint: disable=broad-except
             _LOGGER.exception("Unexpected exception")
             errors["base"] = "unknown"

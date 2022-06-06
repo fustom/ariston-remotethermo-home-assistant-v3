@@ -354,6 +354,10 @@ class PropertyType:
     EXPIRES_ON: final = "expiresOn"
 
 
+class ConnectionException(Exception):
+    """When can not connect to Ariston cloud"""
+
+
 class AristonAPI:
     """Ariston API class"""
 
@@ -366,17 +370,21 @@ class AristonAPI:
     async def async_connect(self) -> bool:
         """Login to ariston cloud and get token"""
 
-        response = await self.post(
-            f"{ARISTON_API_URL}{ARISTON_LOGIN}",
-            {"usr": self.__username, "pwd": self.__password},
-        )
+        try:
+            response = await self.post(
+                f"{ARISTON_API_URL}{ARISTON_LOGIN}",
+                {"usr": self.__username, "pwd": self.__password},
+            )
 
-        if response is None:
-            return False
+            if response is None:
+                return False
 
-        self.__token = response["token"]
+            self.__token = response["token"]
 
-        return True
+            return True
+
+        except Exception as error:
+            raise ConnectionException() from error
 
     async def async_get_detailed_devices(self) -> list:
         """Get detailed cloud devices"""
