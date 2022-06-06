@@ -20,6 +20,7 @@ from .const import (
 from .galevo_device import AristonGalevoDevice
 from .velis_device import AristonVelisDevice
 
+from homeassistant.exceptions import ConfigEntryAuthFailed, ConfigEntryNotReady
 from homeassistant.config_entries import ConfigEntry
 from homeassistant.core import HomeAssistant
 from homeassistant.const import (
@@ -68,13 +69,18 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
         entry.data[CONF_USERNAME],
         entry.data[CONF_PASSWORD],
     )
-    reponse = await api.async_connect()
-    if not reponse:
-        _LOGGER.error(
-            "Failed to connect to Ariston with device: %s",
-            entry.data[CONF_DEVICE].get(DeviceAttribute.NAME),
-        )
-        return False
+
+    try:
+        reponse = await api.async_connect()
+        if not reponse:
+            _LOGGER.error(
+                "Failed to connect to Ariston with device: %s",
+                entry.data[CONF_DEVICE].get(DeviceAttribute.NAME),
+            )
+            raise ConfigEntryAuthFailed()
+    except Exception as error:
+        _LOGGER.exception("")
+        raise ConfigEntryNotReady() from error
 
     extra_energy_features = entry.options.get(
         EXTRA_ENERGY_FEATURES, DEFAULT_EXTRA_ENERGY_FEATURES
