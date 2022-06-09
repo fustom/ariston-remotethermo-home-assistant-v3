@@ -11,6 +11,8 @@ from typing import Any
 from .ariston import (
     AristonAPI,
     ConsumptionProperties,
+    ConsumptionTimeInterval,
+    ConsumptionType,
     Currency,
     CustomDeviceFeatures,
     DeviceAttribute,
@@ -122,6 +124,16 @@ class AristonDevice(ABC):
             ConsumptionProperties.GAS_ENERGY_UNIT, GasEnergyUnit[selected]
         )
 
+    def get_consumption_sequence_last_value(
+        self, consumption_type: ConsumptionType, time_interval: ConsumptionTimeInterval
+    ) -> int:
+        """Get last value for consumption sequence"""
+        for sequence in self.consumptions_sequences:
+            if sequence["k"] == consumption_type and sequence["p"] == time_interval:
+                return sequence["v"][-1]
+
+        return "nan"
+
     def get_gas_consumption_for_heating_last_month(self) -> int:
         """Get gas consumption for heating last month"""
         return self.energy_account.get("LastMonth")[0]["gas"]
@@ -138,16 +150,48 @@ class AristonDevice(ABC):
         """Get electricity consumption for water last month"""
         return self.energy_account.get("LastMonth")[1]["elect"]
 
+    def get_total_consumption_for_heating_last_two_hours(self) -> int:
+        """Get total consumption for heating last two hours"""
+        return self.get_consumption_sequence_last_value(
+            ConsumptionType.HEATING_TOTAL_ENERGY, ConsumptionTimeInterval.TWO_HOURS
+        )
+
+    def get_total_consumption_for_water_last_two_hours(self) -> int:
+        """Get total consumption for water last two hours"""
+        return self.get_consumption_sequence_last_value(
+            ConsumptionType.WATER_TOTAL_ENERGY, ConsumptionTimeInterval.TWO_HOURS
+        )
+
+    def get_gas_consumption_for_heating_last_two_hours(self) -> int:
+        """Get gas consumption for heating last two hours"""
+        return self.get_consumption_sequence_last_value(
+            ConsumptionType.HEATING_GAS, ConsumptionTimeInterval.TWO_HOURS
+        )
+
+    def get_gas_consumption_for_water_last_two_hours(self) -> int:
+        """Get gas consumption for water last two hours"""
+        return self.get_consumption_sequence_last_value(
+            ConsumptionType.WATER_GAS, ConsumptionTimeInterval.TWO_HOURS
+        )
+
+    def get_electricity_consumption_for_heating_last_two_hours(self) -> int:
+        """Get electricity consumption for heating last two hours"""
+        return self.get_consumption_sequence_last_value(
+            ConsumptionType.HEATING_ELECTRICITY, ConsumptionTimeInterval.TWO_HOURS
+        )
+
+    def get_electricity_consumption_for_water_last_two_hours(self) -> int:
+        """Get electricity consumption for water last two hours"""
+        return self.get_consumption_sequence_last_value(
+            ConsumptionType.WATER_ELECTRICITY, ConsumptionTimeInterval.TWO_HOURS
+        )
+
     def get_consumption_sequence_last_changed_utc(self) -> dt.datetime:
         """Get consumption sequence last changed in utc"""
         return self.consumption_sequence_last_changed_utc
 
     async def async_update_energy(self) -> None:
         """Update the device energy settings from the cloud"""
-
-        # k=1: heating k=2: water
-        # p=1: 12*2 hours p=2: 7*1 day p=3: 15*2 days p=4: 12*? year
-        # v: first element is the latest, last element is the newest"""
         old_consumptions_sequences = self.consumptions_sequences
         self.consumptions_sequences = await self.api.async_get_consumptions_sequences(
             self.attributes.get(DeviceAttribute.GW),

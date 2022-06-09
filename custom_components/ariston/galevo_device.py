@@ -226,14 +226,6 @@ class AristonGalevoDevice(AristonDevice):
             if item.get("id") == item_id and item.get(PropertyType.ZONE) == zone_number
         )
 
-    def get_gas_consumption_for_heating_last_two_hours(self) -> int:
-        """Get gas consumption for heating last two hours"""
-        return self.consumptions_sequences[0]["v"][-1]
-
-    def get_gas_consumption_for_water_last_two_hours(self) -> int:
-        """Get gas consumption for water last two hours"""
-        return self.consumptions_sequences[4]["v"][-1]
-
     async def async_set_water_heater_temperature(self, temperature: float):
         """Set water heater temperature"""
         await self.async_set_item_by_id(DeviceProperties.DHW_TEMP, temperature)
