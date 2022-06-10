@@ -126,7 +126,7 @@ class AristonDevice(ABC):
 
     def get_consumption_sequence_last_value(
         self, consumption_type: ConsumptionType, time_interval: ConsumptionTimeInterval
-    ) -> int:
+    ) -> Any:
         """Get last value for consumption sequence"""
         for sequence in self.consumptions_sequences:
             if sequence["k"] == consumption_type and sequence["p"] == time_interval:
@@ -200,6 +200,8 @@ class AristonDevice(ABC):
             self.features.get(DeviceFeatures.HAS_SLP),
         )
 
+        self.set_consumption_custom_device_features()
+
         if (
             old_consumptions_sequences is not None
             and old_consumptions_sequences != self.consumptions_sequences
@@ -218,6 +220,56 @@ class AristonDevice(ABC):
             self.energy_account = await self.api.async_get_energy_account(
                 self.attributes.get(DeviceAttribute.GW)
             )
+
+    def set_consumption_custom_device_features(self):
+        """Set custom device features for consumption"""
+        if (
+            self.get_consumption_sequence_last_value(
+                ConsumptionType.HEATING_TOTAL_ENERGY, ConsumptionTimeInterval.TWO_HOURS
+            )
+            is not "nan"
+        ):
+            self.features[CustomDeviceFeatures.HAS_HEATING_TOTAL_ENERGY] = True
+
+        if (
+            self.get_consumption_sequence_last_value(
+                ConsumptionType.WATER_TOTAL_ENERGY, ConsumptionTimeInterval.TWO_HOURS
+            )
+            is not "nan"
+        ):
+            self.features[CustomDeviceFeatures.HAS_WATER_TOTAL_ENERGY] = True
+
+        if (
+            self.get_consumption_sequence_last_value(
+                ConsumptionType.HEATING_GAS, ConsumptionTimeInterval.TWO_HOURS
+            )
+            is not "nan"
+        ):
+            self.features[CustomDeviceFeatures.HAS_HEATING_GAS] = True
+
+        if (
+            self.get_consumption_sequence_last_value(
+                ConsumptionType.WATER_GAS, ConsumptionTimeInterval.TWO_HOURS
+            )
+            is not "nan"
+        ):
+            self.features[CustomDeviceFeatures.HAS_WATER_GAS] = True
+
+        if (
+            self.get_consumption_sequence_last_value(
+                ConsumptionType.HEATING_ELECTRICITY, ConsumptionTimeInterval.TWO_HOURS
+            )
+            is not "nan"
+        ):
+            self.features[CustomDeviceFeatures.HAS_HEATING_ELECTRICITY] = True
+
+        if (
+            self.get_consumption_sequence_last_value(
+                ConsumptionType.WATER_ELECTRICITY, ConsumptionTimeInterval.TWO_HOURS
+            )
+            is not "nan"
+        ):
+            self.features[CustomDeviceFeatures.HAS_WATER_ELECTRICITY] = True
 
     async def async_set_elect_cost(self, value: float):
         """Set electric cost"""

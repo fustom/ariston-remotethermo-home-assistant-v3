@@ -231,6 +231,12 @@ class CustomDeviceFeatures:
 
     HAS_CH: final = "hasCh"
     HAS_DHW: final = "hasDhw"
+    HAS_HEATING_TOTAL_ENERGY: final = "hasHeatingTotalEnergy"
+    HAS_WATER_TOTAL_ENERGY: final = "hasWaterTotalEnergy"
+    HAS_HEATING_GAS: final = "hasHeatingGas"
+    HAS_WATER_GAS: final = "hasWaterGas"
+    HAS_HEATING_ELECTRICITY: final = "hasHeatingElectricity"
+    HAS_WATER_ELECTRICITY: final = "hasWaterElectricity"
 
 
 class DeviceFeatures:
