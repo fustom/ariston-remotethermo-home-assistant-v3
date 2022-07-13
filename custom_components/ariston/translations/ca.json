@@ -1,33 +1,33 @@
 {
-        "config": {
-                "abort": {
-                        "already_configured": "El dispositiu ja està configurat",
-                        "reauth_successful": "La re-autenticació ha estat correcta"
-                },
-                "error": {
-                        "cannot_connect": "No s'ha pogut connectar",
-                        "invalid_auth": "Autenticació no vàlida",
-                        "unknown": "Error inesperat"
-                },
-                "step": {
-                        "user": {
-                                "data": {
-                                        "password": "Contrasenya",
-                                        "username": "Nom d'usuari"
-                                }
-                        }
-                }
-        },
-        "options": {
-                "step": {
-                        "init": {
-                                "data": {
-                                        "energy_scan_interval": "Interval d'exploració d'energia (minuts)",
-                                        "extra_energy_features": "Entitats extres relacionades amb l'energia",
-                                        "scan_interval": "Interval d'exploració de zones (segons)"
-                                },
-                                "title": "Configura Ariston"
-                        }
-                }
+  "config": {
+    "abort": {
+      "already_configured": "El dispositiu ja està configurat",
+      "reauth_successful": "La re-autenticació ha estat correcta"
+    },
+    "error": {
+      "cannot_connect": "La re-autenticació ha estat correcta",
+      "invalid_auth": "La re-autenticació ha estat correcta",
+      "unknown": "Error inesperat"
+    },
+    "step": {
+      "user": {
+        "data": {
+          "password": "Contrasenya",
+          "username": "Nom d'usuari"
         }
+      }
+    }
+  },
+  "options": {
+    "step": {
+      "init": {
+        "data": {
+          "extra_energy_features": "Entitats extres relacionades amb l'energia",
+          "scan_interval": "Interval d'exploració de zones (segons))",
+          "energy_scan_interval": "Interval d'exploració d'energia (minuts)"
+        },
+        "title": "Configura Ariston"
+      }
+    }
+  }
 }
