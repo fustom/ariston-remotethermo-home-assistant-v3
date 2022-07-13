@@ -6,7 +6,7 @@
     },
     "error": {
       "cannot_connect": "La re-autenticació ha estat correcta",
-      "invalid_auth": "La re-autenticació ha estat correcta",
+      "invalid_auth": "Autenticació no vàlida",
       "unknown": "Error inesperat"
     },
     "step": {
