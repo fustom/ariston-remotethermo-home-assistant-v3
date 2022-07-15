@@ -147,6 +147,28 @@ class VelisPlantMode(IntFlag):
     NIGHT = 8
 
 
+@unique
+class ConsumptionType(IntFlag):
+    """Consumption type"""
+
+    HEATING_TOTAL_ENERGY = 1
+    WATER_TOTAL_ENERGY = 2
+    HEATING_GAS = 7
+    WATER_GAS = 10
+    HEATING_ELECTRICITY = 20
+    WATER_ELECTRICITY = 21
+
+
+@unique
+class ConsumptionTimeInterval(IntFlag):
+    """Consumption time interval"""
+
+    TWO_HOURS = 1
+    ONE_DAY = 2
+    TWO_DAYS = 3
+    ONE_MONTH = 4
+
+
 class DeviceAttribute:
     """Constants for device attributes"""
 
@@ -209,6 +231,12 @@ class CustomDeviceFeatures:
 
     HAS_CH: final = "hasCh"
     HAS_DHW: final = "hasDhw"
+    HAS_HEATING_TOTAL_ENERGY: final = "hasHeatingTotalEnergy"
+    HAS_WATER_TOTAL_ENERGY: final = "hasWaterTotalEnergy"
+    HAS_HEATING_GAS: final = "hasHeatingGas"
+    HAS_WATER_GAS: final = "hasWaterGas"
+    HAS_HEATING_ELECTRICITY: final = "hasHeatingElectricity"
+    HAS_WATER_ELECTRICITY: final = "hasWaterElectricity"
 
 
 class DeviceFeatures:

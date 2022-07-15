@@ -98,10 +98,6 @@ class AristonVelisDevice(AristonDevice):
         """Get average showers unit"""
         return ""
 
-    def get_electric_consumption_for_water_last_two_hours(self) -> int:
-        """Get electric consumption for water last two hours"""
-        return self.consumptions_sequences[0]["v"][-1]
-
     async def async_set_water_heater_temperature(self, temperature: float):
         """Set water heater temperature"""
         await self.api.async_set_velis_temperature(
