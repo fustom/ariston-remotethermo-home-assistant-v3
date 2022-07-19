@@ -188,6 +188,15 @@ ARISTON_SENSOR_TYPES: tuple[AristonSensorEntityDescription, ...] = (
         system_types=[SystemType.GALEVO],
     ),
     AristonSensorEntityDescription(
+        key=DeviceProperties.OUTSIDE_TEMP,
+        name=f"{NAME} Outside temp",
+        device_class=SensorDeviceClass.TEMPERATURE,
+        state_class=SensorStateClass.MEASUREMENT,
+        get_native_value=AristonGalevoDevice.get_outside_temp_value,
+        get_native_unit_of_measurement=AristonGalevoDevice.get_outside_temp_unit,
+        system_types=[SystemType.GALEVO],
+    ),
+    AristonSensorEntityDescription(
         key=VelisDeviceProperties.AV_SHW,
         name=f"{NAME} average showers",
         icon="mdi:shower-head",
