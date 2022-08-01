@@ -50,10 +50,10 @@ class AristonNumber(AristonEntity, NumberEntity):
         super().__init__(coordinator, description)
 
     @property
-    def value(self):
+    def native_value(self):
         """Return the current value"""
         return getattr(self.device, self.entity_description.getter.__name__)()
 
-    async def async_set_value(self, value: float):
+    async def async_set_native_value(self, value: float):
         """Update the current value."""
         await getattr(self.device, self.entity_description.setter.__name__)(value)

@@ -19,21 +19,16 @@ from homeassistant.core import HomeAssistant
 from homeassistant.const import ATTR_TEMPERATURE
 from homeassistant.components.climate import ClimateEntity
 from homeassistant.components.climate.const import (
-    HVAC_MODE_AUTO,
-    HVAC_MODE_HEAT,
-    HVAC_MODE_OFF,
-    HVAC_MODE_COOL,
-    CURRENT_HVAC_OFF,
-    CURRENT_HVAC_HEAT,
-    CURRENT_HVAC_COOL,
-    CURRENT_HVAC_IDLE,
-    SUPPORT_PRESET_MODE,
-    SUPPORT_TARGET_TEMPERATURE,
+    HVACMode,
+    HVACAction,
+    ClimateEntityFeature,
 )
 
 _LOGGER = logging.getLogger(__name__)
 
-SUPPORT_FLAGS = SUPPORT_TARGET_TEMPERATURE | SUPPORT_PRESET_MODE
+SUPPORT_FLAGS = (
+    ClimateEntityFeature.TARGET_TEMPERATURE | ClimateEntityFeature.PRESET_MODE
+)
 
 
 async def async_setup_entry(
@@ -128,17 +123,17 @@ class AristonThermostat(AristonEntity, ClimateEntity):
         plant_mode = self.device.get_plant_mode()
         zone_mode = self.device.get_zone_mode(self.zone)
 
-        curr_hvac_mode = HVAC_MODE_OFF
+        curr_hvac_mode = HVACMode.OFF
         if plant_mode in [PlantMode.WINTER, PlantMode.HEATING_ONLY]:
             if zone_mode is ZoneMode.MANUAL or zone_mode is ZoneMode.MANUAL2:
-                curr_hvac_mode = HVAC_MODE_HEAT
+                curr_hvac_mode = HVACMode.HEAT
             elif zone_mode is ZoneMode.TIME_PROGRAM:
-                curr_hvac_mode = HVAC_MODE_AUTO
+                curr_hvac_mode = HVACMode.AUTO
         if plant_mode in [PlantMode.COOLING]:
             if zone_mode is ZoneMode.MANUAL or zone_mode is ZoneMode.MANUAL2:
-                curr_hvac_mode = HVAC_MODE_COOL
+                curr_hvac_mode = HVACMode.COOL
             elif zone_mode is ZoneMode.TIME_PROGRAM:
-                curr_hvac_mode = HVAC_MODE_AUTO
+                curr_hvac_mode = HVACMode.AUTO
         return curr_hvac_mode
 
     @property
@@ -149,13 +144,13 @@ class AristonThermostat(AristonEntity, ClimateEntity):
 
         supported_modes = []
         if ZoneMode.MANUAL in zone_modes or ZoneMode.MANUAL2 in zone_modes:
-            supported_modes.append(HVAC_MODE_HEAT)
+            supported_modes.append(HVACMode.HEAT)
             if PlantMode.COOLING in plant_modes:
-                supported_modes.append(HVAC_MODE_COOL)
+                supported_modes.append(HVACMode.COOL)
         if ZoneMode.TIME_PROGRAM in zone_modes:
-            supported_modes.append(HVAC_MODE_AUTO)
+            supported_modes.append(HVACMode.AUTO)
         if ZoneMode.OFF in zone_modes:
-            supported_modes.append(HVAC_MODE_OFF)
+            supported_modes.append(HVACMode.OFF)
 
         return supported_modes
 
@@ -165,17 +160,17 @@ class AristonThermostat(AristonEntity, ClimateEntity):
         plant_mode = self.device.get_plant_mode()
         if_flame_on = self.device.get_is_flame_on_value() == 1
 
-        curr_hvac_action = CURRENT_HVAC_OFF
+        curr_hvac_action = HVACAction.OFF
         if plant_mode in [PlantMode.WINTER, PlantMode.HEATING_ONLY]:
             if if_flame_on:
-                curr_hvac_action = CURRENT_HVAC_HEAT
+                curr_hvac_action = HVACAction.HEATING
             else:
-                curr_hvac_action = CURRENT_HVAC_IDLE
+                curr_hvac_action = HVACAction.IDLE
         if plant_mode in [PlantMode.COOLING]:
             if if_flame_on:
-                curr_hvac_action = CURRENT_HVAC_COOL
+                curr_hvac_action = HVACAction.COOLING
             else:
-                curr_hvac_action = CURRENT_HVAC_IDLE
+                curr_hvac_action = HVACAction.IDLE
         return curr_hvac_action
 
     @property
@@ -194,12 +189,12 @@ class AristonThermostat(AristonEntity, ClimateEntity):
         zone_modes = self.device.get_zone_mode_options(self.zone)
         current_plant_mode = self.device.get_plant_mode()
 
-        if hvac_mode == HVAC_MODE_OFF:
+        if hvac_mode == HVACMode.OFF:
             if PlantMode.OFF in plant_modes:
                 await self.device.async_set_plant_mode(PlantMode.OFF)
             else:
                 await self.device.async_set_plant_mode(PlantMode.SUMMER)
-        elif hvac_mode == HVAC_MODE_AUTO:
+        elif hvac_mode == HVACMode.AUTO:
             if current_plant_mode in [
                 PlantMode.WINTER,
                 PlantMode.HEATING_ONLY,
@@ -217,7 +212,7 @@ class AristonThermostat(AristonEntity, ClimateEntity):
                 else:
                     await self.device.async_set_plant_mode(PlantMode.WINTER)
             await self.device.async_set_zone_mode(ZoneMode.TIME_PROGRAM, self.zone)
-        elif hvac_mode == HVAC_MODE_HEAT:
+        elif hvac_mode == HVACMode.HEAT:
             if current_plant_mode in [PlantMode.WINTER, PlantMode.HEATING_ONLY]:
                 # if already heating, change CH mode
                 pass
@@ -234,7 +229,7 @@ class AristonThermostat(AristonEntity, ClimateEntity):
                 await self.device.async_set_zone_mode(ZoneMode.MANUAL2, self.zone)
             else:
                 await self.device.async_set_zone_mode(ZoneMode.MANUAL, self.zone)
-        elif hvac_mode == HVAC_MODE_COOL:
+        elif hvac_mode == HVACMode.COOL:
             await self.device.async_set_plant_mode(PlantMode.COOLING)
             if ZoneMode.MANUAL2 in zone_modes:
                 await self.device.async_set_zone_mode(ZoneMode.MANUAL2, self.zone)
