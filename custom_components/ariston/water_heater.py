@@ -15,8 +15,7 @@ from .coordinator import DeviceDataUpdateCoordinator
 from homeassistant.core import HomeAssistant
 from homeassistant.config_entries import ConfigEntry
 from homeassistant.components.water_heater import (
-    SUPPORT_OPERATION_MODE,
-    SUPPORT_TARGET_TEMPERATURE,
+    WaterHeaterEntityFeature,
     WaterHeaterEntity,
 )
 from homeassistant.const import (
@@ -107,8 +106,11 @@ class AristonWaterHeater(AristonEntity, WaterHeaterEntity):
     def supported_features(self) -> int:
         """Return the supported features for this device integration."""
         if self.device.features.get(DeviceFeatures.DHW_MODE_CHANGEABLE):
-            return SUPPORT_TARGET_TEMPERATURE | SUPPORT_OPERATION_MODE
-        return SUPPORT_TARGET_TEMPERATURE
+            return (
+                WaterHeaterEntityFeature.TARGET_TEMPERATURE
+                | WaterHeaterEntityFeature.OPERATION_MODE
+            )
+        return WaterHeaterEntityFeature.TARGET_TEMPERATURE
 
     @property
     def operation_list(self):
