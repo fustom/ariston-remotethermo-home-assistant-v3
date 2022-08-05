@@ -32,6 +32,15 @@ class AristonGalevoDevice(AristonDevice):
             self.umsys,
         )
 
+        if self.features.get(CustomDeviceFeatures.HAS_OUTSIDE_TEMP) is None:
+            temp = self._get_item_by_id(
+                DeviceProperties.OUTSIDE_TEMP, PropertyType.VALUE
+            )
+            max_temp = self._get_item_by_id(
+                DeviceProperties.OUTSIDE_TEMP, PropertyType.MAX
+            )
+            self.features[CustomDeviceFeatures.HAS_OUTSIDE_TEMP] = temp != max_temp
+
     async def async_get_features(self) -> None:
         """Get device features wrapper"""
         await super().async_get_features()
@@ -127,16 +136,12 @@ class AristonGalevoDevice(AristonDevice):
 
     def get_outside_temp_value(self) -> str:
         """Get outside temperature value"""
-        return self._get_item_by_id(
-            DeviceProperties.OUTSIDE_TEMP, PropertyType.VALUE
-        )
+        return self._get_item_by_id(DeviceProperties.OUTSIDE_TEMP, PropertyType.VALUE)
 
     def get_outside_temp_unit(self) -> str:
         """Get outside temperature unit"""
-        return self._get_item_by_id(
-            DeviceProperties.OUTSIDE_TEMP, PropertyType.UNIT
-        )
-        
+        return self._get_item_by_id(DeviceProperties.OUTSIDE_TEMP, PropertyType.UNIT)
+
     def get_ch_flow_setpoint_temp_unit(self) -> str:
         """Get central heating flow setpoint temperature unit"""
         return self._get_item_by_id(
