@@ -192,6 +192,7 @@ ARISTON_SENSOR_TYPES: tuple[AristonSensorEntityDescription, ...] = (
         name=f"{NAME} Outside temp",
         device_class=SensorDeviceClass.TEMPERATURE,
         state_class=SensorStateClass.MEASUREMENT,
+        device_features=[CustomDeviceFeatures.HAS_OUTSIDE_TEMP],
         get_native_value=AristonGalevoDevice.get_outside_temp_value,
         get_native_unit_of_measurement=AristonGalevoDevice.get_outside_temp_unit,
         system_types=[SystemType.GALEVO],

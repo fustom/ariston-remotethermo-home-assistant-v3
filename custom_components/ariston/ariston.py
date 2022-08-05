@@ -209,6 +209,7 @@ class CustomDeviceFeatures:
 
     HAS_CH: final = "hasCh"
     HAS_DHW: final = "hasDhw"
+    HAS_OUTSIDE_TEMP: final = "hasOutsideTemp"
 
 
 class DeviceFeatures:
