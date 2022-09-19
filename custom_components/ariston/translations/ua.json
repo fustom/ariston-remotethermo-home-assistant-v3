@@ -1,0 +1,33 @@
+{
+  "config": {
+    "abort": {
+      "already_configured": "Пристрій уже налаштовано",
+      "reauth_successful": "Повторна автентифікація пройшла успішно"
+    },
+    "error": {
+      "cannot_connect": "Не вдалося підключитися",
+      "invalid_auth": "Недійсна автентифікація",
+      "unknown": "Неочікувана помилка"
+    },
+    "step": {
+      "user": {
+        "data": {
+          "password": "Пароль",
+          "username": "Ім'я користувача"
+        }
+      }
+    }
+  },
+  "options": {
+    "step": {
+      "init": {
+        "data": {
+          "extra_energy_features": "Суб’єкти, пов’язані з додатковою енергетикою",
+          "scan_interval": "Інтервал сканування зон (секунд)",
+          "energy_scan_interval": "Інтервал сканування енергії (хвилини)"
+        },
+        "title": "Налаштувати Ariston"
+      }
+    }
+  }
+}
