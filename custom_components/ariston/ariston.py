@@ -551,6 +551,22 @@ class AristonAPI:
             },
         )
 
+    async def async_set_velis_power(self, gw_id: str, power: bool) -> None:
+        """Set Velis power"""
+        return await self.post(
+            f"{ARISTON_API_URL}{ARISTON_VELIS}/{ARISTON_MED_PLANT_DATA}/{gw_id}/switch",
+            power,
+        )
+
+    async def async_set_velis_plant_setting(
+        self, gw_id: str, setting: MedDeviceSettings, value: float, old_value: float
+    ) -> None:
+        """Set Velis plant setting"""
+        return await self.post(
+            f"{ARISTON_API_URL}{ARISTON_VELIS}/{ARISTON_MED_PLANT_DATA}/{gw_id}/plantSettings",
+            {setting: {"new": value, "old": old_value}},
+        )
+
     async def async_get_thermostat_time_progs(
         self, gw_id: str, zone: int, umsys: str
     ) -> dict[str, Any]:

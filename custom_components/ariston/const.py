@@ -28,6 +28,7 @@ from .ariston import (
     CustomDeviceFeatures,
     DeviceFeatures,
     DeviceProperties,
+    MedDeviceSettings,
     SystemType,
     VelisDeviceProperties,
 )
@@ -110,6 +111,8 @@ class AristonNumberEntityDescription(
 
     setter: Callable = None
     getter: Callable = None
+    min: Callable = None
+    max: Callable = None
 
 
 @dataclass
@@ -203,7 +206,7 @@ ARISTON_SENSOR_TYPES: tuple[AristonSensorEntityDescription, ...] = (
         icon="mdi:shower-head",
         state_class=SensorStateClass.MEASUREMENT,
         get_native_value=AristonVelisDevice.get_av_shw_value,
-        get_native_unit_of_measurement=AristonVelisDevice.get_av_shw_unit,
+        get_native_unit_of_measurement=AristonVelisDevice.get_empty_unit,
         system_types=[SystemType.VELIS],
     ),
     AristonSensorEntityDescription(
@@ -300,6 +303,15 @@ ARISTON_SENSOR_TYPES: tuple[AristonSensorEntityDescription, ...] = (
         get_last_reset=AristonDevice.get_consumption_sequence_last_changed_utc,
         system_types=[SystemType.VELIS],
     ),
+    AristonSensorEntityDescription(
+        key=VelisDeviceProperties.RM_TM,
+        name=f"{NAME} remaining time",
+        icon="mdi:timer",
+        state_class=SensorStateClass.MEASUREMENT,
+        get_native_value=AristonVelisDevice.get_rm_tm_value,
+        get_native_unit_of_measurement=AristonVelisDevice.get_empty_unit,
+        system_types=[SystemType.VELIS],
+    ),
 )
 
 ARISTON_BINARY_SENSOR_TYPES: tuple[AristonBinarySensorEntityDescription, ...] = (
@@ -323,6 +335,13 @@ ARISTON_BINARY_SENSOR_TYPES: tuple[AristonBinarySensorEntityDescription, ...] = 
         get_is_on=AristonGalevoDevice.get_holiday_mode_value,
         system_types=[SystemType.GALEVO],
     ),
+    AristonBinarySensorEntityDescription(
+        key=VelisDeviceProperties.HEAT_REQ,
+        name=f"{NAME} is heating",
+        icon="mdi:fire",
+        get_is_on=AristonVelisDevice.get_is_heating,
+        system_types=[SystemType.VELIS],
+    ),
 )
 
 ARISTON_SWITCH_TYPES: tuple[AristonSwitchEntityDescription, ...] = (
@@ -341,6 +360,23 @@ ARISTON_SWITCH_TYPES: tuple[AristonSwitchEntityDescription, ...] = (
         icon="mdi:leaf",
         setter=AristonVelisDevice.async_set_eco_mode,
         getter=AristonVelisDevice.get_water_heater_eco_value,
+        system_types=[SystemType.VELIS],
+    ),
+    AristonSwitchEntityDescription(
+        key=VelisDeviceProperties.ON,
+        name=f"{NAME} power",
+        icon="mdi:power",
+        setter=AristonVelisDevice.async_set_power,
+        getter=AristonVelisDevice.get_water_heater_power_value,
+        system_types=[SystemType.VELIS],
+    ),
+    AristonSwitchEntityDescription(
+        key=MedDeviceSettings.MED_ANTILEGIONELLA_ON_OFF,
+        name=f"{NAME} anti legionella",
+        icon="mdi:bacteria-outline",
+        entity_category=EntityCategory.CONFIG,
+        setter=AristonVelisDevice.async_set_antilegionella,
+        getter=AristonVelisDevice.get_water_anti_leg_value,
         system_types=[SystemType.VELIS],
     ),
 )
@@ -375,6 +411,18 @@ ARISTON_NUMBER_TYPES: tuple[AristonNumberEntityDescription, ...] = (
         getter=AristonDevice.get_gas_cost,
         setter=AristonDevice.async_set_gas_cost,
         system_types=[SystemType.GALEVO],
+    ),
+    AristonNumberEntityDescription(
+        key=MedDeviceSettings.MED_MAX_SETPOINT_TEMPERATURE,
+        name=f"{NAME} max setpoint temperature",
+        icon="mdi:thermometer-high",
+        entity_category=EntityCategory.CONFIG,
+        min=AristonVelisDevice.get_water_heater_maximum_setpoint_temperature_minimum,
+        max=AristonVelisDevice.get_water_heater_maximum_setpoint_temperature_maximum,
+        native_step=1,
+        getter=AristonVelisDevice.get_water_heater_maximum_setpoint_temperature,
+        setter=AristonVelisDevice.async_set_max_setpoint_temp,
+        system_types=[SystemType.VELIS],
     ),
 )
 

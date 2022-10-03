@@ -43,15 +43,11 @@ class AristonVelisDevice(AristonDevice):
 
     def get_water_heater_minimum_temperature(self) -> float:
         """Get water heater minimum temperature"""
-        return self.plant_settings.get(
-            MedDeviceSettings.MED_MAX_SETPOINT_TEMPERATURE_MIN
-        )
+        return 40.0
 
     def get_water_heater_maximum_temperature(self) -> float:
         """Get water heater maximum temperature"""
-        return self.plant_settings.get(
-            MedDeviceSettings.MED_MAX_SETPOINT_TEMPERATURE_MAX
-        )
+        return self.get_water_heater_maximum_setpoint_temperature()
 
     def get_water_heater_target_temperature(self) -> float:
         """Get water heater target temperature"""
@@ -93,9 +89,41 @@ class AristonVelisDevice(AristonDevice):
         """Get average showers value"""
         return self.data.get(VelisDeviceProperties.AV_SHW)
 
+    def get_water_heater_power_value(self) -> bool:
+        """Get water heater power value"""
+        return self.data.get(VelisDeviceProperties.ON)
+
+    def get_rm_tm_value(self) -> str:
+        """Get remaining time value"""
+        return self.data.get(VelisDeviceProperties.RM_TM)
+
+    def get_is_heating(self) -> bool:
+        """Get is the water heater heating"""
+        return self.data.get(VelisDeviceProperties.HEAT_REQ)
+
+    def get_water_anti_leg_value(self) -> bool:
+        """Get water heater anti-legionella value"""
+        return self.plant_settings.get(MedDeviceSettings.MED_ANTILEGIONELLA_ON_OFF)
+
+    def get_water_heater_maximum_setpoint_temperature_minimum(self) -> float:
+        """Get water heater maximum setpoint temperature minimum"""
+        return self.plant_settings.get(
+            MedDeviceSettings.MED_MAX_SETPOINT_TEMPERATURE_MIN
+        )
+
+    def get_water_heater_maximum_setpoint_temperature_maximum(self) -> float:
+        """Get water heater maximum setpoint maximum temperature"""
+        return self.plant_settings.get(
+            MedDeviceSettings.MED_MAX_SETPOINT_TEMPERATURE_MAX
+        )
+
+    def get_water_heater_maximum_setpoint_temperature(self) -> float:
+        """Get water heater maximum setpoint temperature value"""
+        return self.plant_settings.get(MedDeviceSettings.MED_MAX_SETPOINT_TEMPERATURE)
+
     @staticmethod
-    def get_av_shw_unit() -> int:
-        """Get average showers unit"""
+    def get_empty_unit() -> int:
+        """Get empty unit"""
         return ""
 
     def get_electric_consumption_for_water_last_two_hours(self) -> int:
@@ -126,3 +154,34 @@ class AristonVelisDevice(AristonDevice):
             self.attributes.get(DeviceAttribute.GW), VelisPlantMode[operation_mode]
         )
         self.data[VelisDeviceProperties.MODE] = VelisPlantMode[operation_mode].value
+
+    async def async_set_power(self, power: bool):
+        """Set water heater power"""
+        await self.api.async_set_velis_power(
+            self.attributes.get(DeviceAttribute.GW), power
+        )
+        self.data[VelisDeviceProperties.ON] = power
+
+    async def async_set_antilegionella(self, anti_leg: bool):
+        """Set water heater anti-legionella"""
+        await self.api.async_set_velis_plant_setting(
+            self.attributes.get(DeviceAttribute.GW),
+            MedDeviceSettings.MED_ANTILEGIONELLA_ON_OFF,
+            1.0 if anti_leg else 0.0,
+            1.0
+            if self.plant_settings[MedDeviceSettings.MED_ANTILEGIONELLA_ON_OFF]
+            else 0.0,
+        )
+        self.plant_settings[MedDeviceSettings.MED_ANTILEGIONELLA_ON_OFF] = anti_leg
+
+    async def async_set_max_setpoint_temp(self, max_setpoint_temp: float):
+        """Set water heater anti-legionella"""
+        await self.api.async_set_velis_plant_setting(
+            self.attributes.get(DeviceAttribute.GW),
+            MedDeviceSettings.MED_MAX_SETPOINT_TEMPERATURE,
+            max_setpoint_temp,
+            self.plant_settings[MedDeviceSettings.MED_MAX_SETPOINT_TEMPERATURE],
+        )
+        self.plant_settings[
+            MedDeviceSettings.MED_MAX_SETPOINT_TEMPERATURE
+        ] = max_setpoint_temp
