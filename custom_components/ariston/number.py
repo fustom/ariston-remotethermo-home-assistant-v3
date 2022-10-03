@@ -54,6 +54,22 @@ class AristonNumber(AristonEntity, NumberEntity):
         """Return the current value"""
         return getattr(self.device, self.entity_description.getter.__name__)()
 
+    @property
+    def native_min_value(self):
+        """Return the minimum value"""
+        if self.entity_description.min is not None:
+            return getattr(self.device, self.entity_description.min.__name__)()
+
+        return self.entity_description.native_min_value
+
+    @property
+    def native_max_value(self):
+        """Return the maximum value"""
+        if self.entity_description.max is not None:
+            return getattr(self.device, self.entity_description.max.__name__)()
+
+        return self.entity_description.native_max_value
+
     async def async_set_native_value(self, value: float):
         """Update the current value."""
         await getattr(self.device, self.entity_description.setter.__name__)(value)
