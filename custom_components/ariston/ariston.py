@@ -534,21 +534,23 @@ class AristonAPI:
             f"{ARISTON_API_URL}{ARISTON_VELIS}/{ARISTON_MED_PLANT_DATA}/{gw_id}/mode",
             {
                 "new": value.value,
-                # "old": old_value
             },
         )
 
-    async def async_set_velis_temperature(
-        self, gw_id: str, eco: bool, value: float
-    ) -> None:
+    async def async_set_velis_temperature(self, gw_id: str, value: float) -> None:
         """Set Velis temperature"""
         return await self.post(
             f"{ARISTON_API_URL}{ARISTON_VELIS}/{ARISTON_MED_PLANT_DATA}/{gw_id}/temperature",
             {
-                "eco": eco,
                 "new": value,
-                # "old": old_value
             },
+        )
+
+    async def async_set_velis_eco_mode(self, gw_id: str, eco_mode: bool) -> None:
+        """Set Velis power"""
+        return await self.post(
+            f"{ARISTON_API_URL}{ARISTON_VELIS}/{ARISTON_MED_PLANT_DATA}/{gw_id}/switchEco",
+            eco_mode,
         )
 
     async def async_set_velis_power(self, gw_id: str, power: bool) -> None:

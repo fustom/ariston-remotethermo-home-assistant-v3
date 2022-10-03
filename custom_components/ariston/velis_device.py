@@ -134,17 +134,15 @@ class AristonVelisDevice(AristonDevice):
         """Set water heater temperature"""
         await self.api.async_set_velis_temperature(
             self.attributes.get(DeviceAttribute.GW),
-            self.data.get(VelisDeviceProperties.ECO),
             temperature,
         )
         self.data[VelisDeviceProperties.REQ_TEMP] = temperature
 
     async def async_set_eco_mode(self, eco_mode: bool):
         """Set water heater eco_mode"""
-        await self.api.async_set_velis_temperature(
+        await self.api.async_set_velis_eco_mode(
             self.attributes.get(DeviceAttribute.GW),
             eco_mode,
-            self.data.get(VelisDeviceProperties.REQ_TEMP),
         )
         self.data[VelisDeviceProperties.ECO] = eco_mode
 
