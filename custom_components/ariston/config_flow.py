@@ -122,6 +122,15 @@ class AristonConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
         errors = {}
         if user_input is not None:
             cloud_device = self.cloud_devices[user_input["select_device"]]
+            existing_entry = await self.async_set_unique_id(
+                cloud_device[DeviceAttribute.GW], raise_on_progress=False
+            )
+            if existing_entry:
+                data = existing_entry.data.copy()
+                self.hass.config_entries.async_update_entry(existing_entry, data=data)
+                await self.hass.config_entries.async_reload(existing_entry.entry_id)
+                return self.async_abort(reason="reauth_successful")
+
             return self.async_create_entry(
                 title=cloud_device[DeviceAttribute.NAME],
                 data={
