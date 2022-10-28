@@ -36,6 +36,7 @@ class PlantMode(IntFlag):
     COOLING = 3
     COOLING_ONLY = 4
     OFF = 5
+    HOLIDAY = 6
 
 
 @unique
@@ -44,8 +45,8 @@ class ZoneMode(IntFlag):
 
     UNDEFINED = -1
     OFF = 0
-    MANUAL = 1
-    MANUAL2 = 2
+    MANUAL_NIGHT = 1
+    MANUAL = 2
     TIME_PROGRAM = 3
 
 
@@ -139,12 +140,51 @@ class SystemType(IntFlag):
 
 
 @unique
+class Brands(IntFlag):
+    """Brands enum"""
+
+    Ariston = 1
+    Chaffoteaux = 2
+    Elco = 3
+    Atag = 4
+    Nti = 5
+    Htp = 6
+    Racold = 7
+
+
+@unique
+class EvoPlantMode(IntFlag):
+    """Evo plant mode enum"""
+
+    MANUAL = 1
+    PROGRAM = 5
+
+
+@unique
 class VelisPlantMode(IntFlag):
     """Velis plant mode enum"""
 
     MANUAL = 1
     PROGRAM = 5
     NIGHT = 8
+
+
+@unique
+class LydosPlantMode(IntFlag):
+    """Lydos hybrid plant mode enum"""
+
+    IMEMORY = 1
+    GREEN = 2
+    PROGRAM = 6
+    BOOST = 7
+
+
+@unique
+class WheType(IntFlag):
+    """Whe type enum"""
+
+    LydosHybrid = 2
+    Evo = 6
 
 
 class DeviceAttribute:
@@ -254,16 +294,27 @@ class VelisDeviceProperties:
 
     ANTI_LEG: final = "antiLeg"
     AV_SHW: final = "avShw"
-    ECO: final = "eco"
     GW: final = "gw"
     HEAT_REQ: final = "heatReq"
     MODE: final = "mode"
     ON: final = "on"
     PROC_REQ_TEMP: final = "procReqTemp"
-    PWR_OPT: final = "pwrOpt"
     REQ_TEMP: final = "reqTemp"
-    RM_TM: final = "rmTm"
     TEMP: final = "temp"
+
+
+class EvoDeviceProperties(VelisDeviceProperties):
+    """Contants for Velis Evo device properties"""
+
+    ECO: final = "eco"
+    PWR_OPT: final = "pwrOpt"
+    RM_TM: final = "rmTm"
+
+
+class LydosDeviceProperties(VelisDeviceProperties):
+    """Contants for Velis Lydos device properties"""
+
+    BOOST_REQ_TEMP: final = "boostReqTemp"
 
 
 class MedDeviceSettings:
@@ -528,8 +579,8 @@ class AristonAPI:
             },
         )
 
-    async def async_set_velis_mode(self, gw_id: str, value: VelisPlantMode) -> None:
-        """Set Velis mode"""
+    async def async_set_evo_mode(self, gw_id: str, value: EvoPlantMode) -> None:
+        """Set Velis Evo mode"""
         return await self.post(
             f"{ARISTON_API_URL}{ARISTON_VELIS}/{ARISTON_MED_PLANT_DATA}/{gw_id}/mode",
             {
@@ -537,8 +588,17 @@ class AristonAPI:
             },
         )
 
-    async def async_set_velis_temperature(self, gw_id: str, value: float) -> None:
-        """Set Velis temperature"""
+    async def async_set_lydos_mode(self, gw_id: str, value: LydosPlantMode) -> None:
+        """Set Velis Lydos mode"""
+        return await self.post(
+            f"{ARISTON_API_URL}{ARISTON_VELIS}/{ARISTON_SE_PLANT_DATA}/{gw_id}/mode",
+            {
+                "new": value.value,
+            },
+        )
+
+    async def async_set_evo_temperature(self, gw_id: str, value: float) -> None:
+        """Set Velis Evo temperature"""
         return await self.post(
             f"{ARISTON_API_URL}{ARISTON_VELIS}/{ARISTON_MED_PLANT_DATA}/{gw_id}/temperature",
             {
@@ -546,26 +606,59 @@ class AristonAPI:
             },
         )
 
-    async def async_set_velis_eco_mode(self, gw_id: str, eco_mode: bool) -> None:
-        """Set Velis power"""
+    async def async_set_lydos_temperature(self, gw_id: str, value: float) -> None:
+        """Set Velis Lydos temperature"""
+        return await self.post(
+            f"{ARISTON_API_URL}{ARISTON_VELIS}/{ARISTON_SE_PLANT_DATA}/{gw_id}/temperature",
+            {
+                "new": value,
+            },
+        )
+
+    async def async_set_evo_eco_mode(self, gw_id: str, eco_mode: bool) -> None:
+        """Set Velis Evo power"""
         return await self.post(
             f"{ARISTON_API_URL}{ARISTON_VELIS}/{ARISTON_MED_PLANT_DATA}/{gw_id}/switchEco",
             eco_mode,
         )
 
-    async def async_set_velis_power(self, gw_id: str, power: bool) -> None:
-        """Set Velis power"""
+    async def async_set_evo_power(self, gw_id: str, power: bool) -> None:
+        """Set Velis Evo power"""
         return await self.post(
             f"{ARISTON_API_URL}{ARISTON_VELIS}/{ARISTON_MED_PLANT_DATA}/{gw_id}/switch",
             power,
         )
 
-    async def async_set_velis_plant_setting(
-        self, gw_id: str, setting: MedDeviceSettings, value: float, old_value: float
+    async def async_set_lydos_power(self, gw_id: str, power: bool) -> None:
+        """Set Velis Lydos power"""
+        return await self.post(
+            f"{ARISTON_API_URL}{ARISTON_VELIS}/{ARISTON_SE_PLANT_DATA}/{gw_id}/switch",
+            power,
+        )
+
+    async def async_set_evo_plant_setting(
+        self,
+        gw_id: str,
+        setting: MedDeviceSettings,
+        value: float,
+        old_value: float,
     ) -> None:
-        """Set Velis plant setting"""
+        """Set Velis Evo plant setting"""
         return await self.post(
             f"{ARISTON_API_URL}{ARISTON_VELIS}/{ARISTON_MED_PLANT_DATA}/{gw_id}/plantSettings",
+            {setting: {"new": value, "old": old_value}},
+        )
+
+    async def async_set_lydos_plant_setting(
+        self,
+        gw_id: str,
+        setting: SeDeviceSettings,
+        value: float,
+        old_value: float,
+    ) -> None:
+        """Set Velis Lydos plant setting"""
+        return await self.post(
+            f"{ARISTON_API_URL}{ARISTON_VELIS}/{ARISTON_SE_PLANT_DATA}/{gw_id}/plantSettings",
             {setting: {"new": value, "old": old_value}},
         )
 

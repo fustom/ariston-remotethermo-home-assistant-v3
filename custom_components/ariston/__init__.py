@@ -5,7 +5,14 @@ import logging
 
 import voluptuous as vol
 
-from .ariston import AristonAPI, DeviceAttribute, DeviceFeatures, SystemType
+from .ariston import (
+    AristonAPI,
+    DeviceAttribute,
+    DeviceFeatures,
+    SystemType,
+    VelisDeviceAttribute,
+    WheType,
+)
 from .coordinator import DeviceDataUpdateCoordinator
 from .const import (
     COORDINATOR,
@@ -18,7 +25,8 @@ from .const import (
     EXTRA_ENERGY_FEATURES,
 )
 from .galevo_device import AristonGalevoDevice
-from .velis_device import AristonVelisDevice
+from .evo_device import AristonEvoDevice
+from .lydos_hybrid_device import AristonLydosHybridDevice
 
 from homeassistant.exceptions import ConfigEntryAuthFailed, ConfigEntryNotReady
 from homeassistant.config_entries import ConfigEntry
@@ -86,16 +94,6 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
         EXTRA_ENERGY_FEATURES, DEFAULT_EXTRA_ENERGY_FEATURES
     )
 
-    if entry.data[CONF_DEVICE].get(DeviceAttribute.SYS) not in [
-        SystemType.GALEVO,
-        SystemType.VELIS,
-    ]:
-        _LOGGER.error(
-            "Your device (%s) is currently not supported. Contact with the developer",
-            entry.data[CONF_DEVICE].get(DeviceAttribute.SYS),
-        )
-        return False
-
     if entry.data[CONF_DEVICE].get(DeviceAttribute.SYS) == SystemType.GALEVO:
         device = AristonGalevoDevice(
             entry.data[CONF_DEVICE],
@@ -103,14 +101,48 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
             extra_energy_features,
             hass.config.units.is_metric,
         )
+    elif entry.data[CONF_DEVICE].get(DeviceAttribute.SYS) == SystemType.VELIS:
+        if (
+            entry.data[CONF_DEVICE].get(VelisDeviceAttribute.WHE_TYPE)
+            == WheType.LydosHybrid
+        ):
+            device = AristonLydosHybridDevice(
+                entry.data[CONF_DEVICE],
+                api,
+                extra_energy_features,
+                hass.config.units.is_metric,
+            )
+        elif entry.data[CONF_DEVICE].get(VelisDeviceAttribute.WHE_TYPE) == WheType.Evo:
+            device = AristonEvoDevice(
+                entry.data[CONF_DEVICE],
+                api,
+                extra_energy_features,
+                hass.config.units.is_metric,
+            )
+        else:
+            # Fallback to Evo
+            device = AristonEvoDevice(
+                entry.data[CONF_DEVICE],
+                api,
+                extra_energy_features,
+                hass.config.units.is_metric,
+            )
+            _LOGGER.error(
+                "Your device (%s) is currently not supported. Contact with the developer. Your fallback device is Velis Evo maybe working",
+                entry.data[CONF_DEVICE].get(VelisDeviceAttribute.WHE_TYPE),
+            )
 
-    if entry.data[CONF_DEVICE].get(DeviceAttribute.SYS) == SystemType.VELIS:
-        device = AristonVelisDevice(
-            entry.data[CONF_DEVICE],
-            api,
-            extra_energy_features,
-            hass.config.units.is_metric,
+            # _LOGGER.error(
+            #     "Your velis device (%s) is currently not supported. Contact with the developer",
+            #     entry.data[CONF_DEVICE].get(VelisDeviceAttribute.WHE_TYPE),
+            # )
+            # return False
+    else:
+        _LOGGER.error(
+            "Your device (%s) is currently not supported. Contact with the developer",
+            entry.data[CONF_DEVICE].get(DeviceAttribute.SYS),
         )
+        return False
 
     await device.async_get_features()
 
