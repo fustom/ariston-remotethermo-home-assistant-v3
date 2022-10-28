@@ -17,8 +17,8 @@ from .ariston import (
 from homeassistant.config_entries import ConfigEntry
 from homeassistant.core import HomeAssistant
 from homeassistant.const import ATTR_TEMPERATURE
-from homeassistant.components.climate import ClimateEntity
-from homeassistant.components.climate.const import (
+from homeassistant.components.climate import (
+    ClimateEntity,
     HVACMode,
     HVACAction,
     ClimateEntityFeature,
@@ -125,12 +125,12 @@ class AristonThermostat(AristonEntity, ClimateEntity):
 
         curr_hvac_mode = HVACMode.OFF
         if plant_mode in [PlantMode.WINTER, PlantMode.HEATING_ONLY]:
-            if zone_mode is ZoneMode.MANUAL or zone_mode is ZoneMode.MANUAL2:
+            if zone_mode is ZoneMode.MANUAL or zone_mode is ZoneMode.MANUAL_NIGHT:
                 curr_hvac_mode = HVACMode.HEAT
             elif zone_mode is ZoneMode.TIME_PROGRAM:
                 curr_hvac_mode = HVACMode.AUTO
         if plant_mode in [PlantMode.COOLING]:
-            if zone_mode is ZoneMode.MANUAL or zone_mode is ZoneMode.MANUAL2:
+            if zone_mode is ZoneMode.MANUAL or zone_mode is ZoneMode.MANUAL_NIGHT:
                 curr_hvac_mode = HVACMode.COOL
             elif zone_mode is ZoneMode.TIME_PROGRAM:
                 curr_hvac_mode = HVACMode.AUTO
@@ -143,7 +143,7 @@ class AristonThermostat(AristonEntity, ClimateEntity):
         zone_modes = self.device.get_zone_mode_options(self.zone)
 
         supported_modes = []
-        if ZoneMode.MANUAL in zone_modes or ZoneMode.MANUAL2 in zone_modes:
+        if ZoneMode.MANUAL in zone_modes or ZoneMode.MANUAL_NIGHT in zone_modes:
             supported_modes.append(HVACMode.HEAT)
             if PlantMode.COOLING in plant_modes:
                 supported_modes.append(HVACMode.COOL)
@@ -225,14 +225,14 @@ class AristonThermostat(AristonEntity, ClimateEntity):
                     await self.device.async_set_plant_mode(PlantMode.HEATING_ONLY)
                 else:
                     await self.device.async_set_plant_mode(PlantMode.WINTER)
-            if ZoneMode.MANUAL2 in zone_modes:
-                await self.device.async_set_zone_mode(ZoneMode.MANUAL2, self.zone)
+            if ZoneMode.MANUAL_NIGHT in zone_modes:
+                await self.device.async_set_zone_mode(ZoneMode.MANUAL_NIGHT, self.zone)
             else:
                 await self.device.async_set_zone_mode(ZoneMode.MANUAL, self.zone)
         elif hvac_mode == HVACMode.COOL:
             await self.device.async_set_plant_mode(PlantMode.COOLING)
-            if ZoneMode.MANUAL2 in zone_modes:
-                await self.device.async_set_zone_mode(ZoneMode.MANUAL2, self.zone)
+            if ZoneMode.MANUAL_NIGHT in zone_modes:
+                await self.device.async_set_zone_mode(ZoneMode.MANUAL_NIGHT, self.zone)
             else:
                 await self.device.async_set_zone_mode(ZoneMode.MANUAL, self.zone)
         self.async_write_ha_state()

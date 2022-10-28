@@ -1,4 +1,4 @@
-"""Device class for Ariston module."""
+"""Galevo device class for Ariston module."""
 from __future__ import annotations
 
 import logging

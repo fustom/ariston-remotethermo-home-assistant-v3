@@ -17,6 +17,7 @@ from .ariston import (
     DeviceFeatures,
     GasEnergyUnit,
     GasType,
+    VelisDeviceAttribute,
 )
 
 _LOGGER = logging.getLogger(__name__)
@@ -202,7 +203,10 @@ class AristonDevice(ABC):
         self, device_features, extra_energy_feature, system_types
     ) -> bool:
         """Checks features availability"""
-        if self.attributes.get(DeviceAttribute.SYS) not in system_types:
+        if (
+            self.attributes.get(DeviceAttribute.SYS) not in system_types
+            and self.attributes.get(VelisDeviceAttribute.WHE_TYPE) not in system_types
+        ):
             return False
 
         if extra_energy_feature and not self.extra_energy_features:

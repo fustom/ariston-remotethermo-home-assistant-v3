@@ -22,6 +22,8 @@ from homeassistant.helpers.entity import EntityCategory, EntityDescription
 
 from .galevo_device import AristonGalevoDevice
 from .velis_device import AristonVelisDevice
+from .evo_device import AristonEvoDevice
+from .lydos_hybrid_device import AristonLydosHybridDevice
 from .device import AristonDevice
 from .ariston import (
     ConsumptionProperties,
@@ -30,7 +32,10 @@ from .ariston import (
     DeviceProperties,
     MedDeviceSettings,
     SystemType,
+    WheType,
     VelisDeviceProperties,
+    EvoDeviceProperties,
+    LydosDeviceProperties,
 )
 
 
@@ -67,7 +72,7 @@ class AristonBaseEntityDescription(EntityDescription, ABC):
         dict[EXTRA_STATE_DEVICE_METHOD:Callable],
     ] or None = None
     zone: int = 0
-    system_types: list[SystemType] or None = None
+    system_types: list[SystemType or WheType] or None = None
 
 
 @dataclass
@@ -304,13 +309,13 @@ ARISTON_SENSOR_TYPES: tuple[AristonSensorEntityDescription, ...] = (
         system_types=[SystemType.VELIS],
     ),
     AristonSensorEntityDescription(
-        key=VelisDeviceProperties.RM_TM,
+        key=EvoDeviceProperties.RM_TM,
         name=f"{NAME} remaining time",
         icon="mdi:timer",
         state_class=SensorStateClass.MEASUREMENT,
-        get_native_value=AristonVelisDevice.get_rm_tm_value,
+        get_native_value=AristonEvoDevice.get_rm_tm_value,
         get_native_unit_of_measurement=AristonVelisDevice.get_empty_unit,
-        system_types=[SystemType.VELIS],
+        system_types=[WheType.Evo],
     ),
 )
 
@@ -355,12 +360,12 @@ ARISTON_SWITCH_TYPES: tuple[AristonSwitchEntityDescription, ...] = (
         system_types=[SystemType.GALEVO],
     ),
     AristonSwitchEntityDescription(
-        key=VelisDeviceProperties.ECO,
+        key=EvoDeviceProperties.ECO,
         name=f"{NAME} eco mode",
         icon="mdi:leaf",
-        setter=AristonVelisDevice.async_set_eco_mode,
-        getter=AristonVelisDevice.get_water_heater_eco_value,
-        system_types=[SystemType.VELIS],
+        setter=AristonEvoDevice.async_set_eco_mode,
+        getter=AristonEvoDevice.get_water_heater_eco_value,
+        system_types=[WheType.Evo],
     ),
     AristonSwitchEntityDescription(
         key=VelisDeviceProperties.ON,
