@@ -4,6 +4,7 @@ from __future__ import annotations
 import logging
 
 from datetime import date
+from typing import Any
 
 from .device import AristonDevice
 from .ariston import (
@@ -44,7 +45,6 @@ class AristonGalevoDevice(AristonDevice):
     async def async_get_features(self) -> None:
         """Get device features wrapper"""
         await super().async_get_features()
-        self.features[CustomDeviceFeatures.HAS_CH] = True
         self.features[CustomDeviceFeatures.HAS_DHW] = self.features.get(
             DeviceFeatures.HAS_BOILER
         )
@@ -243,13 +243,12 @@ class AristonGalevoDevice(AristonDevice):
             if item.get("id") == item_id and item.get(PropertyType.ZONE) == zone_number
         )
 
-    def get_gas_consumption_for_heating_last_two_hours(self) -> int:
-        """Get gas consumption for heating last two hours"""
-        return self.consumptions_sequences[0]["v"][-1]
-
-    def get_gas_consumption_for_water_last_two_hours(self) -> int:
-        """Get gas consumption for water last two hours"""
-        return self.consumptions_sequences[4]["v"][-1]
+    async def async_get_consumptions_sequences(self) -> dict[str, Any]:
+        """Get consumption sequence"""
+        self.consumptions_sequences = await self.api.async_get_consumptions_sequences(
+            self.attributes.get(DeviceAttribute.GW),
+            f"Ch{'%2CDhw' if self.features.get(CustomDeviceFeatures.HAS_DHW) else ''}",
+        )
 
     async def async_set_water_heater_temperature(self, temperature: float):
         """Set water heater temperature"""

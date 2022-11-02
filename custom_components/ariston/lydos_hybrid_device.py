@@ -2,9 +2,12 @@
 from __future__ import annotations
 
 import logging
+from typing import Any
 
 from .velis_device import AristonVelisDevice
 from .ariston import (
+    ConsumptionTimeInterval,
+    ConsumptionType,
     DeviceAttribute,
     LydosPlantMode,
     VelisDeviceProperties,
@@ -54,6 +57,20 @@ class AristonLydosHybridDevice(AristonVelisDevice):
     def get_water_heater_maximum_setpoint_temperature(self) -> float:
         """Get water heater maximum setpoint temperature value"""
         return self.plant_settings.get(SeDeviceSettings.SE_MAX_SETPOINT_TEMPERATURE)
+
+    def get_electric_consumption_for_water_last_two_hours(self) -> int:
+        """Get electric consumption for water last value"""
+        return self.get_consumption_sequence_last_value(
+            ConsumptionType.DOMESTIC_HOT_WATER_HEATING_PUMP_ELECTRICITY,
+            ConsumptionTimeInterval.LAST_DAY,
+        )
+
+    async def async_get_consumptions_sequences(self) -> dict[str, Any]:
+        """Get consumption sequence"""
+        self.consumptions_sequences = await self.api.async_get_consumptions_sequences(
+            self.attributes.get(DeviceAttribute.GW),
+            "DhwHeatingPumpElec%2CDhwResistorElec",
+        )
 
     async def async_set_antilegionella(self, anti_leg: bool):
         """Set water heater anti-legionella"""

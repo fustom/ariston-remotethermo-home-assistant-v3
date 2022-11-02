@@ -187,6 +187,32 @@ class WheType(IntFlag):
     Evo = 6
 
 
+@unique
+class ConsumptionType(IntFlag):
+    """Consumption type"""
+
+    CENTRAL_HEATING_TOTAL_ENERGY = 1
+    DOMESTIC_HOT_WATER_TOTAL_ENERGY = 2
+    CENTRAL_HEATING_GAS = 7
+    DOMESTIC_HOT_WATER_HEATING_PUMP_ELECTRICITY = 8
+    DOMESTIC_HOT_WATER_RESISTOR_ELECTRICITY = 9
+    DOMESTIC_HOT_WATER_GAS = 10
+    CENTRAL_HEATING_ELECTRICITY = 20
+    DOMESTIC_HOT_WATER_ELECTRICITY = 21
+
+
+@unique
+class ConsumptionTimeInterval(IntFlag):
+    """Consumption time interval"""
+
+    # I am not sure. This is just a guess.
+
+    LAST_DAY = 1
+    LAST_WEEK = 2
+    LAST_MONTH = 3
+    LAST_YEAR = 4
+
+
 class DeviceAttribute:
     """Constants for device attributes"""
 
@@ -247,7 +273,6 @@ class ZoneAttribute:
 class CustomDeviceFeatures:
     """Constants for custom device features"""
 
-    HAS_CH: final = "hasCh"
     HAS_DHW: final = "hasDhw"
     HAS_OUTSIDE_TEMP: final = "hasOutsideTemp"
 
@@ -270,7 +295,7 @@ class DeviceFeatures:
     HAS_EM20: final = "hasEm20"
     HAS_FIREPLACE: final = "hasFireplace"
     HAS_METERING: final = "hasMetering"
-    HAS_SLP: final = "hasSlp"
+    HAS_SLP: final = "hasSlp"  # Low Pressure Pump
     HAS_TWO_COOLING_TEMP: final = "hasTwoCoolingTemp"
     HAS_VMC: final = "hasVmc"
     HAS_ZONE_NAMES: final = "hasZoneNames"
@@ -325,7 +350,6 @@ class MedDeviceSettings:
     MED_MAX_SETPOINT_TEMPERATURE: final = "MedMaxSetpointTemperature"
     MED_MAX_SETPOINT_TEMPERATURE_MAX: final = "MedMaxSetpointTemperatureMax"
     MED_MAX_SETPOINT_TEMPERATURE_MIN: final = "MedMaxSetpointTemperatureMin"
-    WHE_MARKET: final = "WheMarket"
 
 
 class SeDeviceSettings:
@@ -465,11 +489,11 @@ class AristonAPI:
         )
 
     async def async_get_consumptions_sequences(
-        self, gw_id: str, has_ch: bool, has_dhw: bool, has_slp: bool
+        self, gw_id: str, usages: str
     ) -> dict[str, Any]:
         """Get consumption sequences for the device"""
         return await self.get(
-            f"{ARISTON_API_URL}{ARISTON_REMOTE}/{ARISTON_REPORTS}/{gw_id}/consSequencesApi8?usages={'Ch' if has_ch else ''}{'%2C' if has_ch and has_dhw else ''}{'Dhw' if has_dhw else ''}&hasSlp={has_slp}"
+            f"{ARISTON_API_URL}{ARISTON_REMOTE}/{ARISTON_REPORTS}/{gw_id}/consSequencesApi8?usages={usages}"
         )
 
     async def async_get_consumptions_settings(self, gw_id: str) -> dict[str, Any]:
@@ -537,7 +561,7 @@ class AristonAPI:
     async def async_get_med_plant_settings(self, gw_id) -> dict[str, Any]:
         """Get Velis settings"""
         return await self.get(
-            f"{ARISTON_API_URL}{ARISTON_VELIS}/{ARISTON_MED_PLANT_DATA}/{gw_id}/plantSettings?wheType=PowerRussis"
+            f"{ARISTON_API_URL}{ARISTON_VELIS}/{ARISTON_MED_PLANT_DATA}/{gw_id}/plantSettings"
         )
 
     async def async_get_se_plant_data(self, gw_id) -> dict[str, Any]:

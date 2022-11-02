@@ -11,10 +11,10 @@ from typing import Any
 from .ariston import (
     AristonAPI,
     ConsumptionProperties,
+    ConsumptionTimeInterval,
+    ConsumptionType,
     Currency,
-    CustomDeviceFeatures,
     DeviceAttribute,
-    DeviceFeatures,
     GasEnergyUnit,
     GasType,
     VelisDeviceAttribute,
@@ -143,19 +143,86 @@ class AristonDevice(ABC):
         """Get consumption sequence last changed in utc"""
         return self.consumption_sequence_last_changed_utc
 
+    def get_central_heating_total_energy_consumption(self) -> int:
+        """Get central heating total energy consumption"""
+        return self.get_consumption_sequence_last_value(
+            ConsumptionType.CENTRAL_HEATING_TOTAL_ENERGY,
+            ConsumptionTimeInterval.LAST_DAY,
+        )
+
+    def get_domestic_hot_water_total_energy_consumption(self) -> int:
+        """Get domestic hot water total energy consumption"""
+        return self.get_consumption_sequence_last_value(
+            ConsumptionType.DOMESTIC_HOT_WATER_TOTAL_ENERGY,
+            ConsumptionTimeInterval.LAST_DAY,
+        )
+
+    def get_central_heating_gas_consumption(self) -> int:
+        """Get central heating gas consumption"""
+        return self.get_consumption_sequence_last_value(
+            ConsumptionType.CENTRAL_HEATING_GAS,
+            ConsumptionTimeInterval.LAST_DAY,
+        )
+
+    def get_domestic_hot_water_heating_pump_electricity_consumption(self) -> int:
+        """Get domestic hot water heating pump electricity consumption"""
+        return self.get_consumption_sequence_last_value(
+            ConsumptionType.DOMESTIC_HOT_WATER_HEATING_PUMP_ELECTRICITY,
+            ConsumptionTimeInterval.LAST_DAY,
+        )
+
+    def get_domestic_hot_water_resistor_electricity_consumption(self) -> int:
+        """Get domestic hot water resistor electricity consumption"""
+        return self.get_consumption_sequence_last_value(
+            ConsumptionType.DOMESTIC_HOT_WATER_RESISTOR_ELECTRICITY,
+            ConsumptionTimeInterval.LAST_DAY,
+        )
+
+    def get_domestic_hot_water_gas_consumption(self) -> int:
+        """Get domestic hot water gas consumption"""
+        return self.get_consumption_sequence_last_value(
+            ConsumptionType.DOMESTIC_HOT_WATER_GAS,
+            ConsumptionTimeInterval.LAST_DAY,
+        )
+
+    def get_central_heating_electricity_consumption(self) -> int:
+        """Get central heating electricity consumption"""
+        return self.get_consumption_sequence_last_value(
+            ConsumptionType.CENTRAL_HEATING_ELECTRICITY,
+            ConsumptionTimeInterval.LAST_DAY,
+        )
+
+    def get_domestic_hot_water_electricity_consumption(self) -> int:
+        """Get domestic hot water electricity consumption"""
+        return self.get_consumption_sequence_last_value(
+            ConsumptionType.DOMESTIC_HOT_WATER_ELECTRICITY,
+            ConsumptionTimeInterval.LAST_DAY,
+        )
+
+    def get_consumption_sequence_last_value(
+        self,
+        consumption_type: ConsumptionType,
+        time_interval: ConsumptionTimeInterval,
+    ) -> Any:
+        """Get last value for consumption sequence"""
+        for sequence in self.consumptions_sequences:
+            if sequence["k"] == consumption_type and sequence["p"] == time_interval:
+                return sequence["v"][-1]
+
+        return "nan"
+
+    @abstractmethod
+    async def async_get_consumptions_sequences(self) -> dict[str, Any]:
+        """Get consumption sequence"""
+        Raise(NotImplementedError)
+
     async def async_update_energy(self) -> None:
         """Update the device energy settings from the cloud"""
-
-        # k=1: heating k=2: water
-        # p=1: 12*2 hours p=2: 7*1 day p=3: 15*2 days p=4: 12*? year
-        # v: first element is the latest, last element is the newest"""
         old_consumptions_sequences = self.consumptions_sequences
-        self.consumptions_sequences = await self.api.async_get_consumptions_sequences(
-            self.attributes.get(DeviceAttribute.GW),
-            self.features.get(CustomDeviceFeatures.HAS_CH),
-            self.features.get(CustomDeviceFeatures.HAS_DHW),
-            self.features.get(DeviceFeatures.HAS_SLP),
-        )
+        await self.async_get_consumptions_sequences()
+
+        if self.features.get(ConsumptionType.DOMESTIC_HOT_WATER_ELECTRICITY) is None:
+            self.set_energy_features()
 
         if (
             old_consumptions_sequences is not None
@@ -175,6 +242,20 @@ class AristonDevice(ABC):
             self.energy_account = await self.api.async_get_energy_account(
                 self.attributes.get(DeviceAttribute.GW)
             )
+
+    def set_energy_features(self):
+        """Set energy features"""
+        for consumption_type in ConsumptionType:
+            if (
+                self.get_consumption_sequence_last_value(
+                    consumption_type,
+                    ConsumptionTimeInterval.LAST_DAY,
+                )
+                != "nan"
+            ):
+                self.features[consumption_type.name] = True
+            else:
+                self.features[consumption_type.name] = False
 
     async def async_set_elect_cost(self, value: float):
         """Set electric cost"""
@@ -204,7 +285,8 @@ class AristonDevice(ABC):
     ) -> bool:
         """Checks features availability"""
         if (
-            self.attributes.get(DeviceAttribute.SYS) not in system_types
+            system_types is not None
+            and self.attributes.get(DeviceAttribute.SYS) not in system_types
             and self.attributes.get(VelisDeviceAttribute.WHE_TYPE) not in system_types
         ):
             return False
@@ -212,11 +294,9 @@ class AristonDevice(ABC):
         if extra_energy_feature and not self.extra_energy_features:
             return False
 
-        if device_features is None:
-            return True
-
-        for device_feature in device_features:
-            if self.features.get(device_feature) is not True:
-                return False
+        if device_features is not None:
+            for device_feature in device_features:
+                if self.features.get(device_feature) is not True:
+                    return False
 
         return True

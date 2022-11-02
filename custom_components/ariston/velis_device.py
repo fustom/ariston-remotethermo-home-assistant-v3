@@ -24,7 +24,6 @@ class AristonVelisDevice(AristonDevice, ABC):
     async def async_get_features(self) -> None:
         """Get device features wrapper"""
         await super().async_get_features()
-        self.features[CustomDeviceFeatures.HAS_CH] = False
         self.features[CustomDeviceFeatures.HAS_DHW] = True
         self.features[DeviceFeatures.DHW_MODE_CHANGEABLE] = True
         await self.async_update_settings()
@@ -104,13 +103,6 @@ class AristonVelisDevice(AristonDevice, ABC):
     def get_empty_unit() -> int:
         """Get empty unit"""
         return ""
-
-    def get_electric_consumption_for_water_last_two_hours(self) -> int:
-        """Get electric consumption for water last two hours"""
-        if len(self.consumptions_sequences[0]["v"]) > 0:
-            return self.consumptions_sequences[0]["v"][-1]
-
-        return 0
 
     @abstractmethod
     async def async_set_antilegionella(self, anti_leg: bool):

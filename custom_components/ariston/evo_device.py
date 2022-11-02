@@ -2,6 +2,7 @@
 from __future__ import annotations
 
 import logging
+from typing import Any
 
 from .velis_device import AristonVelisDevice
 from .ariston import (
@@ -67,6 +68,13 @@ class AristonEvoDevice(AristonVelisDevice):
     def get_water_heater_maximum_setpoint_temperature(self) -> float:
         """Get water heater maximum setpoint temperature value"""
         return self.plant_settings.get(MedDeviceSettings.MED_MAX_SETPOINT_TEMPERATURE)
+
+    async def async_get_consumptions_sequences(self) -> dict[str, Any]:
+        """Get consumption sequence"""
+        self.consumptions_sequences = await self.api.async_get_consumptions_sequences(
+            self.attributes.get(DeviceAttribute.GW),
+            "Dhw",
+        )
 
     async def async_set_eco_mode(self, eco_mode: bool):
         """Set water heater eco_mode"""
