@@ -84,26 +84,7 @@ class AristonConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
             if len(cloud_devices) == 0:
                 errors["base"] = "no device found"
             if len(cloud_devices) == 1:
-                cloud_device = cloud_devices[0]
-                existing_entry = await self.async_set_unique_id(
-                    cloud_device[DeviceAttribute.GW], raise_on_progress=False
-                )
-                if existing_entry:
-                    data = existing_entry.data.copy()
-                    self.hass.config_entries.async_update_entry(
-                        existing_entry, data=data
-                    )
-                    await self.hass.config_entries.async_reload(existing_entry.entry_id)
-                    return self.async_abort(reason="reauth_successful")
-
-                return self.async_create_entry(
-                    title=cloud_device[DeviceAttribute.NAME],
-                    data={
-                        CONF_USERNAME: self.cloud_username,
-                        CONF_PASSWORD: self.cloud_password,
-                        CONF_DEVICE: cloud_device,
-                    },
-                )
+                return await self.async_create_or_update_entry(cloud_devices[0])
             if len(cloud_devices) > 1:
                 for device in cloud_devices:
                     name = device[DeviceAttribute.NAME]
@@ -117,27 +98,32 @@ class AristonConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
             step_id="user", data_schema=STEP_USER_DATA_SCHEMA, errors=errors
         )
 
+    async def async_create_or_update_entry(self, cloud_device):
+        """Create or update config entry"""
+        existing_entry = await self.async_set_unique_id(
+            cloud_device[DeviceAttribute.GW], raise_on_progress=False
+        )
+        if existing_entry:
+            data = existing_entry.data.copy()
+            self.hass.config_entries.async_update_entry(existing_entry, data=data)
+            await self.hass.config_entries.async_reload(existing_entry.entry_id)
+            return self.async_abort(reason="reauth_successful")
+
+        return self.async_create_entry(
+            title=cloud_device[DeviceAttribute.NAME],
+            data={
+                CONF_USERNAME: self.cloud_username,
+                CONF_PASSWORD: self.cloud_password,
+                CONF_DEVICE: cloud_device,
+            },
+        )
+
     async def async_step_select(self, user_input=None):
         """Multiple device found, select one of them"""
         errors = {}
         if user_input is not None:
-            cloud_device = self.cloud_devices[user_input["select_device"]]
-            existing_entry = await self.async_set_unique_id(
-                cloud_device[DeviceAttribute.GW], raise_on_progress=False
-            )
-            if existing_entry:
-                data = existing_entry.data.copy()
-                self.hass.config_entries.async_update_entry(existing_entry, data=data)
-                await self.hass.config_entries.async_reload(existing_entry.entry_id)
-                return self.async_abort(reason="reauth_successful")
-
-            return self.async_create_entry(
-                title=cloud_device[DeviceAttribute.NAME],
-                data={
-                    CONF_USERNAME: self.cloud_username,
-                    CONF_PASSWORD: self.cloud_password,
-                    CONF_DEVICE: cloud_device,
-                },
+            return await self.async_create_or_update_entry(
+                self.cloud_devices[user_input["select_device"]]
             )
 
         select_schema = vol.Schema(
