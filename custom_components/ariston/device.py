@@ -41,6 +41,7 @@ class AristonDevice(ABC):
         self.location = "en-US"
 
         self.features: dict = {}
+        self.custom_features: dict = {}
         self.consumptions_settings: dict = {}
         self.energy_account: dict = {}
         self.consumptions_sequences: list = []
@@ -221,7 +222,10 @@ class AristonDevice(ABC):
         old_consumptions_sequences = self.consumptions_sequences
         await self.async_get_consumptions_sequences()
 
-        if self.features.get(ConsumptionType.DOMESTIC_HOT_WATER_ELECTRICITY) is None:
+        if (
+            self.custom_features.get(ConsumptionType.DOMESTIC_HOT_WATER_ELECTRICITY)
+            is None
+        ):
             self.set_energy_features()
 
         if (
@@ -253,9 +257,9 @@ class AristonDevice(ABC):
                 )
                 != "nan"
             ):
-                self.features[consumption_type.name] = True
+                self.custom_features[consumption_type.name] = True
             else:
-                self.features[consumption_type.name] = False
+                self.custom_features[consumption_type.name] = False
 
     async def async_set_elect_cost(self, value: float):
         """Set electric cost"""
@@ -296,7 +300,10 @@ class AristonDevice(ABC):
 
         if device_features is not None:
             for device_feature in device_features:
-                if self.features.get(device_feature) is not True:
+                if (
+                    self.features.get(device_feature) is not True
+                    and self.custom_features.get(device_feature) is not True
+                ):
                     return False
 
         return True

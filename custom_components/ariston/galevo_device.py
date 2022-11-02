@@ -33,24 +33,38 @@ class AristonGalevoDevice(AristonDevice):
             self.umsys,
         )
 
-        if self.features.get(CustomDeviceFeatures.HAS_OUTSIDE_TEMP) is None:
+        if self.custom_features.get(CustomDeviceFeatures.HAS_OUTSIDE_TEMP) is None:
             temp = self._get_item_by_id(
                 DeviceProperties.OUTSIDE_TEMP, PropertyType.VALUE
             )
             max_temp = self._get_item_by_id(
                 DeviceProperties.OUTSIDE_TEMP, PropertyType.MAX
             )
-            self.features[CustomDeviceFeatures.HAS_OUTSIDE_TEMP] = temp != max_temp
+            self.custom_features[CustomDeviceFeatures.HAS_OUTSIDE_TEMP] = (
+                temp != max_temp
+            )
+
+        if self.custom_features.get(DeviceProperties.DHW_STORAGE_TEMPERATURE) is None:
+            storage_temp = self._get_item_by_id(
+                DeviceProperties.DHW_STORAGE_TEMPERATURE, PropertyType.VALUE
+            )
+            self.custom_features[DeviceProperties.DHW_STORAGE_TEMPERATURE] = (
+                storage_temp is not None
+            )
 
     async def async_get_features(self) -> None:
         """Get device features wrapper"""
         await super().async_get_features()
-        self.features[CustomDeviceFeatures.HAS_DHW] = self.features.get(
+        self.custom_features[CustomDeviceFeatures.HAS_DHW] = self.features.get(
             DeviceFeatures.HAS_BOILER
         )
 
     def get_water_heater_current_temperature(self) -> float:
         """Get water heater current temperature"""
+        if self.custom_features[DeviceProperties.DHW_STORAGE_TEMPERATURE]:
+            return self._get_item_by_id(
+                DeviceProperties.DHW_STORAGE_TEMPERATURE, PropertyType.VALUE
+            )
         return self._get_item_by_id(DeviceProperties.DHW_TEMP, PropertyType.VALUE)
 
     def get_water_heater_minimum_temperature(self) -> float:
@@ -238,16 +252,20 @@ class AristonGalevoDevice(AristonDevice):
     ):
         """Get item attribute from data"""
         return next(
-            item.get(item_value)
-            for item in self.data.get("items")
-            if item.get("id") == item_id and item.get(PropertyType.ZONE) == zone_number
+            (
+                item.get(item_value)
+                for item in self.data.get("items")
+                if item.get("id") == item_id
+                and item.get(PropertyType.ZONE) == zone_number
+            ),
+            None,
         )
 
     async def async_get_consumptions_sequences(self) -> dict[str, Any]:
         """Get consumption sequence"""
         self.consumptions_sequences = await self.api.async_get_consumptions_sequences(
             self.attributes.get(DeviceAttribute.GW),
-            f"Ch{'%2CDhw' if self.features.get(CustomDeviceFeatures.HAS_DHW) else ''}",
+            f"Ch{'%2CDhw' if self.custom_features.get(CustomDeviceFeatures.HAS_DHW) else ''}",
         )
 
     async def async_set_water_heater_temperature(self, temperature: float):

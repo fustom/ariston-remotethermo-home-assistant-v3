@@ -24,7 +24,7 @@ class AristonVelisDevice(AristonDevice, ABC):
     async def async_get_features(self) -> None:
         """Get device features wrapper"""
         await super().async_get_features()
-        self.features[CustomDeviceFeatures.HAS_DHW] = True
+        self.custom_features[CustomDeviceFeatures.HAS_DHW] = True
         self.features[DeviceFeatures.DHW_MODE_CHANGEABLE] = True
         await self.async_update_settings()
 
