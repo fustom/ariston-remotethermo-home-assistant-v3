@@ -385,6 +385,7 @@ class DeviceProperties:
     HEATING_CIRCUIT_PRESSURE: final = "HeatingCircuitPressure"
     CH_FLOW_SETPOINT_TEMP: final = "ChFlowSetpointTemp"
     DHW_TEMP: final = "DhwTemp"
+    DHW_STORAGE_TEMPERATURE: final = "DhwStorageTemperature"
     DHW_MODE: final = "DhwMode"
     AUTOMATIC_THERMOREGULATION: final = "AutomaticThermoregulation"
     ANTILEGIONELLA_ON_OFF: final = "AntilegionellaOnOff"
