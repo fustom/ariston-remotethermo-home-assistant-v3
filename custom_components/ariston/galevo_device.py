@@ -148,6 +148,10 @@ class AristonGalevoDevice(AristonDevice):
             DeviceProperties.CH_FLOW_SETPOINT_TEMP, PropertyType.VALUE
         )
 
+    def get_ch_flow_temp_value(self) -> str:
+        """Get central heating flow temperature value"""
+        return self._get_item_by_id(DeviceProperties.CH_FLOW_TEMP, PropertyType.VALUE)
+
     def get_outside_temp_value(self) -> str:
         """Get outside temperature value"""
         return self._get_item_by_id(DeviceProperties.OUTSIDE_TEMP, PropertyType.VALUE)
@@ -161,6 +165,10 @@ class AristonGalevoDevice(AristonDevice):
         return self._get_item_by_id(
             DeviceProperties.CH_FLOW_SETPOINT_TEMP, PropertyType.UNIT
         )
+
+    def get_ch_flow_temp_unit(self) -> str:
+        """Get central heating flow temperature unit"""
+        return self._get_item_by_id(DeviceProperties.CH_FLOW_TEMP, PropertyType.UNIT)
 
     def get_is_flame_on_value(self) -> bool:
         """Get is flame on value"""
