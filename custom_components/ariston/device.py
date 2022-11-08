@@ -47,7 +47,9 @@ class AristonDevice(ABC):
         self.consumptions_sequences: list = []
         self.data: dict = {}
         self.plant_settings: dict = {}
-        self.consumption_sequence_last_changed_utc: dt.datetime = None
+        self.consumption_sequence_last_changed_utc: dt.datetime = (
+            dt.datetime.utcfromtimestamp(0).replace(tzinfo=dt.timezone.utc)
+        )
 
     async def async_get_features(self) -> None:
         """Get device features wrapper"""
@@ -230,6 +232,7 @@ class AristonDevice(ABC):
 
         if (
             old_consumptions_sequences is not None
+            and len(old_consumptions_sequences) > 0
             and old_consumptions_sequences != self.consumptions_sequences
         ):
             self.consumption_sequence_last_changed_utc = dt.datetime.now(
