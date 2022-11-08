@@ -231,8 +231,8 @@ class AristonDevice(ABC):
             self.set_energy_features()
 
         if (
-            len(old_consumptions_sequences) > 0
-            and old_consumptions_sequences is not None
+            old_consumptions_sequences is not None
+            and len(old_consumptions_sequences) > 0
             and old_consumptions_sequences != self.consumptions_sequences
         ):
             self.consumption_sequence_last_changed_utc = dt.datetime.now(
