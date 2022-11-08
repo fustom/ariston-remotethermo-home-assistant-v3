@@ -1,6 +1,5 @@
 {
     "name": "Ariston NET",
-    "domains": ["ariston", "climate"],
     "render_readme": true,
-    "iot_class": ["Cloud Polling"]
+    "homeassistant": "2022.1.1",
 }
