@@ -184,6 +184,7 @@ class WheType(IntFlag):
     """Whe type enum"""
 
     LydosHybrid = 2
+    NuosSplit = 4
     Evo = 6
 
 
@@ -380,12 +381,21 @@ class DeviceProperties:
 
     PLANT_MODE: final = "PlantMode"
     IS_FLAME_ON: final = "IsFlameOn"
+    IS_HEATING_PUMP_ON: final = "IsHeatingPumpOn"
     HOLIDAY: final = "Holiday"
     OUTSIDE_TEMP: final = "OutsideTemp"
+    WEATHER: final = "Weather"
     HEATING_CIRCUIT_PRESSURE: final = "HeatingCircuitPressure"
+    CH_FLOW_TEMP: final = "ChFlowTemp"
     CH_FLOW_SETPOINT_TEMP: final = "ChFlowSetpointTemp"
+    HEATING_FLOW_TEMP: final = "HeatingFlowTemp"
+    HEATING_FLOW_OFFSET: final = "HeatingFlowOffset"
+    COOLING_FLOW_TEMP: final = "CoolingFlowTemp"
+    COOLING_FLOW_OFFSET: final = "CoolingFlowOffset"
     DHW_TEMP: final = "DhwTemp"
     DHW_STORAGE_TEMPERATURE: final = "DhwStorageTemperature"
+    DHW_TIMEPROG_COMFORT_TEMP: final = "DhwTimeProgComfortTemp"
+    DHW_TIMEPROG_ECONOMY_TEMP: final = "DhwTimeProgEconomyTemp"
     DHW_MODE: final = "DhwMode"
     AUTOMATIC_THERMOREGULATION: final = "AutomaticThermoregulation"
     ANTILEGIONELLA_ON_OFF: final = "AntilegionellaOnOff"
@@ -403,6 +413,7 @@ class ThermostatProperties:
     ZONE_HEAT_REQUEST: final = "ZoneHeatRequest"
     ZONE_ECONOMY_TEMP: final = "ZoneEconomyTemp"
     ZONE_DEROGA: final = "ZoneDeroga"
+    ZONE_IS_ZONE_PILOT_ON: final = "IsZonePilotOn"
     ZONE_VIRT_TEMP_OFFSET_HEAT: final = "VirtTempOffsetHeat"
 
 
@@ -546,6 +557,7 @@ class AristonAPI:
         return await self.post(
             f"{ARISTON_API_URL}{ARISTON_REMOTE}/{ARISTON_DATA_ITEMS}/{gw_id}/get?umsys={umsys}",
             {
+                "useCache": False,
                 "items": self.get_items(features),
                 "features": features,
                 "culture": culture,
