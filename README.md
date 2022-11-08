@@ -1,3 +1,4 @@
+[![CodeQL](https://github.com/fustom/ariston-remotethermo-home-assistant-v3/actions/workflows/codeql.yml/badge.svg?branch=main)](https://github.com/fustom/ariston-remotethermo-home-assistant-v3/actions/workflows/codeql.yml)
 # Ariston NET remotethermo integration for Home Assistant
 This integration inspired by chomupashchuk fantastic work https://github.com/chomupashchuk/ariston-remotethermo-home-assistant-v2
 But it does not use Ariston website. It uses Ariston API what I reversed engineered.
