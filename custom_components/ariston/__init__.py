@@ -30,6 +30,7 @@ from .lydos_hybrid_device import AristonLydosHybridDevice
 
 from homeassistant.exceptions import ConfigEntryAuthFailed, ConfigEntryNotReady
 from homeassistant.config_entries import ConfigEntry
+from homeassistant.util.unit_system import METRIC_SYSTEM
 from homeassistant.core import HomeAssistant
 from homeassistant.const import (
     ATTR_DEVICE_ID,
@@ -99,7 +100,7 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
             entry.data[CONF_DEVICE],
             api,
             extra_energy_features,
-            hass.config.units.is_metric,
+            hass.config.units is METRIC_SYSTEM,
         )
     elif entry.data[CONF_DEVICE].get(DeviceAttribute.SYS) == SystemType.VELIS:
         if (
@@ -110,14 +111,14 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
                 entry.data[CONF_DEVICE],
                 api,
                 extra_energy_features,
-                hass.config.units.is_metric,
+                hass.config.units is METRIC_SYSTEM,
             )
         elif entry.data[CONF_DEVICE].get(VelisDeviceAttribute.WHE_TYPE) == WheType.Evo:
             device = AristonEvoDevice(
                 entry.data[CONF_DEVICE],
                 api,
                 extra_energy_features,
-                hass.config.units.is_metric,
+                hass.config.units is METRIC_SYSTEM,
             )
         else:
             # Fallback to Evo
@@ -125,7 +126,7 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
                 entry.data[CONF_DEVICE],
                 api,
                 extra_energy_features,
-                hass.config.units.is_metric,
+                hass.config.units is METRIC_SYSTEM,
             )
             _LOGGER.error(
                 "Your device (%s) is currently not supported. Contact with the developer. Your fallback device is Velis Evo maybe working",
