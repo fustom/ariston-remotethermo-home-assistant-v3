@@ -18,6 +18,7 @@ create_vacation:
         text:
 set_item_by_id:
   name: Set item by id
+  description: Ariston device or thermostat property
   fields:
     device_id:
       name: Device
@@ -28,6 +29,7 @@ set_item_by_id:
           integration: ariston
     item_id:
       name: Device or thermostat property
+      description: Ariston device or thermostat property
       required: true
       selector:
         select:
