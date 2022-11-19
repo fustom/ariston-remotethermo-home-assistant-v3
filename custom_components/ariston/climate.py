@@ -6,11 +6,9 @@ import logging
 from .entity import AristonEntity
 from .const import ARISTON_CLIMATE_TYPE, COORDINATOR, DOMAIN
 from .coordinator import DeviceDataUpdateCoordinator
-from .ariston import (
-    DeviceAttribute,
-    DeviceFeatures,
+
+from ariston.ariston import (
     PlantMode,
-    ZoneAttribute,
     ZoneMode,
 )
 
@@ -38,11 +36,20 @@ async def async_setup_entry(
     coordinator: DeviceDataUpdateCoordinator = hass.data[DOMAIN][entry.unique_id][
         COORDINATOR
     ]
-    devs = []
-    for zone in coordinator.device.features.get(DeviceFeatures.ZONES):
-        ariston_zone = AristonThermostat(zone[ZoneAttribute.NUM], coordinator)
-        devs.append(ariston_zone)
-    async_add_entities(devs)
+    ariston_climate: list[ClimateEntity] = []
+    if coordinator.device.are_device_features_available(
+        ARISTON_CLIMATE_TYPE.device_features,
+        ARISTON_CLIMATE_TYPE.system_types,
+    ):
+        for zone_number in coordinator.device.get_zone_numbers():
+            ariston_climate.append(
+                AristonThermostat(
+                    zone_number,
+                    coordinator,
+                )
+            )
+
+    async_add_entities(ariston_climate)
 
 
 class AristonThermostat(AristonEntity, ClimateEntity):
@@ -59,20 +66,17 @@ class AristonThermostat(AristonEntity, ClimateEntity):
     @property
     def name(self) -> str:
         """Return the name of the device."""
-        return f"{self.device.attributes.get(DeviceAttribute.NAME)}"
+        return f"{self.device.get_name()}"
 
     @property
     def unique_id(self) -> str:
         """Return a unique id for the device."""
-        return f"{self.device.attributes.get(DeviceAttribute.GW)}_{self.zone}"
+        return f"{self.device.get_gateway()}_{self.zone}"
 
     @property
     def icon(self):
         """Return the icon of the thermostat device."""
-        if self.device.get_plant_mode() in [
-            PlantMode.WINTER,
-            PlantMode.HEATING_ONLY,
-        ]:
+        if self.device.is_plant_in_heat_mode():
             return "mdi:radiator"
         else:
             return "mdi:radiator-off"
@@ -120,36 +124,31 @@ class AristonThermostat(AristonEntity, ClimateEntity):
     @property
     def hvac_mode(self) -> str:
         """Return the current HVAC mode for the device."""
-        plant_mode = self.device.get_plant_mode()
-        zone_mode = self.device.get_zone_mode(self.zone)
-
         curr_hvac_mode = HVACMode.OFF
-        if plant_mode in [PlantMode.WINTER, PlantMode.HEATING_ONLY]:
-            if zone_mode is ZoneMode.MANUAL or zone_mode is ZoneMode.MANUAL_NIGHT:
+
+        if self.device.is_plant_in_heat_mode():
+            if self.device.is_zone_in_manual_mode(self.zone):
                 curr_hvac_mode = HVACMode.HEAT
-            elif zone_mode is ZoneMode.TIME_PROGRAM:
+            elif self.device.is_zone_in_time_program_mode(self.zone):
                 curr_hvac_mode = HVACMode.AUTO
-        if plant_mode in [PlantMode.COOLING]:
-            if zone_mode is ZoneMode.MANUAL or zone_mode is ZoneMode.MANUAL_NIGHT:
+        if self.device.is_plant_in_cool_mode():
+            if self.device.is_zone_in_manual_mode(self.zone):
                 curr_hvac_mode = HVACMode.COOL
-            elif zone_mode is ZoneMode.TIME_PROGRAM:
+            elif self.device.is_zone_in_time_program_mode(self.zone):
                 curr_hvac_mode = HVACMode.AUTO
         return curr_hvac_mode
 
     @property
     def hvac_modes(self) -> list[str]:
         """Return the HVAC modes support by the device."""
-        plant_modes = self.device.get_plant_mode_options()
-        zone_modes = self.device.get_zone_mode_options(self.zone)
-
         supported_modes = []
-        if ZoneMode.MANUAL in zone_modes or ZoneMode.MANUAL_NIGHT in zone_modes:
+        if self.device.is_zone_mode_options_contains_manual(self.zone):
             supported_modes.append(HVACMode.HEAT)
-            if PlantMode.COOLING in plant_modes:
+            if self.device.is_plant_mode_options_contains_cooling():
                 supported_modes.append(HVACMode.COOL)
-        if ZoneMode.TIME_PROGRAM in zone_modes:
+        if self.device.is_zone_mode_options_contains_time_program(self.zone):
             supported_modes.append(HVACMode.AUTO)
-        if ZoneMode.OFF in zone_modes:
+        if self.device.is_zone_mode_options_contains_off(self.zone):
             supported_modes.append(HVACMode.OFF)
 
         return supported_modes
@@ -157,16 +156,15 @@ class AristonThermostat(AristonEntity, ClimateEntity):
     @property
     def hvac_action(self):
         """Return the current running hvac operation."""
-        plant_mode = self.device.get_plant_mode()
         if_flame_on = self.device.get_is_flame_on_value() == 1
 
         curr_hvac_action = HVACAction.OFF
-        if plant_mode in [PlantMode.WINTER, PlantMode.HEATING_ONLY]:
+        if self.device.is_plant_in_heat_mode():
             if if_flame_on:
                 curr_hvac_action = HVACAction.HEATING
             else:
                 curr_hvac_action = HVACAction.IDLE
-        if plant_mode in [PlantMode.COOLING]:
+        if self.device.is_plant_in_cool_mode():
             if if_flame_on:
                 curr_hvac_action = HVACAction.COOLING
             else:
@@ -190,7 +188,7 @@ class AristonThermostat(AristonEntity, ClimateEntity):
         current_plant_mode = self.device.get_plant_mode()
 
         if hvac_mode == HVACMode.OFF:
-            if PlantMode.OFF in plant_modes:
+            if self.device.is_plant_mode_options_contains_off():
                 await self.device.async_set_plant_mode(PlantMode.OFF)
             else:
                 await self.device.async_set_plant_mode(PlantMode.SUMMER)

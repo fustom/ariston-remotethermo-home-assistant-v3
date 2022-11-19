@@ -4,7 +4,6 @@ from __future__ import annotations
 import logging
 
 from .entity import AristonEntity
-from .ariston import DeviceAttribute, DeviceFeatures
 from .const import (
     ARISTON_WATER_HEATER_TYPES,
     DOMAIN,
@@ -37,7 +36,6 @@ async def async_setup_entry(
 
         if coordinator.device.are_device_features_available(
             description.device_features,
-            description.extra_energy_feature,
             description.system_types,
         ):
             ariston_water_heaters.append(AristonWaterHeater(coordinator, description))
@@ -61,12 +59,12 @@ class AristonWaterHeater(AristonEntity, WaterHeaterEntity):
     @property
     def name(self) -> str:
         """Return the name of the device."""
-        return self.device.attributes.get(DeviceAttribute.NAME)
+        return self.device.get_name()
 
     @property
     def unique_id(self) -> str:
         """Return a unique id for the device."""
-        return f"{self.device.attributes.get(DeviceAttribute.GW)}-water_heater"
+        return f"{self.device.get_gateway()}-water_heater"
 
     @property
     def icon(self):
@@ -105,7 +103,7 @@ class AristonWaterHeater(AristonEntity, WaterHeaterEntity):
     @property
     def supported_features(self) -> int:
         """Return the supported features for this device integration."""
-        if self.device.features.get(DeviceFeatures.DHW_MODE_CHANGEABLE):
+        if self.device.get_dhw_mode_changeable():
             return (
                 WaterHeaterEntityFeature.TARGET_TEMPERATURE
                 | WaterHeaterEntityFeature.OPERATION_MODE
@@ -115,16 +113,12 @@ class AristonWaterHeater(AristonEntity, WaterHeaterEntity):
     @property
     def operation_list(self):
         """List of available operation modes."""
-        return self.device.get_water_heater_mode_opertation_texts()
+        return self.device.get_water_heater_mode_operation_texts()
 
     @property
     def current_operation(self):
         """Return current operation"""
-        res = self.device.get_water_heater_mode_options().index(
-            self.device.get_water_heater_mode_value()
-        )
-
-        return self.device.get_water_heater_mode_opertation_texts()[res]
+        return self.device.get_water_heater_current_mode_text()
 
     async def async_set_temperature(self, **kwargs):
         """Set new target temperature."""

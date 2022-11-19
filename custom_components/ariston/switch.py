@@ -26,7 +26,6 @@ async def async_setup_entry(
         ]
         if coordinator.device.are_device_features_available(
             description.device_features,
-            description.extra_energy_feature,
             description.system_types,
         ):
             ariston_switches.append(

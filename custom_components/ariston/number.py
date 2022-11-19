@@ -26,15 +26,19 @@ async def async_setup_entry(
         ]
         if coordinator.device.are_device_features_available(
             description.device_features,
-            description.extra_energy_feature,
             description.system_types,
         ):
-            ariston_numbers.append(
-                AristonNumber(
-                    coordinator,
-                    description,
-                )
-            )
+            if description.zone:
+                for zone_number in coordinator.device.get_zone_numbers():
+                    ariston_numbers.append(
+                        AristonNumber(
+                            coordinator,
+                            description,
+                            zone_number,
+                        )
+                    )
+            else:
+                ariston_numbers.append(AristonNumber(coordinator, description, None))
 
     async_add_entities(ariston_numbers)
 
@@ -46,18 +50,34 @@ class AristonNumber(AristonEntity, NumberEntity):
         self,
         coordinator: DeviceDataUpdateCoordinator,
         description: AristonNumberEntityDescription,
+        zone: int,
     ) -> None:
-        super().__init__(coordinator, description)
+        super().__init__(coordinator, description, zone)
+
+    @property
+    def name(self):
+        """Return the name of the entity"""
+        if self.entity_description.zone:
+            return f"{self.entity_description.name} {self.zone}"
+        return self.entity_description.name
 
     @property
     def native_value(self):
         """Return the current value"""
+        if self.entity_description.zone:
+            return getattr(self.device, self.entity_description.getter.__name__)(
+                self.zone
+            )
         return getattr(self.device, self.entity_description.getter.__name__)()
 
     @property
     def native_min_value(self):
         """Return the minimum value"""
         if self.entity_description.min is not None:
+            if self.entity_description.zone:
+                return getattr(self.device, self.entity_description.min.__name__)(
+                    self.zone
+                )
             return getattr(self.device, self.entity_description.min.__name__)()
 
         return self.entity_description.native_min_value
@@ -66,10 +86,32 @@ class AristonNumber(AristonEntity, NumberEntity):
     def native_max_value(self):
         """Return the maximum value"""
         if self.entity_description.max is not None:
+            if self.entity_description.zone:
+                return getattr(self.device, self.entity_description.max.__name__)(
+                    self.zone
+                )
             return getattr(self.device, self.entity_description.max.__name__)()
 
         return self.entity_description.native_max_value
 
+    @property
+    def native_step(self):
+        """Return the step value"""
+        if self.entity_description.getstep is not None:
+            if self.entity_description.zone:
+                return getattr(self.device, self.entity_description.getstep.__name__)(
+                    self.zone
+                )
+            return getattr(self.device, self.entity_description.getstep.__name__)()
+
+        return self.entity_description.native_step
+
     async def async_set_native_value(self, value: float):
         """Update the current value."""
-        await getattr(self.device, self.entity_description.setter.__name__)(value)
+        if self.entity_description.zone:
+            await getattr(self.device, self.entity_description.setter.__name__)(
+                value, self.zone
+            )
+        else:
+            await getattr(self.device, self.entity_description.setter.__name__)(value)
+        self.async_write_ha_state()
