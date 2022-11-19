@@ -5,45 +5,32 @@ import logging
 
 import voluptuous as vol
 
-from .ariston import (
-    AristonAPI,
-    DeviceAttribute,
-    DeviceFeatures,
-    SystemType,
-    VelisDeviceAttribute,
-    WheType,
+from homeassistant.config_entries import ConfigEntry
+from homeassistant.const import (
+    ATTR_DEVICE_ID,
+    CONF_DEVICE,
+    CONF_PASSWORD,
+    CONF_SCAN_INTERVAL,
+    CONF_USERNAME,
+    Platform,
 )
-from .coordinator import DeviceDataUpdateCoordinator
+from homeassistant.core import HomeAssistant
+from homeassistant.exceptions import ConfigEntryAuthFailed, ConfigEntryNotReady
+from homeassistant.helpers import config_validation as cv, device_registry as dr
+from homeassistant.util.unit_system import METRIC_SYSTEM
+
+from ariston import Ariston
+from ariston.ariston import DeviceAttribute, SystemType
+
 from .const import (
     COORDINATOR,
     DEFAULT_ENERGY_SCAN_INTERVAL_MINUTES,
-    DEFAULT_EXTRA_ENERGY_FEATURES,
     DEFAULT_SCAN_INTERVAL_SECONDS,
     DOMAIN,
     ENERGY_COORDINATOR,
     ENERGY_SCAN_INTERVAL,
-    EXTRA_ENERGY_FEATURES,
 )
-from .galevo_device import AristonGalevoDevice
-from .evo_device import AristonEvoDevice
-from .lydos_hybrid_device import AristonLydosHybridDevice
-
-from homeassistant.exceptions import ConfigEntryAuthFailed, ConfigEntryNotReady
-from homeassistant.config_entries import ConfigEntry
-from homeassistant.util.unit_system import METRIC_SYSTEM
-from homeassistant.core import HomeAssistant
-from homeassistant.const import (
-    ATTR_DEVICE_ID,
-    CONF_SCAN_INTERVAL,
-    Platform,
-    CONF_USERNAME,
-    CONF_PASSWORD,
-    CONF_DEVICE,
-)
-from homeassistant.helpers import (
-    config_validation as cv,
-    device_registry as dr,
-)
+from .coordinator import DeviceDataUpdateCoordinator
 
 _LOGGER = logging.getLogger(__name__)
 
@@ -74,13 +61,11 @@ SET_ITEM_BY_ID_SCHEMA = vol.Schema(
 
 async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
     """Set up Ariston from a config entry."""
-    api = AristonAPI(
-        entry.data[CONF_USERNAME],
-        entry.data[CONF_PASSWORD],
-    )
-
+    ariston = Ariston()
     try:
-        reponse = await api.async_connect()
+        reponse = await ariston.async_connect(
+            entry.data[CONF_USERNAME], entry.data[CONF_PASSWORD]
+        )
         if not reponse:
             _LOGGER.error(
                 "Failed to connect to Ariston with device: %s",
@@ -91,58 +76,11 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
         _LOGGER.exception("")
         raise ConfigEntryNotReady() from error
 
-    extra_energy_features = entry.options.get(
-        EXTRA_ENERGY_FEATURES, DEFAULT_EXTRA_ENERGY_FEATURES
+    device = await ariston.async_hello(
+        entry.data[CONF_DEVICE].get(DeviceAttribute.GW),
+        hass.config.units is METRIC_SYSTEM,
     )
-
-    if entry.data[CONF_DEVICE].get(DeviceAttribute.SYS) == SystemType.GALEVO:
-        device = AristonGalevoDevice(
-            entry.data[CONF_DEVICE],
-            api,
-            extra_energy_features,
-            hass.config.units is METRIC_SYSTEM,
-        )
-    elif entry.data[CONF_DEVICE].get(DeviceAttribute.SYS) == SystemType.VELIS:
-        if (
-            entry.data[CONF_DEVICE].get(VelisDeviceAttribute.WHE_TYPE)
-            == WheType.LydosHybrid
-        ):
-            device = AristonLydosHybridDevice(
-                entry.data[CONF_DEVICE],
-                api,
-                extra_energy_features,
-                hass.config.units is METRIC_SYSTEM,
-            )
-        elif entry.data[CONF_DEVICE].get(VelisDeviceAttribute.WHE_TYPE) == WheType.Evo:
-            device = AristonEvoDevice(
-                entry.data[CONF_DEVICE],
-                api,
-                extra_energy_features,
-                hass.config.units is METRIC_SYSTEM,
-            )
-        else:
-            # Fallback to Evo
-            device = AristonEvoDevice(
-                entry.data[CONF_DEVICE],
-                api,
-                extra_energy_features,
-                hass.config.units is METRIC_SYSTEM,
-            )
-            _LOGGER.error(
-                "Your device (%s) is currently not supported. Contact with the developer. Your fallback device is Velis Evo maybe working",
-                entry.data[CONF_DEVICE].get(VelisDeviceAttribute.WHE_TYPE),
-            )
-
-            # _LOGGER.error(
-            #     "Your velis device (%s) is currently not supported. Contact with the developer",
-            #     entry.data[CONF_DEVICE].get(VelisDeviceAttribute.WHE_TYPE),
-            # )
-            # return False
-    else:
-        _LOGGER.error(
-            "Your device (%s) is currently not supported. Contact with the developer",
-            entry.data[CONF_DEVICE].get(DeviceAttribute.SYS),
-        )
+    if device is None:
         return False
 
     await device.async_get_features()
@@ -161,7 +99,7 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
 
     await coordinator.async_config_entry_first_refresh()
 
-    if device.features.get(DeviceFeatures.HAS_METERING):
+    if device.get_has_metering():
         energy_interval_minutes = entry.options.get(
             ENERGY_SCAN_INTERVAL, DEFAULT_ENERGY_SCAN_INTERVAL_MINUTES
         )
@@ -179,7 +117,7 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
 
     entry.async_on_unload(entry.add_update_listener(update_listener))
 
-    if device.attributes.get(DeviceAttribute.SYS) == SystemType.GALEVO:
+    if device.get_system_type() == SystemType.GALEVO:
 
         async def async_set_item_by_id_service(service_call):
             """Create a vacation on the target device."""

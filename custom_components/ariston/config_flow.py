@@ -16,15 +16,15 @@ from homeassistant.const import (
 from homeassistant.core import callback
 from homeassistant.data_entry_flow import FlowResult
 
+from ariston import Ariston
+from ariston.ariston import DeviceAttribute
+
 from .const import (
     DEFAULT_ENERGY_SCAN_INTERVAL_MINUTES,
-    DEFAULT_EXTRA_ENERGY_FEATURES,
     DEFAULT_SCAN_INTERVAL_SECONDS,
     DOMAIN,
     ENERGY_SCAN_INTERVAL,
-    EXTRA_ENERGY_FEATURES,
 )
-from .ariston import AristonAPI, DeviceAttribute
 
 _LOGGER = logging.getLogger(__name__)
 
@@ -42,9 +42,8 @@ class AristonConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
     VERSION = 1
 
     def __init__(self):
-        self.api: AristonAPI = None
-        self.cloud_username: str = None
-        self.cloud_password: str = None
+        self.cloud_username: str | None = None
+        self.cloud_password: str | None = None
         self.cloud_devices = {}
 
     async def async_step_reauth(self, user_input=None):
@@ -65,22 +64,21 @@ class AristonConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
         try:
             self.cloud_username = user_input[CONF_USERNAME]
             self.cloud_password = user_input[CONF_PASSWORD]
-            self.api = AristonAPI(self.cloud_username, self.cloud_password)
-            response = await self.api.async_connect()
-            if not response:
+            ariston = Ariston()
+
+            reponse = await ariston.async_connect(
+                self.cloud_username, self.cloud_password
+            )
+            if not reponse:
                 errors["base"] = "invalid_auth"
                 return self.async_show_form(
                     step_id="user", data_schema=STEP_USER_DATA_SCHEMA, errors=errors
                 )
-
         except Exception:  # pylint: disable=broad-except
             _LOGGER.exception("Unexpected exception")
             errors["base"] = "unknown"
         else:
-            cloud_devices = []
-            cloud_devices.extend(await self.api.async_get_detailed_devices())
-            cloud_devices.extend(await self.api.async_get_detailed_velis_devices())
-
+            cloud_devices = await ariston.async_discover()
             if len(cloud_devices) == 0:
                 errors["base"] = "no device found"
             if len(cloud_devices) == 1:
@@ -154,9 +152,6 @@ class AristonOptionsFlow(config_entries.OptionsFlow):
             return self.async_create_entry(title="", data=user_input)
 
         options = self.config_entry.options
-        extra_energy_features = options.get(
-            EXTRA_ENERGY_FEATURES, DEFAULT_EXTRA_ENERGY_FEATURES
-        )
         scan_interval = options.get(CONF_SCAN_INTERVAL, DEFAULT_SCAN_INTERVAL_SECONDS)
         energy_scan_interval = options.get(
             ENERGY_SCAN_INTERVAL, DEFAULT_ENERGY_SCAN_INTERVAL_MINUTES
@@ -166,10 +161,6 @@ class AristonOptionsFlow(config_entries.OptionsFlow):
             step_id="init",
             data_schema=vol.Schema(
                 {
-                    vol.Optional(
-                        EXTRA_ENERGY_FEATURES,
-                        default=extra_energy_features,
-                    ): bool,
                     vol.Optional(
                         CONF_SCAN_INTERVAL,
                         default=scan_interval,

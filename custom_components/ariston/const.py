@@ -20,12 +20,11 @@ from homeassistant.components.water_heater import WaterHeaterEntityEntityDescrip
 from homeassistant.const import ENERGY_KILO_WATT_HOUR
 from homeassistant.helpers.entity import EntityCategory, EntityDescription
 
-from .galevo_device import AristonGalevoDevice
-from .velis_device import AristonVelisDevice
-from .evo_device import AristonEvoDevice
-from .lydos_hybrid_device import AristonLydosHybridDevice
-from .device import AristonDevice
-from .ariston import (
+from ariston.galevo_device import AristonGalevoDevice
+from ariston.velis_device import AristonVelisDevice
+from ariston.evo_device import AristonEvoDevice
+from ariston.device import AristonDevice
+from ariston.ariston import (
     ConsumptionProperties,
     ConsumptionType,
     CustomDeviceFeatures,
@@ -36,6 +35,7 @@ from .ariston import (
     WheType,
     VelisDeviceProperties,
     EvoDeviceProperties,
+    ThermostatProperties,
 )
 
 
@@ -44,11 +44,9 @@ NAME: final = "Ariston"
 COORDINATOR: final = "coordinator"
 ENERGY_COORDINATOR: final = "energy_coordinator"
 ENERGY_SCAN_INTERVAL: final = "energy_scan_interval"
-EXTRA_ENERGY_FEATURES: final = "extra_energy_features"
 
 DEFAULT_SCAN_INTERVAL_SECONDS: final = 60
 DEFAULT_ENERGY_SCAN_INTERVAL_MINUTES: final = 60
-DEFAULT_EXTRA_ENERGY_FEATURES: final = False
 
 ATTR_TARGET_TEMP_STEP: final = "target_temp_step"
 ATTR_HEAT_REQUEST: final = "heat_request"
@@ -66,12 +64,11 @@ class AristonBaseEntityDescription(EntityDescription, ABC):
 
     device_features: list[DeviceFeatures] or None = None
     coordinator: str = COORDINATOR
-    extra_energy_feature: bool = False
     extra_states: list[
         dict[EXTRA_STATE_ATTRIBUTE:str],
         dict[EXTRA_STATE_DEVICE_METHOD:Callable],
     ] or None = None
-    zone: int = 0
+    zone: bool = False
     system_types: list[SystemType or WheType] or None = None
 
 
@@ -118,6 +115,7 @@ class AristonNumberEntityDescription(
     getter: Callable = None
     min: Callable = None
     max: Callable = None
+    getstep: Callable = None
 
 
 @dataclass
@@ -232,8 +230,7 @@ ARISTON_SENSOR_TYPES: tuple[AristonSensorEntityDescription, ...] = (
         native_unit_of_measurement=ENERGY_KILO_WATT_HOUR,
         device_features=[DeviceFeatures.HAS_METERING],
         coordinator=ENERGY_COORDINATOR,
-        extra_energy_feature=True,
-        get_native_value=AristonDevice.get_gas_consumption_for_heating_last_month,
+        get_native_value=AristonGalevoDevice.get_gas_consumption_for_heating_last_month,
         system_types=[SystemType.GALEVO],
     ),
     AristonSensorEntityDescription(
@@ -245,8 +242,7 @@ ARISTON_SENSOR_TYPES: tuple[AristonSensorEntityDescription, ...] = (
         native_unit_of_measurement=ENERGY_KILO_WATT_HOUR,
         device_features=[DeviceFeatures.HAS_METERING],
         coordinator=ENERGY_COORDINATOR,
-        extra_energy_feature=True,
-        get_native_value=AristonDevice.get_electricity_consumption_for_heating_last_month,
+        get_native_value=AristonGalevoDevice.get_electricity_consumption_for_heating_last_month,
         system_types=[SystemType.GALEVO],
     ),
     AristonSensorEntityDescription(
@@ -258,8 +254,7 @@ ARISTON_SENSOR_TYPES: tuple[AristonSensorEntityDescription, ...] = (
         native_unit_of_measurement=ENERGY_KILO_WATT_HOUR,
         device_features=[DeviceFeatures.HAS_METERING, CustomDeviceFeatures.HAS_DHW],
         coordinator=ENERGY_COORDINATOR,
-        extra_energy_feature=True,
-        get_native_value=AristonDevice.get_gas_consumption_for_water_last_month,
+        get_native_value=AristonGalevoDevice.get_gas_consumption_for_water_last_month,
         system_types=[SystemType.GALEVO],
     ),
     AristonSensorEntityDescription(
@@ -271,8 +266,7 @@ ARISTON_SENSOR_TYPES: tuple[AristonSensorEntityDescription, ...] = (
         native_unit_of_measurement=ENERGY_KILO_WATT_HOUR,
         device_features=[DeviceFeatures.HAS_METERING, CustomDeviceFeatures.HAS_DHW],
         coordinator=ENERGY_COORDINATOR,
-        extra_energy_feature=True,
-        get_native_value=AristonDevice.get_electricity_consumption_for_water_last_month,
+        get_native_value=AristonGalevoDevice.get_electricity_consumption_for_water_last_month,
         system_types=[SystemType.GALEVO],
     ),
     AristonSensorEntityDescription(
@@ -492,9 +486,8 @@ ARISTON_NUMBER_TYPES: tuple[AristonNumberEntityDescription, ...] = (
         native_step=0.01,
         device_features=[DeviceFeatures.HAS_METERING],
         coordinator=ENERGY_COORDINATOR,
-        extra_energy_feature=True,
-        getter=AristonDevice.get_elect_cost,
-        setter=AristonDevice.async_set_elect_cost,
+        getter=AristonGalevoDevice.get_elect_cost,
+        setter=AristonGalevoDevice.async_set_elect_cost,
         system_types=[SystemType.GALEVO],
     ),
     AristonNumberEntityDescription(
@@ -507,9 +500,8 @@ ARISTON_NUMBER_TYPES: tuple[AristonNumberEntityDescription, ...] = (
         native_step=0.01,
         device_features=[DeviceFeatures.HAS_METERING],
         coordinator=ENERGY_COORDINATOR,
-        extra_energy_feature=True,
-        getter=AristonDevice.get_gas_cost,
-        setter=AristonDevice.async_set_gas_cost,
+        getter=AristonGalevoDevice.get_gas_cost,
+        setter=AristonGalevoDevice.async_set_gas_cost,
         system_types=[SystemType.GALEVO],
     ),
     AristonNumberEntityDescription(
@@ -521,8 +513,34 @@ ARISTON_NUMBER_TYPES: tuple[AristonNumberEntityDescription, ...] = (
         max=AristonVelisDevice.get_water_heater_maximum_setpoint_temperature_maximum,
         native_step=1,
         getter=AristonVelisDevice.get_water_heater_maximum_setpoint_temperature,
-        setter=AristonVelisDevice.async_set_max_setpoint_temp,
+        setter=AristonEvoDevice.async_set_max_setpoint_temp,
         system_types=[SystemType.VELIS],
+    ),
+    AristonNumberEntityDescription(
+        key=ThermostatProperties.HEATING_FLOW_TEMP,
+        name=f"{NAME} heating flow temperature",
+        icon="mdi:thermometer",
+        entity_category=EntityCategory.CONFIG,
+        min=AristonGalevoDevice.get_heating_flow_temp_min,
+        max=AristonGalevoDevice.get_heating_flow_temp_max,
+        getstep=AristonGalevoDevice.get_heating_flow_temp_step,
+        getter=AristonGalevoDevice.get_heating_flow_temp_value,
+        setter=AristonGalevoDevice.async_set_heating_flow_temp,
+        zone=True,
+        system_types=[SystemType.GALEVO],
+    ),
+    AristonNumberEntityDescription(
+        key=ThermostatProperties.HEATING_FLOW_OFFSET,
+        name=f"{NAME} heating flow offset",
+        icon="mdi:progress-wrench",
+        entity_category=EntityCategory.CONFIG,
+        min=AristonGalevoDevice.get_heating_flow_offset_min,
+        max=AristonGalevoDevice.get_heating_flow_offset_max,
+        getstep=AristonGalevoDevice.get_heating_flow_offset_step,
+        getter=AristonGalevoDevice.get_heating_flow_offset_value,
+        setter=AristonGalevoDevice.async_set_heating_flow_offset,
+        zone=True,
+        system_types=[SystemType.GALEVO],
     ),
 )
 
@@ -535,10 +553,9 @@ ARISTON_SELECT_TYPES: tuple[AristonSelectEntityDescription, ...] = (
         entity_category=EntityCategory.CONFIG,
         device_features=[DeviceFeatures.HAS_METERING],
         coordinator=ENERGY_COORDINATOR,
-        extra_energy_feature=True,
-        getter=AristonDevice.get_currency,
-        get_options=AristonDevice.get_currencies,
-        setter=AristonDevice.async_set_currency,
+        getter=AristonGalevoDevice.get_currency,
+        get_options=AristonGalevoDevice.get_currencies,
+        setter=AristonGalevoDevice.async_set_currency,
         system_types=[SystemType.GALEVO],
     ),
     AristonSelectEntityDescription(
@@ -548,10 +565,9 @@ ARISTON_SELECT_TYPES: tuple[AristonSelectEntityDescription, ...] = (
         entity_category=EntityCategory.CONFIG,
         device_features=[DeviceFeatures.HAS_METERING],
         coordinator=ENERGY_COORDINATOR,
-        extra_energy_feature=True,
-        getter=AristonDevice.get_gas_type,
-        get_options=AristonDevice.get_gas_types,
-        setter=AristonDevice.async_set_gas_type,
+        getter=AristonGalevoDevice.get_gas_type,
+        get_options=AristonGalevoDevice.get_gas_types,
+        setter=AristonGalevoDevice.async_set_gas_type,
         system_types=[SystemType.GALEVO],
     ),
     AristonSelectEntityDescription(
@@ -561,10 +577,9 @@ ARISTON_SELECT_TYPES: tuple[AristonSelectEntityDescription, ...] = (
         entity_category=EntityCategory.CONFIG,
         device_features=[DeviceFeatures.HAS_METERING],
         coordinator=ENERGY_COORDINATOR,
-        extra_energy_feature=True,
-        getter=AristonDevice.get_gas_energy_unit,
-        get_options=AristonDevice.get_gas_energy_units,
-        setter=AristonDevice.async_set_gas_energy_unit,
+        getter=AristonGalevoDevice.get_gas_energy_unit,
+        get_options=AristonGalevoDevice.get_gas_energy_units,
+        setter=AristonGalevoDevice.async_set_gas_energy_unit,
         system_types=[SystemType.GALEVO],
     ),
 )

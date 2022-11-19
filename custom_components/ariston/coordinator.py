@@ -8,10 +8,10 @@ import logging
 from homeassistant.core import HomeAssistant
 from homeassistant.helpers.update_coordinator import DataUpdateCoordinator
 
+from ariston.device import AristonDevice
+from ariston.galevo_device import AristonGalevoDevice
+
 from .const import DOMAIN
-from .galevo_device import AristonGalevoDevice
-from .velis_device import AristonVelisDevice
-from .ariston import DeviceAttribute
 
 _LOGGER = logging.getLogger(__name__)
 
@@ -22,7 +22,7 @@ class DeviceDataUpdateCoordinator(DataUpdateCoordinator):
     def __init__(
         self,
         hass: HomeAssistant,
-        device: AristonGalevoDevice or AristonVelisDevice,
+        device: AristonDevice | AristonGalevoDevice,
         scan_interval_seconds: int,
         coordinator_name: str,
         async_update_state: Callable,
@@ -31,7 +31,7 @@ class DeviceDataUpdateCoordinator(DataUpdateCoordinator):
         super().__init__(
             hass,
             _LOGGER,
-            name=f"{DOMAIN}-{device.attributes.get(DeviceAttribute.NAME)}-{coordinator_name}",
+            name=f"{DOMAIN}-{device.get_name()}-{coordinator_name}",
             update_interval=timedelta(seconds=scan_interval_seconds),
         )
 

@@ -5,7 +5,6 @@ import logging
 
 from abc import ABC
 
-
 from homeassistant.helpers.entity import DeviceInfo
 from homeassistant.helpers.update_coordinator import CoordinatorEntity
 
@@ -15,7 +14,6 @@ from .const import (
     EXTRA_STATE_DEVICE_METHOD,
     AristonBaseEntityDescription,
 )
-from .ariston import DeviceAttribute, GalevoDeviceAttribute, SystemType
 from .coordinator import DeviceDataUpdateCoordinator
 
 _LOGGER = logging.getLogger(__name__)
@@ -28,7 +26,7 @@ class AristonEntity(CoordinatorEntity, ABC):
         self,
         coordinator: DeviceDataUpdateCoordinator,
         description: AristonBaseEntityDescription,
-        zone: int = None,
+        zone: int | None = None,
     ) -> None:
         """Initialize the entity."""
         super().__init__(coordinator)
@@ -41,11 +39,11 @@ class AristonEntity(CoordinatorEntity, ABC):
     def device_info(self) -> DeviceInfo:
         """Return device specific attributes."""
         return DeviceInfo(
-            identifiers={(DOMAIN, self.device.attributes.get(DeviceAttribute.SN))},
+            identifiers={(DOMAIN, self.device.get_serial_number())},
             manufacturer=DOMAIN,
-            name=self.device.attributes.get(DeviceAttribute.NAME),
-            sw_version=self.device.attributes.get(GalevoDeviceAttribute.FW_VER),
-            model=SystemType(self.device.attributes.get(DeviceAttribute.SYS)).name,
+            name=self.device.get_name(),
+            sw_version=self.device.get_firmware_version(),
+            model=self.device.get_system_type().name,
         )
 
     @property
@@ -75,4 +73,4 @@ class AristonEntity(CoordinatorEntity, ABC):
     @property
     def unique_id(self):
         """Return the unique id."""
-        return f"{self.device.attributes.get(DeviceAttribute.GW)}-{self.name}"
+        return f"{self.device.get_gateway()}-{self.name}"

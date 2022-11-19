@@ -15,6 +15,11 @@ from homeassistant.helpers import (
     device_registry as dr,
 )
 
+from ariston.ariston import (
+    DeviceProperties,
+    SystemType,
+)
+
 from .entity import AristonEntity
 from .const import (
     ARISTON_BINARY_SENSOR_TYPES,
@@ -23,11 +28,6 @@ from .const import (
     AristonBinarySensorEntityDescription,
 )
 from .coordinator import DeviceDataUpdateCoordinator
-from .ariston import (
-    DeviceAttribute,
-    DeviceProperties,
-    SystemType,
-)
 
 _LOGGER = logging.getLogger(__name__)
 
@@ -53,14 +53,13 @@ async def async_setup_entry(
         ]
         if coordinator.device.are_device_features_available(
             description.device_features,
-            description.extra_energy_feature,
             description.system_types,
         ):
             ariston_binary_sensors.append(AristonBinarySensor(coordinator, description))
 
     async_add_entities(ariston_binary_sensors)
 
-    if coordinator.device.attributes.get(DeviceAttribute.SYS) == SystemType.GALEVO:
+    if coordinator.device.get_system_type() == SystemType.GALEVO:
 
         async def async_create_vacation_service(service_call):
             """Create a vacation on the target device."""
