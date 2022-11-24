@@ -7,10 +7,7 @@ from .entity import AristonEntity
 from .const import ARISTON_CLIMATE_TYPE, COORDINATOR, DOMAIN
 from .coordinator import DeviceDataUpdateCoordinator
 
-from ariston.ariston import (
-    PlantMode,
-    ZoneMode,
-)
+from ariston import PlantMode, ZoneMode
 
 from homeassistant.config_entries import ConfigEntry
 from homeassistant.core import HomeAssistant

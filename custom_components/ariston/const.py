@@ -20,11 +20,11 @@ from homeassistant.components.water_heater import WaterHeaterEntityEntityDescrip
 from homeassistant.const import ENERGY_KILO_WATT_HOUR
 from homeassistant.helpers.entity import EntityCategory, EntityDescription
 
-from ariston.galevo_device import AristonGalevoDevice
-from ariston.velis_device import AristonVelisDevice
-from ariston.evo_device import AristonEvoDevice
-from ariston.device import AristonDevice
-from ariston.ariston import (
+from ariston import (
+    AristonGalevoDevice,
+    AristonVelisDevice,
+    AristonEvoDevice,
+    AristonDevice,
     ConsumptionProperties,
     ConsumptionType,
     CustomDeviceFeatures,

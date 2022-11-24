@@ -15,10 +15,7 @@ from homeassistant.helpers import (
     device_registry as dr,
 )
 
-from ariston.ariston import (
-    DeviceProperties,
-    SystemType,
-)
+from ariston import DeviceProperties, SystemType
 
 from .entity import AristonEntity
 from .const import (

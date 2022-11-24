@@ -16,8 +16,7 @@ from homeassistant.const import (
 from homeassistant.core import callback
 from homeassistant.data_entry_flow import FlowResult
 
-from ariston import Ariston
-from ariston.ariston import DeviceAttribute
+from ariston import Ariston, DeviceAttribute
 
 from .const import (
     DEFAULT_ENERGY_SCAN_INTERVAL_MINUTES,
