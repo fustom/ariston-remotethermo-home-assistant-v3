@@ -2,15 +2,16 @@
   "domain": "ariston",
   "name": "Ariston",
   "integration_type": "device",
-  "version": "0.11.5",
+  "version": "0.11.6",
   "config_flow": true,
   "documentation": "https://github.com/fustom/ariston-remotethermo-home-assistant-v3",
   "issue_tracker": "https://github.com/fustom/ariston-remotethermo-home-assistant-v3/issues",
-  "requirements": ["ariston==0.11.5"],
+  "requirements": ["ariston==0.11.6"],
   "ssdp": [],
   "zeroconf": [],
   "homekit": {},
   "dependencies": [],
   "codeowners": ["@fustom"],
-  "iot_class": "cloud_polling"
+  "iot_class": "cloud_polling",
+  "loggers": "ariston"
 }
