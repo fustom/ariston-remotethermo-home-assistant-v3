@@ -19,8 +19,7 @@ from homeassistant.exceptions import ConfigEntryAuthFailed, ConfigEntryNotReady
 from homeassistant.helpers import config_validation as cv, device_registry as dr
 from homeassistant.util.unit_system import METRIC_SYSTEM
 
-from ariston import Ariston
-from ariston.ariston import DeviceAttribute, SystemType
+from ariston import Ariston, DeviceAttribute, SystemType
 
 from .const import (
     COORDINATOR,
