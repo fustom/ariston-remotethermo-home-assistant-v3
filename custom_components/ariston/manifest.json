@@ -12,6 +12,5 @@
   "homekit": {},
   "dependencies": [],
   "codeowners": ["@fustom"],
-  "iot_class": "cloud_polling",
-  "loggers": ["ariston"]
+  "iot_class": "cloud_polling"
 }
