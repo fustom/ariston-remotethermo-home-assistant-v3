@@ -5,7 +5,7 @@
   "config_flow": true,
   "documentation": "https://github.com/fustom/ariston-remotethermo-home-assistant-v3",
   "issue_tracker": "https://github.com/fustom/ariston-remotethermo-home-assistant-v3/issues",
-  "requirements": ["ariston==0.12.1"],
+  "requirements": ["ariston==0.12.2"],
   "ssdp": [],
   "zeroconf": [],
   "homekit": {},
