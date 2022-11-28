@@ -35,8 +35,7 @@ async def async_setup_entry(
         ]
 
         if coordinator.device.are_device_features_available(
-            description.device_features,
-            description.system_types,
+            description.device_features, description.system_types, description.whe_types
         ):
             ariston_water_heaters.append(AristonWaterHeater(coordinator, description))
 

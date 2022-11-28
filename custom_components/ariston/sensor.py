@@ -32,8 +32,7 @@ async def async_setup_entry(
             description.coordinator
         ]
         if coordinator.device.are_device_features_available(
-            description.device_features,
-            description.system_types,
+            description.device_features, description.system_types, description.whe_types
         ):
             ariston_sensors.append(
                 AristonSensor(

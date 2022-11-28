@@ -20,24 +20,28 @@ from homeassistant.components.water_heater import WaterHeaterEntityEntityDescrip
 from homeassistant.const import ENERGY_KILO_WATT_HOUR
 from homeassistant.helpers.entity import EntityCategory, EntityDescription
 
-from ariston import (
-    AristonGalevoDevice,
-    AristonVelisDevice,
-    AristonEvoDevice,
-    AristonDevice,
+from ariston.galevo_device import AristonGalevoDevice
+from ariston.velis_device import AristonVelisDevice
+from ariston.evo_device import AristonEvoDevice
+from ariston.device import AristonDevice
+from ariston.evo_lydos_device import AristonEvoLydosDevice
+from ariston.nuos_split_device import AristonNuosSplitDevice
+from ariston.const import (
+    DeviceProperties,
+    VelisDeviceProperties,
+    SlpDeviceSettings,
+    EvoLydosDeviceProperties,
+    NuosSplitProperties,
+    EvoDeviceProperties,
+    ThermostatProperties,
     ConsumptionProperties,
     ConsumptionType,
-    CustomDeviceFeatures,
     DeviceFeatures,
-    DeviceProperties,
+    CustomDeviceFeatures,
     MedDeviceSettings,
     SystemType,
     WheType,
-    VelisDeviceProperties,
-    EvoDeviceProperties,
-    ThermostatProperties,
 )
-
 
 DOMAIN: final = "ariston"
 NAME: final = "Ariston"
@@ -62,14 +66,14 @@ EXTRA_STATE_DEVICE_METHOD: final = "DeviceMethod"
 class AristonBaseEntityDescription(EntityDescription, ABC):
     """An abstract class that describes Ariston entites"""
 
-    device_features: list[DeviceFeatures] or None = None
+    device_features: list[DeviceFeatures] = None
     coordinator: str = COORDINATOR
     extra_states: list[
-        dict[EXTRA_STATE_ATTRIBUTE:str],
-        dict[EXTRA_STATE_DEVICE_METHOD:Callable],
-    ] or None = None
+        dict[EXTRA_STATE_ATTRIBUTE:str], dict[EXTRA_STATE_DEVICE_METHOD:Callable]
+    ] = None
     zone: bool = False
-    system_types: list[SystemType or WheType] or None = None
+    system_types: list[SystemType] = None
+    whe_types: list[WheType] = None
 
 
 @dataclass
@@ -213,13 +217,14 @@ ARISTON_SENSOR_TYPES: tuple[AristonSensorEntityDescription, ...] = (
         system_types=[SystemType.GALEVO],
     ),
     AristonSensorEntityDescription(
-        key=VelisDeviceProperties.AV_SHW,
+        key=EvoLydosDeviceProperties.AV_SHW,
         name=f"{NAME} average showers",
         icon="mdi:shower-head",
         state_class=SensorStateClass.MEASUREMENT,
-        get_native_value=AristonVelisDevice.get_av_shw_value,
+        get_native_value=AristonEvoLydosDevice.get_av_shw_value,
         get_native_unit_of_measurement=AristonVelisDevice.get_empty_unit,
         system_types=[SystemType.VELIS],
+        whe_types=[WheType.Evo, WheType.LydosHybrid],
     ),
     AristonSensorEntityDescription(
         key="Gas consumption for heating last month",
@@ -404,7 +409,18 @@ ARISTON_SENSOR_TYPES: tuple[AristonSensorEntityDescription, ...] = (
         state_class=SensorStateClass.MEASUREMENT,
         get_native_value=AristonEvoDevice.get_rm_tm_value,
         get_native_unit_of_measurement=AristonVelisDevice.get_empty_unit,
-        system_types=[WheType.Evo],
+        system_types=[SystemType.VELIS],
+        whe_types=[WheType.Evo],
+    ),
+    AristonSensorEntityDescription(
+        key=SlpDeviceSettings.SLP_HEATING_RATE,
+        name=f"{NAME} heating rate",
+        icon="mdi:chart-line",
+        state_class=SensorStateClass.MEASUREMENT,
+        get_native_value=AristonNuosSplitDevice.get_water_heater_heating_rate,
+        get_native_unit_of_measurement=AristonVelisDevice.get_empty_unit,
+        system_types=[SystemType.VELIS],
+        whe_types=[WheType.NuosSplit],
     ),
 )
 
@@ -430,11 +446,12 @@ ARISTON_BINARY_SENSOR_TYPES: tuple[AristonBinarySensorEntityDescription, ...] = 
         system_types=[SystemType.GALEVO],
     ),
     AristonBinarySensorEntityDescription(
-        key=VelisDeviceProperties.HEAT_REQ,
+        key=EvoLydosDeviceProperties.HEAT_REQ,
         name=f"{NAME} is heating",
         icon="mdi:fire",
-        get_is_on=AristonVelisDevice.get_is_heating,
+        get_is_on=AristonEvoLydosDevice.get_is_heating,
         system_types=[SystemType.VELIS],
+        whe_types=[WheType.Evo, WheType.LydosHybrid],
     ),
 )
 
@@ -454,7 +471,8 @@ ARISTON_SWITCH_TYPES: tuple[AristonSwitchEntityDescription, ...] = (
         icon="mdi:leaf",
         setter=AristonEvoDevice.async_set_eco_mode,
         getter=AristonEvoDevice.get_water_heater_eco_value,
-        system_types=[WheType.Evo],
+        system_types=[SystemType.VELIS],
+        whe_types=[WheType.Evo],
     ),
     AristonSwitchEntityDescription(
         key=VelisDeviceProperties.ON,
@@ -472,6 +490,26 @@ ARISTON_SWITCH_TYPES: tuple[AristonSwitchEntityDescription, ...] = (
         setter=AristonVelisDevice.async_set_antilegionella,
         getter=AristonVelisDevice.get_water_anti_leg_value,
         system_types=[SystemType.VELIS],
+    ),
+    AristonSwitchEntityDescription(
+        key=SlpDeviceSettings.SLP_PRE_HEATING_ON_OFF,
+        name=f"{NAME} preheating",
+        icon="mdi:heat-wave",
+        entity_category=EntityCategory.CONFIG,
+        setter=AristonNuosSplitDevice.async_set_preheating,
+        getter=AristonNuosSplitDevice.get_water_heater_preheating_on_off,
+        system_types=[SystemType.VELIS],
+        whe_types=[WheType.NuosSplit],
+    ),
+    AristonSwitchEntityDescription(
+        key=NuosSplitProperties.BOOST_ON,
+        name=f"{NAME} boost",
+        icon="mdi:car-turbocharger",
+        entity_category=EntityCategory.CONFIG,
+        setter=AristonNuosSplitDevice.async_set_water_heater_boost,
+        getter=AristonNuosSplitDevice.get_water_heater_boost,
+        system_types=[SystemType.VELIS],
+        whe_types=[WheType.NuosSplit],
     ),
 )
 
@@ -515,6 +553,32 @@ ARISTON_NUMBER_TYPES: tuple[AristonNumberEntityDescription, ...] = (
         getter=AristonVelisDevice.get_water_heater_maximum_setpoint_temperature,
         setter=AristonEvoDevice.async_set_max_setpoint_temp,
         system_types=[SystemType.VELIS],
+    ),
+    AristonNumberEntityDescription(
+        key=SlpDeviceSettings.SLP_MIN_SETPOINT_TEMPERATURE,
+        name=f"{NAME} min setpoint temperature",
+        icon="mdi:thermometer-low",
+        entity_category=EntityCategory.CONFIG,
+        min=AristonNuosSplitDevice.get_water_heater_minimum_setpoint_temperature_minimum,
+        max=AristonNuosSplitDevice.get_water_heater_minimum_setpoint_temperature_maximum,
+        native_step=1,
+        getter=AristonNuosSplitDevice.get_water_heater_minimum_setpoint_temperature,
+        setter=AristonNuosSplitDevice.async_set_min_setpoint_temp,
+        system_types=[SystemType.VELIS],
+        whe_types=[WheType.NuosSplit],
+    ),
+    AristonNumberEntityDescription(
+        key=NuosSplitProperties.REDUCED_TEMP,
+        name=f"{NAME} reduced temperature",
+        icon="mdi:thermometer-chevron-down",
+        entity_category=EntityCategory.CONFIG,
+        min=AristonNuosSplitDevice.get_water_heater_minimum_temperature,
+        max=AristonNuosSplitDevice.get_water_heater_maximum_temperature,
+        native_step=1,
+        getter=AristonNuosSplitDevice.get_water_heater_reduced_temperature,
+        setter=AristonNuosSplitDevice.async_set_water_heater_reduced_temperature,
+        system_types=[SystemType.VELIS],
+        whe_types=[WheType.NuosSplit],
     ),
     AristonNumberEntityDescription(
         key=ThermostatProperties.HEATING_FLOW_TEMP,
