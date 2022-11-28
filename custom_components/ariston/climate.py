@@ -37,6 +37,7 @@ async def async_setup_entry(
     if coordinator.device.are_device_features_available(
         ARISTON_CLIMATE_TYPE.device_features,
         ARISTON_CLIMATE_TYPE.system_types,
+        ARISTON_CLIMATE_TYPE.whe_types,
     ):
         for zone_number in coordinator.device.get_zone_numbers():
             ariston_climate.append(
