@@ -17,7 +17,7 @@ from homeassistant.components.sensor import (
 )
 from homeassistant.components.switch import SwitchEntityDescription
 from homeassistant.components.water_heater import WaterHeaterEntityEntityDescription
-from homeassistant.const import ENERGY_KILO_WATT_HOUR
+from homeassistant.const import UnitOfEnergy
 from homeassistant.helpers.entity import EntityCategory, EntityDescription
 
 from ariston.galevo_device import AristonGalevoDevice
@@ -232,7 +232,7 @@ ARISTON_SENSOR_TYPES: tuple[AristonSensorEntityDescription, ...] = (
         icon="mdi:cash",
         entity_category=EntityCategory.DIAGNOSTIC,
         device_class=SensorDeviceClass.ENERGY,
-        native_unit_of_measurement=ENERGY_KILO_WATT_HOUR,
+        native_unit_of_measurement=UnitOfEnergy.KILO_WATT_HOUR,
         device_features=[DeviceFeatures.HAS_METERING],
         coordinator=ENERGY_COORDINATOR,
         get_native_value=AristonGalevoDevice.get_gas_consumption_for_heating_last_month,
@@ -244,7 +244,7 @@ ARISTON_SENSOR_TYPES: tuple[AristonSensorEntityDescription, ...] = (
         icon="mdi:cash",
         entity_category=EntityCategory.DIAGNOSTIC,
         device_class=SensorDeviceClass.ENERGY,
-        native_unit_of_measurement=ENERGY_KILO_WATT_HOUR,
+        native_unit_of_measurement=UnitOfEnergy.KILO_WATT_HOUR,
         device_features=[DeviceFeatures.HAS_METERING],
         coordinator=ENERGY_COORDINATOR,
         get_native_value=AristonGalevoDevice.get_electricity_consumption_for_heating_last_month,
@@ -256,7 +256,7 @@ ARISTON_SENSOR_TYPES: tuple[AristonSensorEntityDescription, ...] = (
         icon="mdi:cash",
         entity_category=EntityCategory.DIAGNOSTIC,
         device_class=SensorDeviceClass.ENERGY,
-        native_unit_of_measurement=ENERGY_KILO_WATT_HOUR,
+        native_unit_of_measurement=UnitOfEnergy.KILO_WATT_HOUR,
         device_features=[DeviceFeatures.HAS_METERING, CustomDeviceFeatures.HAS_DHW],
         coordinator=ENERGY_COORDINATOR,
         get_native_value=AristonGalevoDevice.get_gas_consumption_for_water_last_month,
@@ -268,7 +268,7 @@ ARISTON_SENSOR_TYPES: tuple[AristonSensorEntityDescription, ...] = (
         icon="mdi:cash",
         entity_category=EntityCategory.DIAGNOSTIC,
         device_class=SensorDeviceClass.ENERGY,
-        native_unit_of_measurement=ENERGY_KILO_WATT_HOUR,
+        native_unit_of_measurement=UnitOfEnergy.KILO_WATT_HOUR,
         device_features=[DeviceFeatures.HAS_METERING, CustomDeviceFeatures.HAS_DHW],
         coordinator=ENERGY_COORDINATOR,
         get_native_value=AristonGalevoDevice.get_electricity_consumption_for_water_last_month,
@@ -281,7 +281,7 @@ ARISTON_SENSOR_TYPES: tuple[AristonSensorEntityDescription, ...] = (
         entity_category=EntityCategory.DIAGNOSTIC,
         state_class=SensorStateClass.TOTAL,
         device_class=SensorDeviceClass.ENERGY,
-        native_unit_of_measurement=ENERGY_KILO_WATT_HOUR,
+        native_unit_of_measurement=UnitOfEnergy.KILO_WATT_HOUR,
         device_features=[
             DeviceFeatures.HAS_METERING,
             ConsumptionType.CENTRAL_HEATING_TOTAL_ENERGY.name,
@@ -297,7 +297,7 @@ ARISTON_SENSOR_TYPES: tuple[AristonSensorEntityDescription, ...] = (
         entity_category=EntityCategory.DIAGNOSTIC,
         state_class=SensorStateClass.TOTAL,
         device_class=SensorDeviceClass.ENERGY,
-        native_unit_of_measurement=ENERGY_KILO_WATT_HOUR,
+        native_unit_of_measurement=UnitOfEnergy.KILO_WATT_HOUR,
         device_features=[
             DeviceFeatures.HAS_METERING,
             ConsumptionType.DOMESTIC_HOT_WATER_TOTAL_ENERGY.name,
@@ -313,7 +313,7 @@ ARISTON_SENSOR_TYPES: tuple[AristonSensorEntityDescription, ...] = (
         entity_category=EntityCategory.DIAGNOSTIC,
         state_class=SensorStateClass.TOTAL,
         device_class=SensorDeviceClass.ENERGY,
-        native_unit_of_measurement=ENERGY_KILO_WATT_HOUR,
+        native_unit_of_measurement=UnitOfEnergy.KILO_WATT_HOUR,
         device_features=[
             DeviceFeatures.HAS_METERING,
             ConsumptionType.CENTRAL_HEATING_GAS.name,
@@ -329,7 +329,7 @@ ARISTON_SENSOR_TYPES: tuple[AristonSensorEntityDescription, ...] = (
         entity_category=EntityCategory.DIAGNOSTIC,
         state_class=SensorStateClass.TOTAL,
         device_class=SensorDeviceClass.ENERGY,
-        native_unit_of_measurement=ENERGY_KILO_WATT_HOUR,
+        native_unit_of_measurement=UnitOfEnergy.KILO_WATT_HOUR,
         device_features=[
             DeviceFeatures.HAS_METERING,
             ConsumptionType.DOMESTIC_HOT_WATER_HEATING_PUMP_ELECTRICITY.name,
@@ -345,7 +345,7 @@ ARISTON_SENSOR_TYPES: tuple[AristonSensorEntityDescription, ...] = (
         entity_category=EntityCategory.DIAGNOSTIC,
         state_class=SensorStateClass.TOTAL,
         device_class=SensorDeviceClass.ENERGY,
-        native_unit_of_measurement=ENERGY_KILO_WATT_HOUR,
+        native_unit_of_measurement=UnitOfEnergy.KILO_WATT_HOUR,
         device_features=[
             DeviceFeatures.HAS_METERING,
             ConsumptionType.DOMESTIC_HOT_WATER_RESISTOR_ELECTRICITY.name,
@@ -361,7 +361,7 @@ ARISTON_SENSOR_TYPES: tuple[AristonSensorEntityDescription, ...] = (
         entity_category=EntityCategory.DIAGNOSTIC,
         state_class=SensorStateClass.TOTAL,
         device_class=SensorDeviceClass.ENERGY,
-        native_unit_of_measurement=ENERGY_KILO_WATT_HOUR,
+        native_unit_of_measurement=UnitOfEnergy.KILO_WATT_HOUR,
         device_features=[
             DeviceFeatures.HAS_METERING,
             ConsumptionType.DOMESTIC_HOT_WATER_GAS.name,
@@ -377,7 +377,7 @@ ARISTON_SENSOR_TYPES: tuple[AristonSensorEntityDescription, ...] = (
         entity_category=EntityCategory.DIAGNOSTIC,
         state_class=SensorStateClass.TOTAL,
         device_class=SensorDeviceClass.ENERGY,
-        native_unit_of_measurement=ENERGY_KILO_WATT_HOUR,
+        native_unit_of_measurement=UnitOfEnergy.KILO_WATT_HOUR,
         device_features=[
             DeviceFeatures.HAS_METERING,
             ConsumptionType.CENTRAL_HEATING_ELECTRICITY.name,
@@ -393,7 +393,7 @@ ARISTON_SENSOR_TYPES: tuple[AristonSensorEntityDescription, ...] = (
         entity_category=EntityCategory.DIAGNOSTIC,
         state_class=SensorStateClass.TOTAL,
         device_class=SensorDeviceClass.ENERGY,
-        native_unit_of_measurement=ENERGY_KILO_WATT_HOUR,
+        native_unit_of_measurement=UnitOfEnergy.KILO_WATT_HOUR,
         device_features=[
             DeviceFeatures.HAS_METERING,
             ConsumptionType.DOMESTIC_HOT_WATER_ELECTRICITY.name,
