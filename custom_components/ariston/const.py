@@ -224,7 +224,7 @@ ARISTON_SENSOR_TYPES: tuple[AristonSensorEntityDescription, ...] = (
         get_native_value=AristonEvoLydosDevice.get_av_shw_value,
         get_native_unit_of_measurement=AristonVelisDevice.get_empty_unit,
         system_types=[SystemType.VELIS],
-        whe_types=[WheType.Evo, WheType.LydosHybrid],
+        whe_types=[WheType.Evo, WheType.Evo2, WheType.LydosHybrid],
     ),
     AristonSensorEntityDescription(
         key="Gas consumption for heating last month",
@@ -410,7 +410,7 @@ ARISTON_SENSOR_TYPES: tuple[AristonSensorEntityDescription, ...] = (
         get_native_value=AristonEvoDevice.get_rm_tm_value,
         get_native_unit_of_measurement=AristonVelisDevice.get_empty_unit,
         system_types=[SystemType.VELIS],
-        whe_types=[WheType.Evo],
+        whe_types=[WheType.Evo, WheType.Evo2],
     ),
     AristonSensorEntityDescription(
         key=SlpDeviceSettings.SLP_HEATING_RATE,
@@ -451,7 +451,7 @@ ARISTON_BINARY_SENSOR_TYPES: tuple[AristonBinarySensorEntityDescription, ...] = 
         icon="mdi:fire",
         get_is_on=AristonEvoLydosDevice.get_is_heating,
         system_types=[SystemType.VELIS],
-        whe_types=[WheType.Evo, WheType.LydosHybrid],
+        whe_types=[WheType.Evo, WheType.Evo2, WheType.LydosHybrid],
     ),
 )
 
@@ -472,7 +472,7 @@ ARISTON_SWITCH_TYPES: tuple[AristonSwitchEntityDescription, ...] = (
         setter=AristonEvoDevice.async_set_eco_mode,
         getter=AristonEvoDevice.get_water_heater_eco_value,
         system_types=[SystemType.VELIS],
-        whe_types=[WheType.Evo],
+        whe_types=[WheType.Evo, WheType.Evo2],
     ),
     AristonSwitchEntityDescription(
         key=VelisDeviceProperties.ON,
