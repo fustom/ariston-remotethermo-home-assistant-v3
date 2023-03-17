@@ -1,7 +1,7 @@
 {
   "config": {
     "abort": {
-      "already_configured": "Пристрій уже налаштовано",
+      "already_configured": "Пристрій вже налаштовано",
       "reauth_successful": "Повторна автентифікація пройшла успішно"
     },
     "error": {
@@ -22,7 +22,7 @@
     "step": {
       "init": {
         "data": {
-          "extra_energy_features": "Суб’єкти, пов’язані з додатковою енергетикою",
+          "extra_energy_features": "Об'єкти, пов’язані з додатковою енергетикою",
           "scan_interval": "Інтервал сканування зон (секунд)",
           "energy_scan_interval": "Інтервал сканування енергії (хвилини)"
         },
