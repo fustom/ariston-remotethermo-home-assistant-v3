@@ -438,6 +438,7 @@ ARISTON_BINARY_SENSOR_TYPES: tuple[AristonBinarySensorEntityDescription, ...] = 
         name=f"{NAME} is heating pump on",
         icon="mdi:heat-pump-outline",
         get_is_on=AristonGalevoDevice.get_is_heating_pump_on_value,
+        device_features=[DeviceFeatures.HYBRID_SYS],
         system_types=[SystemType.GALEVO],
     ),
     AristonBinarySensorEntityDescription(
