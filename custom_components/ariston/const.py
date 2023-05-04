@@ -17,7 +17,7 @@ from homeassistant.components.sensor import (
 )
 from homeassistant.components.switch import SwitchEntityDescription
 from homeassistant.components.water_heater import WaterHeaterEntityEntityDescription
-from homeassistant.const import UnitOfEnergy
+from homeassistant.const import UnitOfEnergy, UnitOfTime
 from homeassistant.helpers.entity import EntityCategory, EntityDescription
 
 from ariston.galevo_device import AristonGalevoDevice
@@ -408,8 +408,8 @@ ARISTON_SENSOR_TYPES: tuple[AristonSensorEntityDescription, ...] = (
         name=f"{NAME} remaining time",
         icon="mdi:timer",
         state_class=SensorStateClass.MEASUREMENT,
-        get_native_value=AristonEvoDevice.get_rm_tm_value,
-        get_native_unit_of_measurement=AristonVelisDevice.get_empty_unit,
+        get_native_value=AristonEvoDevice.get_rm_tm_in_minutes,
+        native_unit_of_measurement=UnitOfTime.MINUTES,
         system_types=[SystemType.VELIS],
         whe_types=[WheType.Lux, WheType.Evo, WheType.Evo2],
     ),
