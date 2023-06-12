@@ -39,11 +39,11 @@ class AristonEntity(CoordinatorEntity, ABC):
     def device_info(self) -> DeviceInfo:
         """Return device specific attributes."""
         return DeviceInfo(
-            identifiers={(DOMAIN, self.device.get_serial_number())},
+            identifiers={(DOMAIN, self.device.serial_number)},
             manufacturer=DOMAIN,
-            name=self.device.get_name(),
-            sw_version=self.device.get_firmware_version(),
-            model=self.device.get_system_type().name,
+            name=self.device.name,
+            sw_version=self.device.firmware_version,
+            model=self.device.system_type.name,
         )
 
     @property
@@ -72,4 +72,4 @@ class AristonEntity(CoordinatorEntity, ABC):
     @property
     def unique_id(self):
         """Return the unique id."""
-        return f"{self.device.get_gateway()}-{self.name}"
+        return f"{self.device.gateway}-{self.name}"

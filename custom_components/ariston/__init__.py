@@ -95,7 +95,7 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
 
         await coordinator.async_config_entry_first_refresh()
 
-        if device.get_has_metering():
+        if device.has_metering:
             energy_interval_minutes = entry.options.get(
                 ENERGY_SCAN_INTERVAL, DEFAULT_ENERGY_SCAN_INTERVAL_MINUTES
             )
@@ -113,7 +113,7 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
 
         entry.async_on_unload(entry.add_update_listener(update_listener))
 
-        if device.get_system_type() == SystemType.GALEVO:
+        if device.system_type == SystemType.GALEVO:
 
             async def async_set_item_by_id_service(service_call):
                 """Create a vacation on the target device."""
