@@ -100,4 +100,4 @@ class AristonBinarySensor(AristonEntity, BinarySensorEntity):
     @property
     def is_on(self):
         """Return True if the binary sensor is on."""
-        return getattr(self.device, self.entity_description.get_is_on.__name__)()
+        return self.entity_description.get_is_on(self)

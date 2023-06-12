@@ -58,16 +58,13 @@ class AristonSensor(AristonEntity, SensorEntity):
     @property
     def native_value(self):
         """Return value of sensor."""
-        return getattr(self.device, self.entity_description.get_native_value.__name__)()
+        return self.entity_description.get_native_value(self)
 
     @property
     def native_unit_of_measurement(self):
         """Return the nateive unit of measurement"""
         if self.entity_description.get_native_unit_of_measurement is not None:
-            return getattr(
-                self.device,
-                self.entity_description.get_native_unit_of_measurement.__name__,
-            )()
+            return self.entity_description.get_native_unit_of_measurement(self)
 
         if self.entity_description.native_unit_of_measurement is not None:
             return self.entity_description.native_unit_of_measurement
@@ -75,7 +72,4 @@ class AristonSensor(AristonEntity, SensorEntity):
     @property
     def last_reset(self) -> datetime | None:
         if self.entity_description.get_last_reset is not None:
-            return getattr(
-                self.device,
-                self.entity_description.get_last_reset.__name__,
-            )()
+            return self.entity_description.get_last_reset(self)
