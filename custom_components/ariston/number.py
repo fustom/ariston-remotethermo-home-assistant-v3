@@ -10,6 +10,7 @@ from homeassistant.config_entries import ConfigEntry
 from .entity import AristonEntity
 from .const import ARISTON_NUMBER_TYPES, DOMAIN, AristonNumberEntityDescription
 from .coordinator import DeviceDataUpdateCoordinator
+from ariston.const import SystemType
 
 _LOGGER = logging.getLogger(__name__)
 
@@ -27,7 +28,7 @@ async def async_setup_entry(
         if coordinator.device.are_device_features_available(
             description.device_features, description.system_types, description.whe_types
         ):
-            if description.zone:
+            if coordinator.device.get_system_type() == SystemType.GALEVO:
                 for zone_number in coordinator.device.get_zone_numbers():
                     ariston_numbers.append(
                         AristonNumber(
@@ -56,61 +57,40 @@ class AristonNumber(AristonEntity, NumberEntity):
     @property
     def name(self):
         """Return the name of the entity"""
-        if self.entity_description.zone:
+        if self.zone:
             return f"{self.entity_description.name} {self.zone}"
         return self.entity_description.name
 
     @property
     def native_value(self):
         """Return the current value"""
-        if self.entity_description.zone:
-            return getattr(self.device, self.entity_description.getter.__name__)(
-                self.zone
-            )
-        return getattr(self.device, self.entity_description.getter.__name__)()
+        return self.entity_description.get_native_value(self)
 
     @property
     def native_min_value(self):
         """Return the minimum value"""
-        if self.entity_description.min is not None:
-            if self.entity_description.zone:
-                return getattr(self.device, self.entity_description.min.__name__)(
-                    self.zone
-                )
-            return getattr(self.device, self.entity_description.min.__name__)()
+        if self.entity_description.get_native_min_value is not None:
+            return self.entity_description.get_native_min_value(self)
 
         return self.entity_description.native_min_value
 
     @property
     def native_max_value(self):
         """Return the maximum value"""
-        if self.entity_description.max is not None:
-            if self.entity_description.zone:
-                return getattr(self.device, self.entity_description.max.__name__)(
-                    self.zone
-                )
-            return getattr(self.device, self.entity_description.max.__name__)()
+        if self.entity_description.get_native_max_value is not None:
+            return self.entity_description.get_native_max_value(self)
 
         return self.entity_description.native_max_value
 
     @property
     def native_step(self):
         """Return the step value"""
-        if self.entity_description.getstep is not None:
-            if self.entity_description.zone:
-                return getattr(self.device, self.entity_description.getstep.__name__)(
-                    self.zone
-                )
-            return getattr(self.device, self.entity_description.getstep.__name__)()
+        if self.entity_description.get_native_step is not None:
+            return self.entity_description.get_native_step(self)
 
         return self.entity_description.native_step
 
     async def async_set_native_value(self, value: float):
         """Update the current value."""
-        if self.entity_description.zone:
-            await getattr(self.device, self.entity_description.setter.__name__)(
-                value, self.zone
-            )
-        else:
-            await getattr(self.device, self.entity_description.setter.__name__)(value)
+        await self.entity_description.set_native_value(self, value)
         self.async_write_ha_state()

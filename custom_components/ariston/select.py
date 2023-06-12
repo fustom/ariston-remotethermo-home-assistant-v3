@@ -54,13 +54,13 @@ class AristonSelect(AristonEntity, SelectEntity):
     @property
     def current_option(self):
         """Return current selected option."""
-        return getattr(self.device, self.entity_description.getter.__name__)()
+        return self.entity_description.get_current_option(self)
 
     @property
     def options(self):
         """Return options"""
-        return getattr(self.device, self.entity_description.get_options.__name__)()
+        return self.entity_description.get_options(self)
 
     async def async_select_option(self, option: str):
-        await getattr(self.device, self.entity_description.setter.__name__)(option)
+        await self.entity_description.select_option(self, option)
         self.async_write_ha_state()

@@ -51,14 +51,14 @@ class AristonSwitch(AristonEntity, SwitchEntity):
     @property
     def is_on(self):
         """Return true if switch is on."""
-        return getattr(self.device, self.entity_description.getter.__name__)()
+        return self.entity_description.get_is_on(self)
 
     async def async_turn_on(self, **kwargs) -> None:
         """Turn the switch on."""
-        await getattr(self.device, self.entity_description.setter.__name__)(True)
+        await self.entity_description.set_value(self, True)
         self.async_write_ha_state()
 
     async def async_turn_off(self, **kwargs) -> None:
         """Turn the device off."""
-        await getattr(self.device, self.entity_description.setter.__name__)(False)
+        await self.entity_description.set_value(self, False)
         self.async_write_ha_state()

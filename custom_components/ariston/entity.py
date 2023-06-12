@@ -60,8 +60,7 @@ class AristonEntity(CoordinatorEntity, ABC):
             if device_method is None:
                 continue
 
-            method = getattr(self.device, device_method.__name__)
-            state_attribute = method() if self.zone is None else method(self.zone)
+            state_attribute = device_method(self)
 
             if state_attribute is None:
                 continue
