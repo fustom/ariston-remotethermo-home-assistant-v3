@@ -39,7 +39,7 @@ async def async_setup_entry(
         ARISTON_CLIMATE_TYPE.system_types,
         ARISTON_CLIMATE_TYPE.whe_types,
     ):
-        for zone_number in coordinator.device.get_zone_numbers():
+        for zone_number in coordinator.device.zone_numbers:
             ariston_climate.append(
                 AristonThermostat(
                     zone_number,
@@ -64,12 +64,12 @@ class AristonThermostat(AristonEntity, ClimateEntity):
     @property
     def name(self) -> str:
         """Return the name of the device."""
-        return f"{self.device.get_name()}"
+        return f"{self.device.name}"
 
     @property
     def unique_id(self) -> str:
         """Return a unique id for the device."""
-        return f"{self.device.get_gateway()}_{self.zone}"
+        return f"{self.device.gateway}_{self.zone}"
 
     @property
     def icon(self):
@@ -124,12 +124,12 @@ class AristonThermostat(AristonEntity, ClimateEntity):
         """Return the current HVAC mode for the device."""
         curr_hvac_mode = HVACMode.OFF
 
-        if self.device.is_plant_in_heat_mode():
+        if self.device.is_plant_in_heat_mode:
             if self.device.is_zone_in_manual_mode(self.zone):
                 curr_hvac_mode = HVACMode.HEAT
             elif self.device.is_zone_in_time_program_mode(self.zone):
                 curr_hvac_mode = HVACMode.AUTO
-        if self.device.is_plant_in_cool_mode():
+        if self.device.is_plant_in_cool_mode:
             if self.device.is_zone_in_manual_mode(self.zone):
                 curr_hvac_mode = HVACMode.COOL
             elif self.device.is_zone_in_time_program_mode(self.zone):
@@ -142,7 +142,7 @@ class AristonThermostat(AristonEntity, ClimateEntity):
         supported_modes = []
         if self.device.is_zone_mode_options_contains_manual(self.zone):
             supported_modes.append(HVACMode.HEAT)
-            if self.device.is_plant_mode_options_contains_cooling():
+            if self.device.is_plant_mode_options_contains_cooling:
                 supported_modes.append(HVACMode.COOL)
         if self.device.is_zone_mode_options_contains_time_program(self.zone):
             supported_modes.append(HVACMode.AUTO)
@@ -154,15 +154,15 @@ class AristonThermostat(AristonEntity, ClimateEntity):
     @property
     def hvac_action(self):
         """Return the current running hvac operation."""
-        if_flame_on = self.device.get_is_flame_on_value() == 1
+        if_flame_on = self.device.is_flame_on_value == 1
 
         curr_hvac_action = HVACAction.OFF
-        if self.device.is_plant_in_heat_mode():
+        if self.device.is_plant_in_heat_mode:
             if if_flame_on:
                 curr_hvac_action = HVACAction.HEATING
             else:
                 curr_hvac_action = HVACAction.IDLE
-        if self.device.is_plant_in_cool_mode():
+        if self.device.is_plant_in_cool_mode:
             if if_flame_on:
                 curr_hvac_action = HVACAction.COOLING
             else:
@@ -172,18 +172,18 @@ class AristonThermostat(AristonEntity, ClimateEntity):
     @property
     def preset_mode(self) -> str:
         """Return the current preset mode, e.g., home, away, temp."""
-        return self.device.get_plant_mode_text()
+        return self.device.plant_mode_text
 
     @property
     def preset_modes(self) -> list[str]:
         """Return a list of available preset modes."""
-        return self.device.get_plant_mode_opt_texts()
+        return self.device.plant_mode_opt_texts
 
     async def async_set_hvac_mode(self, hvac_mode):
         """Set new target hvac mode."""
-        plant_modes = self.device.get_plant_mode_options()
+        plant_modes = self.device.plant_mode_options
         zone_modes = self.device.get_zone_mode_options(self.zone)
-        current_plant_mode = self.device.get_plant_mode()
+        current_plant_mode = self.device.plant_mode
 
         if hvac_mode == HVACMode.OFF:
             if self.device.is_plant_mode_options_contains_off():
@@ -242,7 +242,7 @@ class AristonThermostat(AristonEntity, ClimateEntity):
         )
 
         await self.device.async_set_plant_mode(
-            PlantMode(self.device.get_plant_mode_opt_texts().index(preset_mode)),
+            PlantMode(self.device.plant_mode_opt_texts.index(preset_mode)),
         )
         self.async_write_ha_state()
 

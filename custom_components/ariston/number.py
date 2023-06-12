@@ -28,8 +28,8 @@ async def async_setup_entry(
         if coordinator.device.are_device_features_available(
             description.device_features, description.system_types, description.whe_types
         ):
-            if coordinator.device.get_system_type() == SystemType.GALEVO:
-                for zone_number in coordinator.device.get_zone_numbers():
+            if coordinator.device.system_type == SystemType.GALEVO:
+                for zone_number in coordinator.device.zone_numbers:
                     ariston_numbers.append(
                         AristonNumber(
                             coordinator,

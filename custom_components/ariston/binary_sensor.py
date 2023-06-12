@@ -55,7 +55,7 @@ async def async_setup_entry(
 
     async_add_entities(ariston_binary_sensors)
 
-    if coordinator.device.get_system_type() == SystemType.GALEVO:
+    if coordinator.device.system_type == SystemType.GALEVO:
 
         async def async_create_vacation_service(service_call):
             """Create a vacation on the target device."""
