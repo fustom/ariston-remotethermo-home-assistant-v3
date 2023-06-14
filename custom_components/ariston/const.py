@@ -653,7 +653,7 @@ ARISTON_SELECT_TYPES: list[AristonSelectEntityDescription] = (
         device_features=[DeviceFeatures.HAS_METERING],
         coordinator=ENERGY_COORDINATOR,
         get_current_option=lambda entity: entity.device.currency,
-        get_options=lambda entity: entity.device.currencies,
+        get_options=lambda entity: entity.device.get_currencies(),
         select_option=lambda entity, option: entity.device.async_set_currency(option),
         system_types=[SystemType.GALEVO],
     ),
@@ -665,7 +665,7 @@ ARISTON_SELECT_TYPES: list[AristonSelectEntityDescription] = (
         device_features=[DeviceFeatures.HAS_METERING],
         coordinator=ENERGY_COORDINATOR,
         get_current_option=lambda entity: entity.device.gas_type,
-        get_options=lambda entity: entity.device.gas_types,
+        get_options=lambda entity: entity.device.get_gas_types(),
         select_option=lambda entity, option: entity.device.async_set_gas_type(option),
         system_types=[SystemType.GALEVO],
     ),
@@ -677,7 +677,7 @@ ARISTON_SELECT_TYPES: list[AristonSelectEntityDescription] = (
         device_features=[DeviceFeatures.HAS_METERING],
         coordinator=ENERGY_COORDINATOR,
         get_current_option=lambda entity: entity.device.gas_energy_unit,
-        get_options=lambda entity: entity.device.gas_energy_units,
+        get_options=lambda entity: entity.device.get_gas_energy_units(),
         select_option=lambda entity, option: entity.device.async_set_gas_energy_unit(
             option
         ),
