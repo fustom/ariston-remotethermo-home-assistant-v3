@@ -40,7 +40,7 @@ class AristonConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
 
     VERSION = 1
 
-    def __init__(self):
+    def __init__(self) -> None:
         self.cloud_username: str | None = None
         self.cloud_password: str | None = None
         self.cloud_devices = {}
@@ -141,7 +141,7 @@ class AristonConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
 class AristonOptionsFlow(config_entries.OptionsFlow):
     """Handle Ariston options."""
 
-    def __init__(self, config_entry):
+    def __init__(self, config_entry) -> None:
         """Initialize Ariston options flow."""
         self.config_entry = config_entry
 
