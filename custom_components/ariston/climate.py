@@ -74,7 +74,7 @@ class AristonThermostat(AristonEntity, ClimateEntity):
     @property
     def icon(self):
         """Return the icon of the thermostat device."""
-        if self.device.is_plant_in_heat_mode():
+        if self.device.is_plant_in_heat_mode:
             return "mdi:radiator"
         else:
             return "mdi:radiator-off"
@@ -154,7 +154,7 @@ class AristonThermostat(AristonEntity, ClimateEntity):
     @property
     def hvac_action(self):
         """Return the current running hvac operation."""
-        if_flame_on = self.device.is_flame_on_value == 1
+        if_flame_on = self.device.is_flame_on_value is True
 
         curr_hvac_action = HVACAction.OFF
         if self.device.is_plant_in_heat_mode:
@@ -186,7 +186,7 @@ class AristonThermostat(AristonEntity, ClimateEntity):
         current_plant_mode = self.device.plant_mode
 
         if hvac_mode == HVACMode.OFF:
-            if self.device.is_plant_mode_options_contains_off():
+            if self.device.is_plant_mode_options_contains_off:
                 await self.device.async_set_plant_mode(PlantMode.OFF)
             else:
                 await self.device.async_set_plant_mode(PlantMode.SUMMER)
