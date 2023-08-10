@@ -4,7 +4,11 @@ from __future__ import annotations
 import logging
 
 from .entity import AristonEntity
-from .const import ARISTON_CLIMATE_TYPE, COORDINATOR, DOMAIN
+from .const import (
+    ARISTON_CLIMATE_TYPES,
+    DOMAIN,
+    AristonClimateEntityDescription,
+)
 from .coordinator import DeviceDataUpdateCoordinator
 
 from ariston import PlantMode, ZoneMode
@@ -21,33 +25,32 @@ from homeassistant.components.climate import (
 
 _LOGGER = logging.getLogger(__name__)
 
-SUPPORT_FLAGS = (
-    ClimateEntityFeature.TARGET_TEMPERATURE | ClimateEntityFeature.PRESET_MODE
-)
-
 
 async def async_setup_entry(
     hass: HomeAssistant, entry: ConfigEntry, async_add_entities
 ):
     """Set up the Ariston device from config entry."""
-    coordinator: DeviceDataUpdateCoordinator = hass.data[DOMAIN][entry.unique_id][
-        COORDINATOR
-    ]
-    ariston_climate: list[ClimateEntity] = []
-    if coordinator.device.are_device_features_available(
-        ARISTON_CLIMATE_TYPE.device_features,
-        ARISTON_CLIMATE_TYPE.system_types,
-        ARISTON_CLIMATE_TYPE.whe_types,
-    ):
-        for zone_number in coordinator.device.zone_numbers:
-            ariston_climate.append(
-                AristonThermostat(
-                    zone_number,
-                    coordinator,
-                )
-            )
+    ariston_climates: list[ClimateEntity] = []
 
-    async_add_entities(ariston_climate)
+    for description in ARISTON_CLIMATE_TYPES:
+        coordinator: DeviceDataUpdateCoordinator = hass.data[DOMAIN][entry.unique_id][
+            description.coordinator
+        ]
+        if coordinator.device.are_device_features_available(
+            description.device_features,
+            description.system_types,
+            description.whe_types,
+        ):
+            for zone_number in coordinator.device.zone_numbers:
+                ariston_climates.append(
+                    AristonThermostat(
+                        zone_number,
+                        coordinator,
+                        description,
+                    )
+                )
+
+    async_add_entities(ariston_climates)
 
 
 class AristonThermostat(AristonEntity, ClimateEntity):
@@ -57,9 +60,10 @@ class AristonThermostat(AristonEntity, ClimateEntity):
         self,
         zone: int,
         coordinator: DeviceDataUpdateCoordinator,
+        description: AristonClimateEntityDescription,
     ) -> None:
         """Initialize the thermostat"""
-        super().__init__(coordinator, ARISTON_CLIMATE_TYPE, zone)
+        super().__init__(coordinator, description, zone)
 
     @property
     def name(self) -> str:
@@ -117,7 +121,11 @@ class AristonThermostat(AristonEntity, ClimateEntity):
     @property
     def supported_features(self) -> int:
         """Return the supported features for this device integration."""
-        return SUPPORT_FLAGS
+        return (
+            ClimateEntityFeature.TARGET_TEMPERATURE | ClimateEntityFeature.PRESET_MODE
+            if self.device.plant_mode_supported
+            else ClimateEntityFeature.TARGET_TEMPERATURE
+        )
 
     @property
     def hvac_mode(self) -> str:
@@ -142,8 +150,9 @@ class AristonThermostat(AristonEntity, ClimateEntity):
         supported_modes = []
         if self.device.is_zone_mode_options_contains_manual(self.zone):
             supported_modes.append(HVACMode.HEAT)
-            if self.device.is_plant_mode_options_contains_cooling:
-                supported_modes.append(HVACMode.COOL)
+            if self.device.plant_mode_supported:
+                if self.device.is_plant_mode_options_contains_cooling:
+                    supported_modes.append(HVACMode.COOL)
         if self.device.is_zone_mode_options_contains_time_program(self.zone):
             supported_modes.append(HVACMode.AUTO)
         if self.device.is_zone_mode_options_contains_off(self.zone):
@@ -181,56 +190,64 @@ class AristonThermostat(AristonEntity, ClimateEntity):
 
     async def async_set_hvac_mode(self, hvac_mode):
         """Set new target hvac mode."""
-        plant_modes = self.device.plant_mode_options
-        zone_modes = self.device.get_zone_mode_options(self.zone)
-        current_plant_mode = self.device.plant_mode
+        if self.device.plant_mode_supported:
+            plant_modes = self.device.plant_mode_options
+            zone_modes = self.device.get_zone_mode_options(self.zone)
+            current_plant_mode = self.device.plant_mode
 
-        if hvac_mode == HVACMode.OFF:
-            if self.device.is_plant_mode_options_contains_off:
-                await self.device.async_set_plant_mode(PlantMode.OFF)
-            else:
-                await self.device.async_set_plant_mode(PlantMode.SUMMER)
-        elif hvac_mode == HVACMode.AUTO:
-            if current_plant_mode in [
-                PlantMode.WINTER,
-                PlantMode.HEATING_ONLY,
-                PlantMode.COOLING,
-            ]:
-                # if already heating or cooling just change CH mode
-                pass
-            elif current_plant_mode == PlantMode.SUMMER:
-                # DHW is working, so use Winter where CH and DHW are active
-                await self.device.async_set_plant_mode(PlantMode.WINTER)
-            else:
-                # hvac is OFF, so use heating only, if not supported then winter
-                if PlantMode.HEATING_ONLY in plant_modes:
-                    await self.device.async_set_plant_mode(PlantMode.HEATING_ONLY)
+            if hvac_mode == HVACMode.OFF:
+                if self.device.is_plant_mode_options_contains_off:
+                    await self.device.async_set_plant_mode(PlantMode.OFF)
                 else:
+                    await self.device.async_set_plant_mode(PlantMode.SUMMER)
+            elif hvac_mode == HVACMode.AUTO:
+                if current_plant_mode in [
+                    PlantMode.WINTER,
+                    PlantMode.HEATING_ONLY,
+                    PlantMode.COOLING,
+                ]:
+                    # if already heating or cooling just change CH mode
+                    pass
+                elif current_plant_mode == PlantMode.SUMMER:
+                    # DHW is working, so use Winter where CH and DHW are active
                     await self.device.async_set_plant_mode(PlantMode.WINTER)
-            await self.device.async_set_zone_mode(ZoneMode.TIME_PROGRAM, self.zone)
-        elif hvac_mode == HVACMode.HEAT:
-            if current_plant_mode in [PlantMode.WINTER, PlantMode.HEATING_ONLY]:
-                # if already heating, change CH mode
-                pass
-            elif current_plant_mode in [PlantMode.SUMMER, PlantMode.COOLING]:
-                # DHW is working, so use Winter and change mode
-                await self.device.async_set_plant_mode(PlantMode.WINTER)
-            else:
-                # hvac is OFF, so use heating only, if not supported then winter
-                if PlantMode.HEATING_ONLY in plant_modes:
-                    await self.device.async_set_plant_mode(PlantMode.HEATING_ONLY)
                 else:
+                    # hvac is OFF, so use heating only, if not supported then winter
+                    if PlantMode.HEATING_ONLY in plant_modes:
+                        await self.device.async_set_plant_mode(PlantMode.HEATING_ONLY)
+                    else:
+                        await self.device.async_set_plant_mode(PlantMode.WINTER)
+                await self.device.async_set_zone_mode(ZoneMode.TIME_PROGRAM, self.zone)
+            elif hvac_mode == HVACMode.HEAT:
+                if current_plant_mode in [PlantMode.WINTER, PlantMode.HEATING_ONLY]:
+                    # if already heating, change CH mode
+                    pass
+                elif current_plant_mode in [PlantMode.SUMMER, PlantMode.COOLING]:
+                    # DHW is working, so use Winter and change mode
                     await self.device.async_set_plant_mode(PlantMode.WINTER)
-            if ZoneMode.MANUAL_NIGHT in zone_modes:
-                await self.device.async_set_zone_mode(ZoneMode.MANUAL_NIGHT, self.zone)
-            else:
-                await self.device.async_set_zone_mode(ZoneMode.MANUAL, self.zone)
-        elif hvac_mode == HVACMode.COOL:
-            await self.device.async_set_plant_mode(PlantMode.COOLING)
-            if ZoneMode.MANUAL_NIGHT in zone_modes:
-                await self.device.async_set_zone_mode(ZoneMode.MANUAL_NIGHT, self.zone)
-            else:
-                await self.device.async_set_zone_mode(ZoneMode.MANUAL, self.zone)
+                else:
+                    # hvac is OFF, so use heating only, if not supported then winter
+                    if PlantMode.HEATING_ONLY in plant_modes:
+                        await self.device.async_set_plant_mode(PlantMode.HEATING_ONLY)
+                    else:
+                        await self.device.async_set_plant_mode(PlantMode.WINTER)
+                if ZoneMode.MANUAL_NIGHT in zone_modes:
+                    await self.device.async_set_zone_mode(
+                        ZoneMode.MANUAL_NIGHT, self.zone
+                    )
+                else:
+                    await self.device.async_set_zone_mode(ZoneMode.MANUAL, self.zone)
+            elif hvac_mode == HVACMode.COOL:
+                await self.device.async_set_plant_mode(PlantMode.COOLING)
+                if ZoneMode.MANUAL_NIGHT in zone_modes:
+                    await self.device.async_set_zone_mode(
+                        ZoneMode.MANUAL_NIGHT, self.zone
+                    )
+                else:
+                    await self.device.async_set_zone_mode(ZoneMode.MANUAL, self.zone)
+        else:
+            await self.device.async_set_zone_mode(hvac_mode, self.zone)
+
         self.async_write_ha_state()
 
     async def async_set_preset_mode(self, preset_mode):
