@@ -139,29 +139,35 @@ class AristonSelectEntityDescription(
     select_option: Callable[[AristonDevice, str], Coroutine] = None
 
 
-ARISTON_CLIMATE_TYPE = AristonClimateEntityDescription(
-    key="AristonClimate",
-    extra_states=[
-        {
-            EXTRA_STATE_ATTRIBUTE: ATTR_HEAT_REQUEST,
-            EXTRA_STATE_DEVICE_METHOD: lambda entity: entity.device.get_zone_heat_request_value(
-                entity.zone
-            ),
-        },
-        {
-            EXTRA_STATE_ATTRIBUTE: ATTR_ECONOMY_TEMP,
-            EXTRA_STATE_DEVICE_METHOD: lambda entity: entity.device.get_zone_economy_temp_value(
-                entity.zone
-            ),
-        },
-        {
-            EXTRA_STATE_ATTRIBUTE: ATTR_ZONE,
-            EXTRA_STATE_DEVICE_METHOD: lambda entity: entity.device.get_zone_number(
-                entity.zone
-            ),
-        },
-    ],
-    system_types=[SystemType.GALEVO],
+ARISTON_CLIMATE_TYPES: list[AristonClimateEntityDescription] = (
+    AristonClimateEntityDescription(
+        key="AristonClimate",
+        extra_states=[
+            {
+                EXTRA_STATE_ATTRIBUTE: ATTR_HEAT_REQUEST,
+                EXTRA_STATE_DEVICE_METHOD: lambda entity: entity.device.get_zone_heat_request_value(
+                    entity.zone
+                ),
+            },
+            {
+                EXTRA_STATE_ATTRIBUTE: ATTR_ECONOMY_TEMP,
+                EXTRA_STATE_DEVICE_METHOD: lambda entity: entity.device.get_zone_economy_temp_value(
+                    entity.zone
+                ),
+            },
+            {
+                EXTRA_STATE_ATTRIBUTE: ATTR_ZONE,
+                EXTRA_STATE_DEVICE_METHOD: lambda entity: entity.device.get_zone_number(
+                    entity.zone
+                ),
+            },
+        ],
+        system_types=[SystemType.GALEVO],
+    ),
+    AristonClimateEntityDescription(
+        key="AristonClimate",
+        system_types=[SystemType.BSB],
+    ),
 )
 
 ARISTON_WATER_HEATER_TYPES: list[AristonWaterHeaterEntityDescription] = (
