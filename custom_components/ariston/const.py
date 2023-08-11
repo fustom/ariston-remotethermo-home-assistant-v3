@@ -180,7 +180,7 @@ ARISTON_WATER_HEATER_TYPES: list[AristonWaterHeaterEntityDescription] = (
             }
         ],
         device_features=[CustomDeviceFeatures.HAS_DHW],
-        system_types=[SystemType.GALEVO, SystemType.VELIS],
+        system_types=[SystemType.GALEVO, SystemType.VELIS, SystemType.BSB],
     ),
 )
 
