@@ -24,8 +24,14 @@ async def async_setup_entry(
         coordinator: DeviceDataUpdateCoordinator = hass.data[DOMAIN][entry.unique_id][
             description.coordinator
         ]
-        if coordinator.device.are_device_features_available(
-            description.device_features, description.system_types, description.whe_types
+        if (
+            coordinator
+            and coordinator.device
+            and coordinator.device.are_device_features_available(
+                description.device_features,
+                description.system_types,
+                description.whe_types,
+            )
         ):
             ariston_switches.append(
                 AristonSwitch(
