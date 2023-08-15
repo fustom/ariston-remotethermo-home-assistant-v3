@@ -32,10 +32,7 @@ class DeviceDataUpdateCoordinator(DataUpdateCoordinator):
             _LOGGER,
             name=f"{DOMAIN}-{device.name}-{coordinator_name}",
             update_interval=timedelta(seconds=scan_interval_seconds),
+            update_method=async_update_state,
         )
 
         self.device = device
-        self.async_update_state = async_update_state
-
-    async def _async_update_data(self):
-        await self.async_update_state()
