@@ -221,7 +221,7 @@ ARISTON_SENSOR_TYPES: list[AristonSensorEntityDescription] = (
         device_features=[CustomDeviceFeatures.HAS_OUTSIDE_TEMP],
         get_native_value=lambda entity: entity.device.outside_temp_value,
         get_native_unit_of_measurement=lambda entity: entity.device.outside_temp_unit,
-        system_types=[SystemType.GALEVO],
+        system_types=[SystemType.GALEVO, SystemType.BSB],
     ),
     AristonSensorEntityDescription(
         key=EvoLydosDeviceProperties.AV_SHW,
