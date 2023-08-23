@@ -616,7 +616,9 @@ ARISTON_NUMBER_TYPES: list[AristonNumberEntityDescription] = (
         get_native_max_value=lambda entity: entity.device.get_heating_flow_temp_max(
             entity.zone
         ),
-        get_native_step=lambda entity: entity.get_heating_flow_temp_step(entity.zone),
+        get_native_step=lambda entity: entity.device.get_heating_flow_temp_step(
+            entity.zone
+        ),
         get_native_value=lambda entity: entity.device.get_heating_flow_temp_value(
             entity.zone
         ),
@@ -636,7 +638,9 @@ ARISTON_NUMBER_TYPES: list[AristonNumberEntityDescription] = (
         get_native_max_value=lambda entity: entity.device.get_heating_flow_offset_max(
             entity.zone
         ),
-        get_native_step=lambda entity: entity.get_heating_flow_offset_step(entity.zone),
+        get_native_step=lambda entity: entity.device.get_heating_flow_offset_step(
+            entity.zone
+        ),
         get_native_value=lambda entity: entity.device.get_heating_flow_offset_value(
             entity.zone
         ),
