@@ -11,6 +11,7 @@ from .const import (
 )
 from .coordinator import DeviceDataUpdateCoordinator
 
+from ariston.const import SystemType
 from homeassistant.core import HomeAssistant
 from homeassistant.config_entries import ConfigEntry
 from homeassistant.components.water_heater import (
@@ -108,12 +109,12 @@ class AristonWaterHeater(AristonEntity, WaterHeaterEntity):
     @property
     def supported_features(self) -> int:
         """Return the supported features for this device integration."""
+        features = WaterHeaterEntityFeature.TARGET_TEMPERATURE
         if self.device.dhw_mode_changeable:
-            return (
-                WaterHeaterEntityFeature.TARGET_TEMPERATURE
-                | WaterHeaterEntityFeature.OPERATION_MODE
-            )
-        return WaterHeaterEntityFeature.TARGET_TEMPERATURE
+            features |= WaterHeaterEntityFeature.OPERATION_MODE
+        if self.device.system_type == SystemType.VELIS:
+            features |= WaterHeaterEntityFeature.ON_OFF
+        return features
 
     @property
     def operation_list(self):
@@ -144,3 +145,11 @@ class AristonWaterHeater(AristonEntity, WaterHeaterEntity):
         """Set operation mode."""
         await self.device.async_set_water_heater_operation_mode(operation_mode)
         self.async_write_ha_state()
+
+    async def async_turn_off(self, **kwargs) -> None:
+        """Turn the water heater off."""
+        await self.device.async_set_power(False)
+
+    async def async_turn_on(self, **kwargs) -> None:
+        """Turn the water heater on."""
+        await self.device.async_set_power(True)
