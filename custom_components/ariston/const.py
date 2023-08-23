@@ -157,9 +157,7 @@ ARISTON_CLIMATE_TYPES: list[AristonClimateEntityDescription] = (
             },
             {
                 EXTRA_STATE_ATTRIBUTE: ATTR_ZONE,
-                EXTRA_STATE_DEVICE_METHOD: lambda entity: entity.device.get_zone_number(
-                    entity.zone
-                ),
+                EXTRA_STATE_DEVICE_METHOD: lambda entity: entity.zone,
             },
         ],
         system_types=[SystemType.GALEVO],
@@ -437,7 +435,7 @@ ARISTON_BINARY_SENSOR_TYPES: list[AristonBinarySensorEntityDescription] = (
         name=f"{NAME} is flame on",
         icon="mdi:fire",
         get_is_on=lambda entity: entity.device.is_flame_on_value,
-        system_types=[SystemType.GALEVO],
+        system_types=[SystemType.GALEVO, SystemType.BSB],
     ),
     AristonBinarySensorEntityDescription(
         key=DeviceProperties.IS_HEATING_PUMP_ON,
