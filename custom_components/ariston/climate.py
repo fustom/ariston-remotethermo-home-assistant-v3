@@ -11,7 +11,7 @@ from .const import (
 )
 from .coordinator import DeviceDataUpdateCoordinator
 
-from ariston import PlantMode, ZoneMode
+from ariston.const import PlantMode, ZoneMode
 
 from homeassistant.config_entries import ConfigEntry
 from homeassistant.core import HomeAssistant
