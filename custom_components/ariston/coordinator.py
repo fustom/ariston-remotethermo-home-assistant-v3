@@ -8,7 +8,7 @@ import logging
 from homeassistant.core import HomeAssistant
 from homeassistant.helpers.update_coordinator import DataUpdateCoordinator
 
-from ariston import AristonDevice
+from ariston.device import AristonDevice
 
 from .const import DOMAIN
 
