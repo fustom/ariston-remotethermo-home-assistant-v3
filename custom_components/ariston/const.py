@@ -235,6 +235,7 @@ ARISTON_SENSOR_TYPES: list[AristonSensorEntityDescription] = (
             WheType.Evo2,
             WheType.LydosHybrid,
             WheType.Andris2,
+            WheType.Lux2,
         ],
     ),
     AristonSensorEntityDescription(
@@ -421,7 +422,7 @@ ARISTON_SENSOR_TYPES: list[AristonSensorEntityDescription] = (
         get_native_value=lambda entity: entity.device.rm_tm_in_minutes,
         native_unit_of_measurement=UnitOfTime.MINUTES,
         system_types=[SystemType.VELIS],
-        whe_types=[WheType.Lux, WheType.Evo, WheType.Evo2],
+        whe_types=[WheType.Lux, WheType.Evo, WheType.Evo2, WheType.Lux2],
     ),
     AristonSensorEntityDescription(
         key=SlpDeviceSettings.SLP_HEATING_RATE,
@@ -476,6 +477,7 @@ ARISTON_BINARY_SENSOR_TYPES: list[AristonBinarySensorEntityDescription] = (
             WheType.Evo2,
             WheType.LydosHybrid,
             WheType.Andris2,
+            WheType.Lux2,
         ],
     ),
 )
@@ -499,7 +501,24 @@ ARISTON_SWITCH_TYPES: list[AristonSwitchEntityDescription] = (
         set_value=lambda entity, value: entity.device.async_set_eco_mode(value),
         get_is_on=lambda entity: entity.device.water_heater_eco_value,
         system_types=[SystemType.VELIS],
-        whe_types=[WheType.Lux, WheType.Evo, WheType.Evo2, WheType.Andris2],
+        whe_types=[
+            WheType.Lux,
+            WheType.Evo,
+            WheType.Evo2,
+            WheType.Andris2,
+            WheType.Lux2,
+        ],
+    ),
+    AristonSwitchEntityDescription(
+        key=EvoDeviceProperties.PWR_OPT,
+        name=f"{NAME} power option",
+        icon="mdi:leaf",
+        set_value=lambda entity, value: entity.device.async_set_water_heater_power_option(
+            value
+        ),
+        get_is_on=lambda entity: entity.device.water_heater_power_option_value,
+        system_types=[SystemType.VELIS],
+        whe_types=[WheType.Lux2],
     ),
     AristonSwitchEntityDescription(
         key=VelisDeviceProperties.ON,
