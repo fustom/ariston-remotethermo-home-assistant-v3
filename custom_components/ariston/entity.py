@@ -16,6 +16,8 @@ from .const import (
 )
 from .coordinator import DeviceDataUpdateCoordinator
 
+from ariston.const import WheType
+
 _LOGGER = logging.getLogger(__name__)
 
 
@@ -43,7 +45,11 @@ class AristonEntity(CoordinatorEntity, ABC):
             manufacturer=DOMAIN,
             name=self.device.name,
             sw_version=self.device.firmware_version,
-            model=self.device.system_type.name,
+            model=f"{self.device.system_type.name}"
+            if self.device.whe_type is WheType.Unknown
+            else f"{self.device.system_type.name} {self.device.whe_type.name}"
+            if self.device.whe_model_type == 0
+            else f"{self.device.system_type.name} {self.device.whe_type.name} | Model {self.device.whe_model_type}",
         )
 
     @property
