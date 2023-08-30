@@ -36,6 +36,7 @@ from ariston.const import (
     MedDeviceSettings,
     SystemType,
     WheType,
+    ARISTON_BUS_ERRORS,
 )
 
 DOMAIN: final = "ariston"
@@ -433,6 +434,15 @@ ARISTON_SENSOR_TYPES: list[AristonSensorEntityDescription] = (
         native_unit_of_measurement="",
         system_types=[SystemType.VELIS],
         whe_types=[WheType.NuosSplit],
+    ),
+    AristonSensorEntityDescription(
+        key=ARISTON_BUS_ERRORS,
+        name=f"{NAME} errors count",
+        icon="mdi:alert-outline",
+        state_class=SensorStateClass.MEASUREMENT,
+        entity_category=EntityCategory.DIAGNOSTIC,
+        get_native_value=lambda entity: len(entity.device.bus_errors),
+        native_unit_of_measurement="",
     ),
 )
 
