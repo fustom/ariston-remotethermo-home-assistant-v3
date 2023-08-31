@@ -736,4 +736,17 @@ ARISTON_SELECT_TYPES: list[AristonSelectEntityDescription] = (
         ),
         system_types=[SystemType.GALEVO],
     ),
+    AristonSelectEntityDescription(
+        key=DeviceProperties.HYBRID_MODE,
+        name=f"{NAME} hybrid mode",
+        icon="mdi:cog",
+        entity_category=EntityCategory.CONFIG,
+        device_features=[DeviceFeatures.HYBRID_SYS],
+        get_current_option=lambda entity: entity.device.hybrid_mode,
+        get_options=lambda entity: entity.device.hybrid_mode_opt_texts,
+        select_option=lambda entity, option: entity.device.async_set_hybrid_mode(
+            option
+        ),
+        system_types=[SystemType.GALEVO],
+    ),
 )
