@@ -78,4 +78,8 @@ class AristonEntity(CoordinatorEntity, ABC):
     @property
     def unique_id(self):
         """Return the unique id."""
-        return f"{self.device.gateway}-{self.name}"
+        return (
+            f"{self.device.gateway}-{self.name}-{self.zone}"
+            if self.zone
+            else f"{self.device.gateway}-{self.name}"
+        )

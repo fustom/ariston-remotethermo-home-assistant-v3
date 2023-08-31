@@ -10,7 +10,6 @@ from homeassistant.config_entries import ConfigEntry
 from .entity import AristonEntity
 from .const import ARISTON_NUMBER_TYPES, DOMAIN, AristonNumberEntityDescription
 from .coordinator import DeviceDataUpdateCoordinator
-from ariston.const import SystemType
 
 _LOGGER = logging.getLogger(__name__)
 
@@ -34,7 +33,7 @@ async def async_setup_entry(
                 description.whe_types,
             )
         ):
-            if coordinator.device.system_type == SystemType.GALEVO:
+            if description.zone:
                 for zone_number in coordinator.device.zone_numbers:
                     ariston_numbers.append(
                         AristonNumber(

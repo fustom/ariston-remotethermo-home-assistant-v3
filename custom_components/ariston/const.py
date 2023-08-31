@@ -70,6 +70,7 @@ class AristonBaseEntityDescription(EntityDescription, ABC):
     ] = None
     system_types: list[SystemType] = None
     whe_types: list[WheType] = None
+    zone: bool = False
 
 
 @dataclass
@@ -651,6 +652,7 @@ ARISTON_NUMBER_TYPES: list[AristonNumberEntityDescription] = (
         name=f"{NAME} heating flow temperature",
         icon="mdi:thermometer",
         entity_category=EntityCategory.CONFIG,
+        zone=True,
         get_native_min_value=lambda entity: entity.device.get_heating_flow_temp_min(
             entity.zone
         ),
@@ -673,6 +675,7 @@ ARISTON_NUMBER_TYPES: list[AristonNumberEntityDescription] = (
         name=f"{NAME} heating flow offset",
         icon="mdi:progress-wrench",
         entity_category=EntityCategory.CONFIG,
+        zone=True,
         get_native_min_value=lambda entity: entity.device.get_heating_flow_offset_min(
             entity.zone
         ),
