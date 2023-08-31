@@ -759,4 +759,17 @@ ARISTON_SELECT_TYPES: list[AristonSelectEntityDescription] = (
         ),
         system_types=[SystemType.GALEVO],
     ),
+    AristonSelectEntityDescription(
+        key=DeviceProperties.BUFFER_CONTROL_MODE,
+        name=f"{NAME} buffer control mode",
+        icon="mdi:cup-water",
+        entity_category=EntityCategory.CONFIG,
+        device_features=[DeviceFeatures.BUFFER_TIME_PROG_AVAILABLE],
+        get_current_option=lambda entity: entity.device.buffer_control_mode,
+        get_options=lambda entity: entity.device.buffer_control_mode_opt_texts,
+        select_option=lambda entity, option: entity.device.async_set_buffer_control_mode(
+            option
+        ),
+        system_types=[SystemType.GALEVO],
+    ),
 )
