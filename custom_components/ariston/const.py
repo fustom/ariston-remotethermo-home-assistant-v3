@@ -211,6 +211,7 @@ ARISTON_SENSOR_TYPES: list[AristonSensorEntityDescription] = (
         state_class=SensorStateClass.MEASUREMENT,
         get_native_value=lambda entity: entity.device.ch_flow_temp_value,
         get_native_unit_of_measurement=lambda entity: entity.device.ch_flow_temp_unit,
+        device_features=[DeviceProperties.CH_FLOW_TEMP],
         system_types=[SystemType.GALEVO],
     ),
     AristonSensorEntityDescription(
