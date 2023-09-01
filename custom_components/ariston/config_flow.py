@@ -19,6 +19,8 @@ from homeassistant.data_entry_flow import FlowResult
 from ariston import Ariston, DeviceAttribute
 
 from .const import (
+    BUS_ERRORS_SCAN_INTERVAL,
+    DEFAULT_BUS_ERRORS_SCAN_INTERVAL_SECONDS,
     DEFAULT_ENERGY_SCAN_INTERVAL_MINUTES,
     DEFAULT_SCAN_INTERVAL_SECONDS,
     DOMAIN,
@@ -155,6 +157,9 @@ class AristonOptionsFlow(config_entries.OptionsFlow):
         energy_scan_interval = options.get(
             ENERGY_SCAN_INTERVAL, DEFAULT_ENERGY_SCAN_INTERVAL_MINUTES
         )
+        bus_errors_scan_interval = options.get(
+            BUS_ERRORS_SCAN_INTERVAL, DEFAULT_BUS_ERRORS_SCAN_INTERVAL_SECONDS
+        )
 
         return self.async_show_form(
             step_id="init",
@@ -167,6 +172,10 @@ class AristonOptionsFlow(config_entries.OptionsFlow):
                     vol.Optional(
                         ENERGY_SCAN_INTERVAL,
                         default=energy_scan_interval,
+                    ): int,
+                    vol.Optional(
+                        BUS_ERRORS_SCAN_INTERVAL,
+                        default=bus_errors_scan_interval,
                     ): int,
                 }
             ),

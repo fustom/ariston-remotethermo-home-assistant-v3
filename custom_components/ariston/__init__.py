@@ -28,6 +28,9 @@ from .const import (
     DOMAIN,
     ENERGY_COORDINATOR,
     ENERGY_SCAN_INTERVAL,
+    DEFAULT_BUS_ERRORS_SCAN_INTERVAL_SECONDS,
+    BUS_ERRORS_COORDINATOR,
+    BUS_ERRORS_SCAN_INTERVAL,
 )
 from .coordinator import DeviceDataUpdateCoordinator
 
@@ -94,6 +97,21 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
         hass.data[DOMAIN][entry.unique_id][COORDINATOR] = coordinator
 
         await coordinator.async_config_entry_first_refresh()
+
+        bus_errors_scan_interval_seconds = entry.options.get(
+            BUS_ERRORS_SCAN_INTERVAL, DEFAULT_BUS_ERRORS_SCAN_INTERVAL_SECONDS
+        )
+        bus_errors_coordinator = DeviceDataUpdateCoordinator(
+            hass,
+            device,
+            bus_errors_scan_interval_seconds,
+            BUS_ERRORS_COORDINATOR,
+            device.async_get_bus_errors,
+        )
+        hass.data[DOMAIN][entry.unique_id][
+            BUS_ERRORS_COORDINATOR
+        ] = bus_errors_coordinator
+        await bus_errors_coordinator.async_config_entry_first_refresh()
 
         if device.has_metering:
             energy_interval_minutes = entry.options.get(
