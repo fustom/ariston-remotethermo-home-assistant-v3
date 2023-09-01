@@ -44,9 +44,12 @@ NAME: final = "Ariston"
 COORDINATOR: final = "coordinator"
 ENERGY_COORDINATOR: final = "energy_coordinator"
 ENERGY_SCAN_INTERVAL: final = "energy_scan_interval"
+BUS_ERRORS_COORDINATOR: final = "bus_errors_coordinator"
+BUS_ERRORS_SCAN_INTERVAL: final = "bus_errors_scan_interval"
 
 DEFAULT_SCAN_INTERVAL_SECONDS: final = 60
 DEFAULT_ENERGY_SCAN_INTERVAL_MINUTES: final = 60
+DEFAULT_BUS_ERRORS_SCAN_INTERVAL_SECONDS: final = 30
 
 ATTR_TARGET_TEMP_STEP: final = "target_temp_step"
 ATTR_HEAT_REQUEST: final = "heat_request"
@@ -441,6 +444,7 @@ ARISTON_SENSOR_TYPES: list[AristonSensorEntityDescription] = (
         key=ARISTON_BUS_ERRORS,
         name=f"{NAME} errors count",
         icon="mdi:alert-outline",
+        coordinator=BUS_ERRORS_COORDINATOR,
         state_class=SensorStateClass.MEASUREMENT,
         entity_category=EntityCategory.DIAGNOSTIC,
         get_native_value=lambda entity: len(entity.device.bus_errors),
