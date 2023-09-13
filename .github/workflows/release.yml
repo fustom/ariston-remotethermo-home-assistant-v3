@@ -22,4 +22,4 @@ jobs:
         with:
           name: ariston-remotethermo-home-assistant-v3.zip
           path: .
-          repo_token: ${{ secrets.GITHUB_TOKEN }}
+          repo-token: ${{ secrets.GITHUB_TOKEN }}
