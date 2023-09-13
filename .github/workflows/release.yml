@@ -16,7 +16,7 @@ jobs:
         uses: TheDoctor0/zip-release@0.7.1
         with:
           filename: ariston-remotethermo-home-assistant-v3.zip
-          path: custom_components/ariston
+          directory: custom_components/ariston
       - name: Upload to Release Action
         uses: Shopify/upload-to-release@v1.0.1
         with:
