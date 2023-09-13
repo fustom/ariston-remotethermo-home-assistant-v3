@@ -56,6 +56,7 @@ ATTR_HEAT_REQUEST: final = "heat_request"
 ATTR_ECONOMY_TEMP: final = "economy_temp"
 ATTR_HOLIDAY: final = "holiday"
 ATTR_ZONE: final = "zone_number"
+ATTR_ERRORS: final = "errors"
 
 EXTRA_STATE_ATTRIBUTE: final = "Attribute"
 EXTRA_STATE_DEVICE_METHOD: final = "DeviceMethod"
@@ -449,6 +450,12 @@ ARISTON_SENSOR_TYPES: list[AristonSensorEntityDescription] = (
         entity_category=EntityCategory.DIAGNOSTIC,
         get_native_value=lambda entity: len(entity.device.bus_errors),
         native_unit_of_measurement="",
+        extra_states=[
+            {
+                EXTRA_STATE_ATTRIBUTE: ATTR_ERRORS,
+                EXTRA_STATE_DEVICE_METHOD: lambda entity: entity.device.bus_errors,
+            },
+        ]
     ),
 )
 
