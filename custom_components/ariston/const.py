@@ -270,6 +270,18 @@ ARISTON_SENSOR_TYPES: list[AristonSensorEntityDescription] = (
         system_types=[SystemType.GALEVO],
     ),
     AristonSensorEntityDescription(
+        key="Electricity consumption for cooling last month",
+        name=f"{NAME} electricity consumption for cooling last month",
+        icon="mdi:cash",
+        entity_category=EntityCategory.DIAGNOSTIC,
+        device_class=SensorDeviceClass.ENERGY,
+        native_unit_of_measurement=UnitOfEnergy.KILO_WATT_HOUR,
+        device_features=[DeviceFeatures.HAS_METERING],
+        coordinator=ENERGY_COORDINATOR,
+        get_native_value=lambda entity: entity.device.electricity_consumption_for_cooling_last_month,
+        system_types=[SystemType.GALEVO],
+    ),
+    AristonSensorEntityDescription(
         key="Gas consumption for water last month",
         name=f"{NAME} gas consumption for water last month",
         icon="mdi:cash",
