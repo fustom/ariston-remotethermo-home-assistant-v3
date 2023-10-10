@@ -48,9 +48,6 @@ async def async_setup_entry(
 
     async_add_entities(ariston_water_heaters)
 
-    return
-
-
 class AristonWaterHeater(AristonEntity, WaterHeaterEntity):
     """Ariston Water Heater Device."""
 
