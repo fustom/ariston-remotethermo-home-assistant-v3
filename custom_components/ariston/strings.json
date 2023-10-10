@@ -4,7 +4,8 @@
       "user": {
         "data": {
           "username": "[%key:common::config_flow::data::username%]",
-          "password": "[%key:common::config_flow::data::password%]"
+          "password": "[%key:common::config_flow::data::password%]",
+          "api_url_setting": "[%key:common::config_flow::data::api_url_setting%]"
         }
       }
     },
@@ -26,7 +27,8 @@
           "extra_energy_features": "Extra energy related entities",
           "scan_interval": "Zone Scan Interval (seconds)",
           "energy_scan_interval": "Energy Scan Interval (minutes)",
-          "bus_errors_scan_interval": "Bus Errors Scan Interval (seconds)"
+          "bus_errors_scan_interval": "Bus Errors Scan Interval (seconds)",
+          "api_url_setting": "Ariston API url"
         }
       }
     }
