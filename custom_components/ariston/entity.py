@@ -45,12 +45,16 @@ class AristonEntity(CoordinatorEntity, ABC):
             manufacturer=DOMAIN,
             name=self.device.name,
             sw_version=self.device.firmware_version,
-            model=f"{self.device.system_type.name}"
-            if self.device.whe_type is WheType.Unknown
-            else f"{self.device.system_type.name} {self.device.whe_type.name}"
-            if self.device.whe_model_type == 0
-            else f"{self.device.system_type.name} {self.device.whe_type.name} | Model {self.device.whe_model_type}",
+            model=self.model,
         )
+
+    @property
+    def model(self) -> str:
+        if self.device.whe_model_type == 0:
+            if self.device.whe_type is WheType.Unknown:
+                return f"{self.device.system_type.name}"
+            return f"{self.device.system_type.name} {self.device.whe_type.name}"
+        return f"{self.device.system_type.name} {self.device.whe_type.name} | Model {self.device.whe_model_type}"
 
     @property
     def extra_state_attributes(self):
