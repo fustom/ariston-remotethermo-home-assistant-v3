@@ -17,8 +17,10 @@ from homeassistant.core import callback
 from homeassistant.data_entry_flow import FlowResult
 
 from ariston import Ariston, DeviceAttribute
+from ariston.const import ARISTON_API_URL
 
 from .const import (
+    API_URL_SETTING,
     BUS_ERRORS_SCAN_INTERVAL,
     DEFAULT_BUS_ERRORS_SCAN_INTERVAL_SECONDS,
     DEFAULT_ENERGY_SCAN_INTERVAL_MINUTES,
@@ -33,6 +35,7 @@ STEP_USER_DATA_SCHEMA = vol.Schema(
     {
         vol.Required(CONF_USERNAME): str,
         vol.Required(CONF_PASSWORD): str,
+        vol.Optional(API_URL_SETTING,default=ARISTON_API_URL): str
     }
 )
 
@@ -160,6 +163,10 @@ class AristonOptionsFlow(config_entries.OptionsFlow):
         bus_errors_scan_interval = options.get(
             BUS_ERRORS_SCAN_INTERVAL, DEFAULT_BUS_ERRORS_SCAN_INTERVAL_SECONDS
         )
+        api_url_setting = options.get(
+            API_URL_SETTING, ARISTON_API_URL
+        )
+
 
         return self.async_show_form(
             step_id="init",
@@ -177,6 +184,10 @@ class AristonOptionsFlow(config_entries.OptionsFlow):
                         BUS_ERRORS_SCAN_INTERVAL,
                         default=bus_errors_scan_interval,
                     ): int,
+                    vol.Optional(
+                        API_URL_SETTING,
+                        default=api_url_setting,
+                    ): str
                 }
             ),
             last_step=True,

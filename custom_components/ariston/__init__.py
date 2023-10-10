@@ -20,8 +20,10 @@ from homeassistant.helpers import config_validation as cv, device_registry as dr
 from homeassistant.util.unit_system import METRIC_SYSTEM
 
 from ariston import Ariston, DeviceAttribute, SystemType
+from ariston.const import ARISTON_API_URL
 
 from .const import (
+    API_URL_SETTING,
     COORDINATOR,
     DEFAULT_ENERGY_SCAN_INTERVAL_MINUTES,
     DEFAULT_SCAN_INTERVAL_SECONDS,
@@ -65,8 +67,12 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
     """Set up Ariston from a config entry."""
     ariston = Ariston()
     try:
+        api_url_setting = entry.options.get(
+            API_URL_SETTING, ARISTON_API_URL
+        )
+
         reponse = await ariston.async_connect(
-            entry.data[CONF_USERNAME], entry.data[CONF_PASSWORD]
+            entry.data[CONF_USERNAME], entry.data[CONF_PASSWORD], api_url_setting
         )
         if not reponse:
             _LOGGER.error(

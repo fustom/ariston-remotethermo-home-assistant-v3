@@ -47,6 +47,7 @@ ENERGY_COORDINATOR: final = "energy_coordinator"
 ENERGY_SCAN_INTERVAL: final = "energy_scan_interval"
 BUS_ERRORS_COORDINATOR: final = "bus_errors_coordinator"
 BUS_ERRORS_SCAN_INTERVAL: final = "bus_errors_scan_interval"
+API_URL_SETTING: final = "api_url_setting"
 
 DEFAULT_SCAN_INTERVAL_SECONDS: final = 60
 DEFAULT_ENERGY_SCAN_INTERVAL_MINUTES: final = 60
@@ -468,7 +469,7 @@ ARISTON_SENSOR_TYPES: list[AristonSensorEntityDescription] = (
                 EXTRA_STATE_ATTRIBUTE: ATTR_ERRORS,
                 EXTRA_STATE_DEVICE_METHOD: lambda entity: entity.device.bus_errors,
             },
-        ]
+        ],
     ),
 )
 
