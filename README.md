@@ -18,7 +18,7 @@ But it does not use Ariston website. It uses Ariston API what I reversed enginee
 | New code, may contains lot of bugs | Old, tested code |
 
 ## TODO
-- Localization. Currently only english is supported.
+- Localization. Avaliable in english, catalan,italian, rusian and ukranian.
 - More sensors, switches, binary sersors, selectors, services.
 - Exception handling.
 - More logs.
