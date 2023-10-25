@@ -2,18 +2,19 @@
   "config": {
     "abort": {
       "already_configured": "El dispositiu ja està configurat",
-      "reauth_successful": "La re-autenticació ha estat correcta"
+      "reauth_successful": "L'autenticació ha estat correcta"
     },
     "error": {
-      "cannot_connect": "La re-autenticació ha estat correcta",
-      "invalid_auth": "Autenticació no vàlida",
+      "cannot_connect": "No s'ha pogut connectar",
+      "invalid_auth": "L'autenticació ha fallat",
       "unknown": "Error inesperat"
     },
     "step": {
       "user": {
         "data": {
           "password": "Contrasenya",
-          "username": "Nom d'usuari"
+          "username": "Nom d'usuari",
+          "api_url_setting": "URL de l'API d'Ariston"
         }
       }
     }
@@ -24,9 +25,11 @@
         "data": {
           "extra_energy_features": "Entitats extres relacionades amb l'energia",
           "scan_interval": "Interval d'exploració de zones (segons)",
-          "energy_scan_interval": "Interval d'exploració d'energia (minuts)"
+          "energy_scan_interval": "Interval d'exploració d'energia (minuts)",
+          "bus_errors_scan_interval": "Interval d'exploració d'errors de bus (segons)",
+          "api_url_setting": "URL de l'API d'Ariston"
         },
-        "title": "Configura Ariston"
+        "title": "Configura l'Ariston"
       }
     }
   }
