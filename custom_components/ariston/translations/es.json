@@ -1,0 +1,34 @@
+{
+  "config": {
+    "abort": {
+      "already_configured": "El dispositivo ya está configurado",
+      "reauth_successful": "Re-autenticación correcta"
+    },
+    "error": {
+      "cannot_connect": "Fallo al conectar",
+      "invalid_auth": "Autenticación incorrecta",
+      "unknown": "Error inesperado"
+    },
+    "step": {
+      "user": {
+        "data": {
+          "password": "Contraseña",
+          "username": "Usuario"
+        }
+      }
+    }
+  },
+  "options": {
+    "step": {
+      "init": {
+        "data": {
+          "extra_energy_features": "Energia entidades extra ",
+          "scan_interval": "Intervalo de escaneo de zona (segundos)",
+          "energy_scan_interval": "Intervalo de escaneo de Energia(minutos)",
+          "bus_errors_scan_interval": "Intervalo de escaneo de errores de BUS(segundos)"
+        },
+        "title": "Configurar Ariston"
+      }
+    }
+  }
+}
