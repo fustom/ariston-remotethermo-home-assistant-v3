@@ -167,7 +167,7 @@ class AristonThermostat(AristonEntity, ClimateEntity):
     @property
     def hvac_action(self):
         """Return the current running hvac operation."""
-        if_flame_on = self.device.is_flame_on_value is True
+        if_flame_on = bool(self.device.is_flame_on_value)
 
         curr_hvac_action = HVACAction.OFF
         if self.device.is_plant_in_heat_mode:
