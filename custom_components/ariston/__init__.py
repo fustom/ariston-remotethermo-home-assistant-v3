@@ -67,7 +67,7 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
     """Set up Ariston from a config entry."""
     ariston = Ariston()
     try:
-        api_url_setting = entry.options.get(
+        api_url_setting = entry.data.get(
             API_URL_SETTING, ARISTON_API_URL
         )
 

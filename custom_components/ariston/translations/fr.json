@@ -26,8 +26,7 @@
           "extra_energy_features": "Entités supplémentaires liées à l'énergie",
           "scan_interval": "Intervalle de scan de zone (secondes)",
           "energy_scan_interval": "Intervalle d'analyse énergétique (minutes)",
-          "bus_errors_scan_interval": "Intervalle d'analyse des erreurs de bus (secondes)",
-          "api_url_setting": "URL de l'API Ariston"
+          "bus_errors_scan_interval": "Intervalle d'analyse des erreurs de bus (secondes)"
         },
         "title": "Configurer Ariston"
       }

@@ -48,6 +48,7 @@ class AristonConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
     def __init__(self) -> None:
         self.cloud_username: str | None = None
         self.cloud_password: str | None = None
+        self.cloud_api_url: str = ARISTON_API_URL
         self.cloud_devices = {}
 
     async def async_step_reauth(self, user_input=None):
@@ -68,10 +69,11 @@ class AristonConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
         try:
             self.cloud_username = user_input[CONF_USERNAME]
             self.cloud_password = user_input[CONF_PASSWORD]
+            self.cloud_api_url = user_input[API_URL_SETTING]
             ariston = Ariston()
 
             reponse = await ariston.async_connect(
-                self.cloud_username, self.cloud_password
+                self.cloud_username, self.cloud_password, self.cloud_api_url
             )
             if not reponse:
                 errors["base"] = "invalid_auth"
@@ -116,6 +118,7 @@ class AristonConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
             data={
                 CONF_USERNAME: self.cloud_username,
                 CONF_PASSWORD: self.cloud_password,
+                API_URL_SETTING: self.cloud_api_url,
                 CONF_DEVICE: cloud_device,
             },
         )
@@ -163,10 +166,6 @@ class AristonOptionsFlow(config_entries.OptionsFlow):
         bus_errors_scan_interval = options.get(
             BUS_ERRORS_SCAN_INTERVAL, DEFAULT_BUS_ERRORS_SCAN_INTERVAL_SECONDS
         )
-        api_url_setting = options.get(
-            API_URL_SETTING, ARISTON_API_URL
-        )
-
 
         return self.async_show_form(
             step_id="init",
@@ -183,11 +182,7 @@ class AristonOptionsFlow(config_entries.OptionsFlow):
                     vol.Optional(
                         BUS_ERRORS_SCAN_INTERVAL,
                         default=bus_errors_scan_interval,
-                    ): int,
-                    vol.Optional(
-                        API_URL_SETTING,
-                        default=api_url_setting,
-                    ): str
+                    ): int
                 }
             ),
             last_step=True,
