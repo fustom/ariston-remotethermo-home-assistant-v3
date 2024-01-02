@@ -532,13 +532,13 @@ ARISTON_SWITCH_TYPES: list[AristonSwitchEntityDescription] = (
         system_types=[SystemType.GALEVO],
     ),
     AristonSwitchEntityDescription(
-        key=DeviceProperties.IS_QUITE,
-        name=f"{NAME} is quite",
+        key=DeviceProperties.IS_QUIET,
+        name=f"{NAME} is quiet",
         icon="mdi:volume-off",
         entity_category=EntityCategory.CONFIG,
-        device_features=[DeviceProperties.IS_QUITE],
-        set_value=lambda entity, value: entity.device.async_set_is_quite(value),
-        get_is_on=lambda entity: entity.device.is_quite_value,
+        device_features=[DeviceProperties.IS_QUIET],
+        set_value=lambda entity, value: entity.device.async_set_is_quiet(value),
+        get_is_on=lambda entity: entity.device.is_quiet_value,
         system_types=[SystemType.GALEVO],
     ),
     AristonSwitchEntityDescription(
