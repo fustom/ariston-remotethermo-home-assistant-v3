@@ -1,7 +1,6 @@
 """Constants for the Ariston integration."""
 import sys
 
-from abc import ABC
 from collections.abc import Callable, Coroutine
 from dataclasses import dataclass
 from typing import final
@@ -64,7 +63,7 @@ EXTRA_STATE_ATTRIBUTE: final = "Attribute"
 EXTRA_STATE_DEVICE_METHOD: final = "DeviceMethod"
 
 
-@dataclass(frozen=True, kw_only=True)
+@dataclass(kw_only=True)
 class AristonBaseEntityDescription(EntityDescription):
     """An abstract class that describes Ariston entites"""
 
@@ -79,21 +78,21 @@ class AristonBaseEntityDescription(EntityDescription):
     zone: bool = False
 
 
-@dataclass(frozen=True, kw_only=True)
+@dataclass(kw_only=True)
 class AristonClimateEntityDescription(
     ClimateEntityDescription, AristonBaseEntityDescription
 ):
     """A class that describes climate entities."""
 
 
-@dataclass(frozen=True, kw_only=True)
+@dataclass(kw_only=True)
 class AristonWaterHeaterEntityDescription(
     WaterHeaterEntityEntityDescription, AristonBaseEntityDescription
 ):
     """A class that describes climate entities."""
 
 
-@dataclass(frozen=True, kw_only=True)
+@dataclass(kw_only=True)
 class AristonBinarySensorEntityDescription(
     BinarySensorEntityDescription, AristonBaseEntityDescription
 ):
@@ -102,7 +101,7 @@ class AristonBinarySensorEntityDescription(
     get_is_on: Callable[[AristonDevice], Coroutine] = None
 
 
-@dataclass(frozen=True, kw_only=True)
+@dataclass(kw_only=True)
 class AristonSwitchEntityDescription(
     SwitchEntityDescription, AristonBaseEntityDescription
 ):
@@ -112,7 +111,7 @@ class AristonSwitchEntityDescription(
     get_is_on: Callable[[AristonDevice], Coroutine] = None
 
 
-@dataclass(frozen=True, kw_only=True)
+@dataclass(kw_only=True)
 class AristonNumberEntityDescription(
     NumberEntityDescription, AristonBaseEntityDescription
 ):
@@ -125,7 +124,7 @@ class AristonNumberEntityDescription(
     get_native_step: Callable[[AristonDevice], Coroutine] = None
 
 
-@dataclass(frozen=True, kw_only=True)
+@dataclass(kw_only=True)
 class AristonSensorEntityDescription(
     SensorEntityDescription, AristonBaseEntityDescription
 ):
@@ -136,7 +135,7 @@ class AristonSensorEntityDescription(
     get_native_value: Callable[[AristonDevice], Coroutine] = None
 
 
-@dataclass(frozen=True, kw_only=True)
+@dataclass(kw_only=True)
 class AristonSelectEntityDescription(
     SelectEntityDescription, AristonBaseEntityDescription
 ):
