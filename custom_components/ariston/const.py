@@ -27,6 +27,7 @@ from ariston.const import (
     EvoLydosDeviceProperties,
     NuosSplitProperties,
     EvoDeviceProperties,
+    EvoOneDeviceProperties,
     ThermostatProperties,
     ConsumptionProperties,
     ConsumptionType,
@@ -582,6 +583,15 @@ ARISTON_SWITCH_TYPES: list[AristonSwitchEntityDescription] = (
         set_value=lambda entity, value: entity.device.async_set_antilegionella(value),
         get_is_on=lambda entity: entity.device.water_anti_leg_value,
         system_types=[SystemType.VELIS],
+        whe_types=[
+            WheType.Andris2,
+            WheType.Evo2,
+            WheType.Lux,
+            WheType.Lux2,
+            WheType.Lydos,
+            WheType.LydosHybrid,
+            WheType.NuosSplit,
+        ],
     ),
     AristonSwitchEntityDescription(
         key=SlpDeviceSettings.SLP_PRE_HEATING_ON_OFF,
@@ -651,6 +661,15 @@ ARISTON_NUMBER_TYPES: list[AristonNumberEntityDescription] = (
             value
         ),
         system_types=[SystemType.VELIS],
+        whe_types=[
+            WheType.Andris2,
+            WheType.Evo2,
+            WheType.Lux,
+            WheType.Lux2,
+            WheType.Lydos,
+            WheType.LydosHybrid,
+            WheType.NuosSplit,
+        ],
     ),
     AristonNumberEntityDescription(
         key=SlpDeviceSettings.SLP_MIN_SETPOINT_TEMPERATURE,
@@ -727,6 +746,18 @@ ARISTON_NUMBER_TYPES: list[AristonNumberEntityDescription] = (
             value, entity.zone
         ),
         system_types=[SystemType.GALEVO],
+    ),
+    AristonNumberEntityDescription(
+        key=EvoOneDeviceProperties.AV_SHW,
+        name=f"{NAME} requested number of showers",
+        icon="mdi:shower-head",
+        native_min_value=0,
+        get_native_max_value=lambda entity: entity.device.max_req_shower,
+        native_step=1,
+        get_native_value=lambda entity: entity.device.req_shower,
+        set_native_value=lambda entity,
+        value: entity.device.async_set_water_heater_number_of_showers(int(value)),
+        whe_types=[WheType.Evo],
     ),
 )
 
