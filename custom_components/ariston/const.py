@@ -54,6 +54,7 @@ DEFAULT_ENERGY_SCAN_INTERVAL_MINUTES: final = 60
 DEFAULT_BUS_ERRORS_SCAN_INTERVAL_SECONDS: final = 30
 
 ATTR_TARGET_TEMP_STEP: final = "target_temp_step"
+ATTR_HVAC_ACTION: final = "hvac_action"
 ATTR_HEAT_REQUEST: final = "heat_request"
 ATTR_ECONOMY_TEMP: final = "economy_temp"
 ATTR_HOLIDAY: final = "holiday"
@@ -183,6 +184,10 @@ ARISTON_WATER_HEATER_TYPES: list[AristonWaterHeaterEntityDescription] = (
             {
                 EXTRA_STATE_ATTRIBUTE: ATTR_TARGET_TEMP_STEP,
                 EXTRA_STATE_DEVICE_METHOD: lambda entity: entity.device.water_heater_temperature_step,
+            },
+            {
+                EXTRA_STATE_ATTRIBUTE: ATTR_HVAC_ACTION,
+                EXTRA_STATE_DEVICE_METHOD: lambda entity: "heating" if entity.device.is_heating else "idle",
             }
         ],
         device_features=[CustomDeviceFeatures.HAS_DHW],
@@ -323,6 +328,22 @@ ARISTON_SENSOR_TYPES: list[AristonSensorEntityDescription] = (
         coordinator=ENERGY_COORDINATOR,
         get_native_value=lambda entity: entity.device.central_heating_total_energy_consumption,
         get_last_reset=lambda entity: entity.device.consumption_sequence_last_changed_utc,
+    ),
+    AristonSensorEntityDescription(
+        key="Target temperature",
+        name=f"{NAME} Target temperature",
+        device_class=SensorDeviceClass.TEMPERATURE,
+        state_class=SensorStateClass.MEASUREMENT,
+        get_native_value=lambda entity: int(entity.device.water_heater_target_temperature),
+        get_native_unit_of_measurement=lambda entity: entity.device.water_heater_temperature_unit,
+    ),
+    AristonSensorEntityDescription(
+        key="Current temperature",
+        name=f"{NAME} Current temperature",
+        device_class=SensorDeviceClass.TEMPERATURE,
+        state_class=SensorStateClass.MEASUREMENT,
+        get_native_value=lambda entity: int(entity.device.water_heater_current_temperature),
+        get_native_unit_of_measurement=lambda entity: entity.device.water_heater_temperature_unit,
     ),
     AristonSensorEntityDescription(
         key="Domestic hot water total energy consumption",
@@ -835,5 +856,17 @@ ARISTON_SELECT_TYPES: list[AristonSelectEntityDescription] = (
             option
         ),
         system_types=[SystemType.GALEVO],
+    ),
+    AristonSelectEntityDescription(
+        key="Operation mode",
+        name=f"{NAME} Operation mode",
+        icon="mdi:cog",
+        entity_category=EntityCategory.CONFIG,
+        get_current_option=lambda entity: entity.device.water_heater_current_mode_text,
+        get_options=lambda entity: entity.device.water_heater_mode_operation_texts,
+        select_option=lambda entity, option: entity.device.async_set_water_heater_operation_mode(
+            option
+        ),
+        system_types=[SystemType.VELIS],
     ),
 )
