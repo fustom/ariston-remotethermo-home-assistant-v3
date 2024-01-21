@@ -110,7 +110,7 @@ class AristonThermostat(AristonEntity, ClimateEntity):
     @property
     def target_temperature_step(self) -> float:
         """Return the target temperature step support by the device."""
-        return self.device.get_comfort_temp_step(self.zone)
+        return self.device.get_target_temp_step(self.zone)
 
     @property
     def current_temperature(self) -> float:
@@ -120,7 +120,7 @@ class AristonThermostat(AristonEntity, ClimateEntity):
     @property
     def target_temperature(self) -> float:
         """Return the target temperature for the device."""
-        return self.device.get_comfort_temp_value(self.zone)
+        return self.device.get_target_temp_value(self.zone)
 
     @property
     def supported_features(self) -> int:
