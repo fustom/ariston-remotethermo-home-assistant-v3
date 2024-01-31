@@ -2,7 +2,7 @@
   "config": {
     "abort": {
       "already_configured": "Equipamento já configurado",
-      "reauth_successful": "A reautenticação efetuda"
+      "reauth_successful": "Reautenticação efetuada"
     },
     "error": {
       "cannot_connect": "Falha na ligação",
@@ -14,7 +14,7 @@
         "data": {
           "password": "Senha",
           "username": "Utilizador",
-          "api_url_setting": "Link de do API Ariston"
+          "api_url_setting": "Link de API Ariston"
         }
       }
     }
@@ -23,10 +23,10 @@
     "step": {
       "init": {
         "data": {
-          "extra_energy_features": "Entidade relacionadas com a energia",
+          "extra_energy_features": "Entidades relacionadas com energia",
           "scan_interval": "Pesquisa de zonas (segundos)",
           "energy_scan_interval": "Pesquisa de energia (minutos)",
-          "bus_errors_scan_interval": "Procusa de erros bus (segundos)"
+          "bus_errors_scan_interval": "Pesquisa de erros bus (segundos)"
         },
         "title": "Configurar Ariston"
       }
