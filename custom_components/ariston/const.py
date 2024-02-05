@@ -786,6 +786,19 @@ ARISTON_NUMBER_TYPES: list[AristonNumberEntityDescription] = (
         value: entity.device.async_set_water_heater_number_of_showers(int(value)),
         whe_types=[WheType.Evo],
     ),
+    AristonNumberEntityDescription(
+        key=SeDeviceSettings.SE_ANTI_COOLING_TEMPERATURE,
+        name=f"{NAME} anti cooling temperature",
+        icon="mdi:shower-head",
+        entity_category=EntityCategory.CONFIG,
+        get_native_min_value=lambda entity: entity.device.anti_cooling_temperature_minimum,
+        get_native_max_value=lambda entity: entity.device.anti_cooling_temperature_maximum,
+        native_step=1,
+        get_native_value=lambda entity: entity.device.anti_cooling_temperature_value,
+        set_native_value=lambda entity,
+        value: entity.device.async_set_cooling_temperature_value(int(value)),
+        whe_types=[WheType.LydosHybrid],
+    ),
 )
 
 ARISTON_SELECT_TYPES: list[AristonSelectEntityDescription] = (
