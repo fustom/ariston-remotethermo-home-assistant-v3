@@ -37,6 +37,7 @@ from ariston.const import (
     SystemType,
     WheType,
     DeviceAttribute,
+    SeDeviceSettings,
     ARISTON_BUS_ERRORS,
 )
 
@@ -469,7 +470,7 @@ ARISTON_SENSOR_TYPES: list[AristonSensorEntityDescription] = (
             WheType.Lux,
             WheType.Evo,
             WheType.Evo2,
-            WheType.Lux2, 
+            WheType.Lux2,
             WheType.Lydos,
         ],
     ),
@@ -554,9 +555,8 @@ ARISTON_SWITCH_TYPES: list[AristonSwitchEntityDescription] = (
         name=f"{NAME} automatic thermoregulation",
         icon="mdi:radiator",
         device_features=[DeviceFeatures.AUTO_THERMO_REG],
-        set_value=lambda entity, value: entity.device.async_set_automatic_thermoregulation(
-            value
-        ),
+        set_value=lambda entity,
+        value: entity.device.async_set_automatic_thermoregulation(value),
         get_is_on=lambda entity: entity.device.automatic_thermoregulation,
         system_types=[SystemType.GALEVO],
     ),
@@ -590,9 +590,8 @@ ARISTON_SWITCH_TYPES: list[AristonSwitchEntityDescription] = (
         key=EvoDeviceProperties.PWR_OPT,
         name=f"{NAME} power option",
         icon="mdi:leaf",
-        set_value=lambda entity, value: entity.device.async_set_water_heater_power_option(
-            value
-        ),
+        set_value=lambda entity,
+        value: entity.device.async_set_water_heater_power_option(value),
         get_is_on=lambda entity: entity.device.water_heater_power_option_value,
         system_types=[SystemType.VELIS],
         whe_types=[WheType.Lux2],
@@ -645,6 +644,30 @@ ARISTON_SWITCH_TYPES: list[AristonSwitchEntityDescription] = (
         system_types=[SystemType.VELIS],
         whe_types=[WheType.NuosSplit],
     ),
+    AristonSwitchEntityDescription(
+        key=SeDeviceSettings.SE_PERMANENT_BOOST_ON_OFF,
+        name=f"{NAME} permanent boost",
+        icon="mdi:car-turbocharger",
+        entity_category=EntityCategory.CONFIG,
+        set_value=lambda entity, value: entity.device.async_set_permanent_boost_value(
+            value
+        ),
+        get_is_on=lambda entity: entity.device.permanent_boost_value,
+        system_types=[SystemType.VELIS],
+        whe_types=[WheType.LydosHybrid],
+    ),
+    AristonSwitchEntityDescription(
+        key=SeDeviceSettings.SE_ANTI_COOLING_ON_OFF,
+        name=f"{NAME} anti cooling",
+        icon="mdi:snowflake-thermometer",
+        entity_category=EntityCategory.CONFIG,
+        set_value=lambda entity, value: entity.device.async_set_anti_cooling_value(
+            value
+        ),
+        get_is_on=lambda entity: entity.device.anti_cooling_value,
+        system_types=[SystemType.VELIS],
+        whe_types=[WheType.LydosHybrid],
+    ),
 )
 
 ARISTON_NUMBER_TYPES: list[AristonNumberEntityDescription] = (
@@ -687,9 +710,8 @@ ARISTON_NUMBER_TYPES: list[AristonNumberEntityDescription] = (
         get_native_max_value=lambda entity: entity.device.water_heater_maximum_setpoint_temperature_maximum,
         native_step=1,
         get_native_value=lambda entity: entity.device.water_heater_maximum_setpoint_temperature,
-        set_native_value=lambda entity, value: entity.device.async_set_max_setpoint_temp(
-            value
-        ),
+        set_native_value=lambda entity,
+        value: entity.device.async_set_max_setpoint_temp(value),
         system_types=[SystemType.VELIS],
         whe_types=[
             WheType.Andris2,
@@ -710,9 +732,8 @@ ARISTON_NUMBER_TYPES: list[AristonNumberEntityDescription] = (
         get_native_max_value=lambda entity: entity.device.water_heater_minimum_setpoint_temperature_maximum,
         native_step=1,
         get_native_value=lambda entity: entity.device.water_heater_minimum_setpoint_temperature,
-        set_native_value=lambda entity, value: entity.device.async_set_min_setpoint_temp(
-            value
-        ),
+        set_native_value=lambda entity,
+        value: entity.device.async_set_min_setpoint_temp(value),
         system_types=[SystemType.VELIS],
         whe_types=[WheType.NuosSplit],
     ),
@@ -725,9 +746,8 @@ ARISTON_NUMBER_TYPES: list[AristonNumberEntityDescription] = (
         get_native_max_value=lambda entity: entity.device.water_heater_maximum_temperature,
         native_step=1,
         get_native_value=lambda entity: entity.device.water_heater_reduced_temperature,
-        set_native_value=lambda entity, value: entity.device.async_set_water_heater_reduced_temperature(
-            value
-        ),
+        set_native_value=lambda entity,
+        value: entity.device.async_set_water_heater_reduced_temperature(value),
         system_types=[SystemType.VELIS],
         whe_types=[WheType.NuosSplit],
     ),
@@ -749,9 +769,8 @@ ARISTON_NUMBER_TYPES: list[AristonNumberEntityDescription] = (
         get_native_value=lambda entity: entity.device.get_heating_flow_temp_value(
             entity.zone
         ),
-        set_native_value=lambda entity, value: entity.device.async_set_heating_flow_temp(
-            value, entity.zone
-        ),
+        set_native_value=lambda entity,
+        value: entity.device.async_set_heating_flow_temp(value, entity.zone),
         system_types=[SystemType.GALEVO],
     ),
     AristonNumberEntityDescription(
@@ -772,9 +791,8 @@ ARISTON_NUMBER_TYPES: list[AristonNumberEntityDescription] = (
         get_native_value=lambda entity: entity.device.get_heating_flow_offset_value(
             entity.zone
         ),
-        set_native_value=lambda entity, value: entity.device.async_set_heating_flow_offset(
-            value, entity.zone
-        ),
+        set_native_value=lambda entity,
+        value: entity.device.async_set_heating_flow_offset(value, entity.zone),
         system_types=[SystemType.GALEVO],
     ),
     AristonNumberEntityDescription(
@@ -788,6 +806,19 @@ ARISTON_NUMBER_TYPES: list[AristonNumberEntityDescription] = (
         set_native_value=lambda entity,
         value: entity.device.async_set_water_heater_number_of_showers(int(value)),
         whe_types=[WheType.Evo],
+    ),
+    AristonNumberEntityDescription(
+        key=SeDeviceSettings.SE_ANTI_COOLING_TEMPERATURE,
+        name=f"{NAME} anti cooling temperature",
+        icon="mdi:thermometer-alert",
+        entity_category=EntityCategory.CONFIG,
+        get_native_min_value=lambda entity: entity.device.anti_cooling_temperature_minimum,
+        get_native_max_value=lambda entity: entity.device.anti_cooling_temperature_maximum,
+        native_step=1,
+        get_native_value=lambda entity: entity.device.anti_cooling_temperature_value,
+        set_native_value=lambda entity,
+        value: entity.device.async_set_cooling_temperature_value(int(value)),
+        whe_types=[WheType.LydosHybrid],
     ),
 )
 
@@ -852,9 +883,8 @@ ARISTON_SELECT_TYPES: list[AristonSelectEntityDescription] = (
         device_features=[DeviceFeatures.BUFFER_TIME_PROG_AVAILABLE],
         get_current_option=lambda entity: entity.device.buffer_control_mode,
         get_options=lambda entity: entity.device.buffer_control_mode_opt_texts,
-        select_option=lambda entity, option: entity.device.async_set_buffer_control_mode(
-            option
-        ),
+        select_option=lambda entity,
+        option: entity.device.async_set_buffer_control_mode(option),
         system_types=[SystemType.GALEVO],
     ),
     AristonSelectEntityDescription(
