@@ -1,0 +1,5 @@
+blank_issues_enabled: false
+contact_links:
+  - name: I have a question or need support
+    url: https://github.com/fustom/ariston-remotethermo-home-assistant-v3/discussions
+    about: Use descussions for resources on getting help.
