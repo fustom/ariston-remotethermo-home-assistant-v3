@@ -526,6 +526,19 @@ ARISTON_BINARY_SENSOR_TYPES: list[AristonBinarySensorEntityDescription] = (
             WheType.Lux2,
         ],
     ),
+    AristonBinarySensorEntityDescription(
+        key=EvoLydosDeviceProperties.ANTI_LEG,
+        name=f"{NAME} anti-legionella cycle",
+        icon="mdi:bacteria",
+        get_is_on=lambda entity: entity.device.is_antileg,
+        system_types=[SystemType.VELIS],
+        whe_types=[
+            WheType.Evo2,
+            WheType.Lydos,
+            WheType.LydosHybrid,
+            WheType.Andris2,
+        ],
+    ),
 )
 
 ARISTON_SWITCH_TYPES: list[AristonSwitchEntityDescription] = (
