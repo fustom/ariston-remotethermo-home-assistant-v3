@@ -16,7 +16,7 @@ from homeassistant.components.sensor import (
 )
 from homeassistant.components.switch import SwitchEntityDescription
 from homeassistant.components.water_heater import WaterHeaterEntityEntityDescription
-from homeassistant.const import UnitOfEnergy, UnitOfTime
+from homeassistant.const import UnitOfEnergy, UnitOfTime, UnitOfTemperature
 from homeassistant.helpers.entity import EntityCategory, EntityDescription
 
 from ariston.device import AristonDevice
@@ -187,7 +187,27 @@ ARISTON_WATER_HEATER_TYPES: list[AristonWaterHeaterEntityDescription] = (
             }
         ],
         device_features=[CustomDeviceFeatures.HAS_DHW],
-        system_types=[SystemType.GALEVO, SystemType.VELIS, SystemType.BSB],
+        system_types=[SystemType.GALEVO, SystemType.BSB],
+    ),
+    AristonWaterHeaterEntityDescription(
+        key="AristonWaterHeater",
+        extra_states=[
+            {
+                EXTRA_STATE_ATTRIBUTE: ATTR_TARGET_TEMP_STEP,
+                EXTRA_STATE_DEVICE_METHOD: lambda entity: entity.device.water_heater_temperature_step,
+            }
+        ],
+        device_features=[CustomDeviceFeatures.HAS_DHW],
+        system_types=[SystemType.VELIS],
+        whe_types=[
+            WheType.Andris2,
+            WheType.Evo2,
+            WheType.Lux,
+            WheType.Lux2,
+            WheType.Lydos,
+            WheType.LydosHybrid,
+            WheType.NuosSplit,
+        ],
     ),
 )
 
@@ -479,6 +499,38 @@ ARISTON_SENSOR_TYPES: list[AristonSensorEntityDescription] = (
             },
         ],
     ),
+    AristonSensorEntityDescription(
+        key=EvoOneDeviceProperties.TEMP,
+        name=f"{NAME} current temperature",
+        icon="mdi:thermometer-auto",
+        device_class=SensorDeviceClass.TEMPERATURE,
+        state_class=SensorStateClass.MEASUREMENT,
+        get_native_value=lambda entity: entity.device.water_heater_current_temperature,
+        native_unit_of_measurement=UnitOfTemperature.CELSIUS,
+        system_types=[SystemType.VELIS],
+        whe_types=[
+            WheType.Evo,
+        ],
+    ),
+    AristonSensorEntityDescription(
+        key=VelisDeviceProperties.PROC_REQ_TEMP,
+        name=f"{NAME} proc req temp",
+        icon="mdi:thermometer-auto",
+        device_class=SensorDeviceClass.TEMPERATURE,
+        state_class=SensorStateClass.MEASUREMENT,
+        get_native_value=lambda entity: entity.device.proc_req_temp_value,
+        native_unit_of_measurement=UnitOfTemperature.CELSIUS,
+        system_types=[SystemType.VELIS],
+        whe_types=[
+            WheType.NuosSplit,
+            WheType.Evo2,
+            WheType.LydosHybrid,
+            WheType.Lydos,
+            WheType.Andris2,
+            WheType.Lux,
+            WheType.Lux2,
+        ],
+    ),
 )
 
 ARISTON_BINARY_SENSOR_TYPES: list[AristonBinarySensorEntityDescription] = (
@@ -524,6 +576,19 @@ ARISTON_BINARY_SENSOR_TYPES: list[AristonBinarySensorEntityDescription] = (
             WheType.LydosHybrid,
             WheType.Andris2,
             WheType.Lux2,
+        ],
+    ),
+    AristonBinarySensorEntityDescription(
+        key=EvoLydosDeviceProperties.ANTI_LEG,
+        name=f"{NAME} anti-legionella cycle",
+        icon="mdi:bacteria",
+        get_is_on=lambda entity: entity.device.is_antileg,
+        system_types=[SystemType.VELIS],
+        whe_types=[
+            WheType.Evo2,
+            WheType.Lydos,
+            WheType.LydosHybrid,
+            WheType.Andris2,
         ],
     ),
 )
@@ -644,6 +709,16 @@ ARISTON_SWITCH_TYPES: list[AristonSwitchEntityDescription] = (
             value
         ),
         get_is_on=lambda entity: entity.device.anti_cooling_value,
+        system_types=[SystemType.VELIS],
+        whe_types=[WheType.LydosHybrid],
+    ),
+    AristonSwitchEntityDescription(
+        key=SeDeviceSettings.SE_NIGHT_MODE_ON_OFF,
+        name=f"{NAME} night mode",
+        icon="mdi:weather-night",
+        entity_category=EntityCategory.CONFIG,
+        set_value=lambda entity, value: entity.device.async_set_night_mode_value(value),
+        get_is_on=lambda entity: entity.device.night_mode_value,
         system_types=[SystemType.VELIS],
         whe_types=[WheType.LydosHybrid],
     ),
@@ -865,5 +940,16 @@ ARISTON_SELECT_TYPES: list[AristonSelectEntityDescription] = (
         select_option=lambda entity,
         option: entity.device.async_set_buffer_control_mode(option),
         system_types=[SystemType.GALEVO],
+    ),
+    AristonSelectEntityDescription(
+        key=EvoOneDeviceProperties.MODE,
+        name=f"{NAME} operation mode",
+        icon="mdi:cog",
+        get_current_option=lambda entity: entity.device.water_heater_current_mode_text,
+        get_options=lambda entity: entity.device.water_heater_mode_operation_texts,
+        select_option=lambda entity,
+        option: entity.device.async_set_water_heater_operation_mode(option),
+        system_types=[SystemType.VELIS],
+        whe_types=[WheType.Evo],
     ),
 )
