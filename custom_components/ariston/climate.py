@@ -125,11 +125,11 @@ class AristonThermostat(AristonEntity, ClimateEntity):
     @property
     def supported_features(self) -> int:
         """Return the supported features for this device integration."""
-        features = (
-            ClimateEntityFeature.TARGET_TEMPERATURE
-            | ClimateEntityFeature.TURN_ON
-            | ClimateEntityFeature.TURN_OFF
-        )
+        features = ClimateEntityFeature.TARGET_TEMPERATURE
+        if hasattr(ClimateEntityFeature, "TURN_OFF"):
+            features |= ClimateEntityFeature.TURN_OFF
+        if hasattr(ClimateEntityFeature, "TURN_ON"):
+            features |= ClimateEntityFeature.TURN_ON
         return (
             features | ClimateEntityFeature.PRESET_MODE
             if self.device.plant_mode_supported
