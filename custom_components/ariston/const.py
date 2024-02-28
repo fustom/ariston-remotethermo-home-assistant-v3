@@ -512,6 +512,25 @@ ARISTON_SENSOR_TYPES: list[AristonSensorEntityDescription] = (
             WheType.Evo,
         ],
     ),
+    AristonSensorEntityDescription(
+        key=VelisDeviceProperties.PROC_REQ_TEMP,
+        name=f"{NAME} proc req temp",
+        icon="mdi:thermometer-auto",
+        device_class=SensorDeviceClass.TEMPERATURE,
+        state_class=SensorStateClass.MEASUREMENT,
+        get_native_value=lambda entity: entity.device.proc_req_temp_value,
+        native_unit_of_measurement=UnitOfTemperature.CELSIUS,
+        system_types=[SystemType.VELIS],
+        whe_types=[
+            WheType.NuosSplit,
+            WheType.Evo2,
+            WheType.LydosHybrid,
+            WheType.Lydos,
+            WheType.Andris2,
+            WheType.Lux,
+            WheType.Lux2,
+        ],
+    ),
 )
 
 ARISTON_BINARY_SENSOR_TYPES: list[AristonBinarySensorEntityDescription] = (
