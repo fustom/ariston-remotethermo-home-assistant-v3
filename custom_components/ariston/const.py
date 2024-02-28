@@ -16,7 +16,7 @@ from homeassistant.components.sensor import (
 )
 from homeassistant.components.switch import SwitchEntityDescription
 from homeassistant.components.water_heater import WaterHeaterEntityEntityDescription
-from homeassistant.const import UnitOfEnergy, UnitOfTime
+from homeassistant.const import UnitOfEnergy, UnitOfTime, UnitOfTemperature
 from homeassistant.helpers.entity import EntityCategory, EntityDescription
 
 from ariston.device import AristonDevice
@@ -187,7 +187,27 @@ ARISTON_WATER_HEATER_TYPES: list[AristonWaterHeaterEntityDescription] = (
             }
         ],
         device_features=[CustomDeviceFeatures.HAS_DHW],
-        system_types=[SystemType.GALEVO, SystemType.VELIS, SystemType.BSB],
+        system_types=[SystemType.GALEVO, SystemType.BSB],
+    ),
+    AristonWaterHeaterEntityDescription(
+        key="AristonWaterHeater",
+        extra_states=[
+            {
+                EXTRA_STATE_ATTRIBUTE: ATTR_TARGET_TEMP_STEP,
+                EXTRA_STATE_DEVICE_METHOD: lambda entity: entity.device.water_heater_temperature_step,
+            }
+        ],
+        device_features=[CustomDeviceFeatures.HAS_DHW],
+        system_types=[SystemType.VELIS],
+        whe_types=[
+            WheType.Andris2,
+            WheType.Evo2,
+            WheType.Lux,
+            WheType.Lux2,
+            WheType.Lydos,
+            WheType.LydosHybrid,
+            WheType.NuosSplit,
+        ],
     ),
 )
 
@@ -477,6 +497,19 @@ ARISTON_SENSOR_TYPES: list[AristonSensorEntityDescription] = (
                 EXTRA_STATE_ATTRIBUTE: ATTR_ERRORS,
                 EXTRA_STATE_DEVICE_METHOD: lambda entity: entity.device.bus_errors,
             },
+        ],
+    ),
+    AristonSensorEntityDescription(
+        key=EvoOneDeviceProperties.TEMP,
+        name=f"{NAME} current temperature",
+        icon="mdi:thermometer-auto",
+        device_class=SensorDeviceClass.TEMPERATURE,
+        state_class=SensorStateClass.MEASUREMENT,
+        get_native_value=lambda entity: entity.device.water_heater_current_temperature,
+        native_unit_of_measurement=UnitOfTemperature.CELSIUS,
+        system_types=[SystemType.VELIS],
+        whe_types=[
+            WheType.Evo,
         ],
     ),
 )
@@ -888,5 +921,16 @@ ARISTON_SELECT_TYPES: list[AristonSelectEntityDescription] = (
         select_option=lambda entity,
         option: entity.device.async_set_buffer_control_mode(option),
         system_types=[SystemType.GALEVO],
+    ),
+    AristonSelectEntityDescription(
+        key=EvoOneDeviceProperties.MODE,
+        name=f"{NAME} operation mode",
+        icon="mdi:cog",
+        get_current_option=lambda entity: entity.device.water_heater_current_mode_text,
+        get_options=lambda entity: entity.device.water_heater_mode_operation_texts,
+        select_option=lambda entity,
+        option: entity.device.async_set_water_heater_operation_mode(option),
+        system_types=[SystemType.VELIS],
+        whe_types=[WheType.Evo],
     ),
 )
