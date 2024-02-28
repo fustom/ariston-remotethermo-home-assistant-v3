@@ -660,6 +660,16 @@ ARISTON_SWITCH_TYPES: list[AristonSwitchEntityDescription] = (
         system_types=[SystemType.VELIS],
         whe_types=[WheType.LydosHybrid],
     ),
+    AristonSwitchEntityDescription(
+        key=SeDeviceSettings.SE_NIGHT_MODE_ON_OFF,
+        name=f"{NAME} night mode",
+        icon="mdi:weather-night",
+        entity_category=EntityCategory.CONFIG,
+        set_value=lambda entity, value: entity.device.async_set_night_mode_value(value),
+        get_is_on=lambda entity: entity.device.night_mode_value,
+        system_types=[SystemType.VELIS],
+        whe_types=[WheType.LydosHybrid],
+    ),
 )
 
 ARISTON_NUMBER_TYPES: list[AristonNumberEntityDescription] = (
