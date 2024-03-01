@@ -38,6 +38,7 @@ from ariston.const import (
     WheType,
     DeviceAttribute,
     SeDeviceSettings,
+    MenuItemNames,
     ARISTON_BUS_ERRORS,
 )
 
@@ -239,6 +240,24 @@ ARISTON_SENSOR_TYPES: list[AristonSensorEntityDescription] = (
         get_native_value=lambda entity: entity.device.ch_flow_temp_value,
         get_native_unit_of_measurement=lambda entity: entity.device.ch_flow_temp_unit,
         device_features=[DeviceProperties.CH_FLOW_TEMP],
+        system_types=[SystemType.GALEVO],
+    ),
+    AristonSensorEntityDescription(
+        key=MenuItemNames.SIGNAL_STRENGTH,
+        name=f"{NAME} signal strength",
+        state_class=SensorStateClass.MEASUREMENT,
+        entity_category=EntityCategory.DIAGNOSTIC,
+        get_native_value=lambda entity: entity.device.signal_strength_value,
+        get_native_unit_of_measurement=lambda entity: entity.device.signal_strength_unit,
+        system_types=[SystemType.GALEVO],
+    ),
+    AristonSensorEntityDescription(
+        key=MenuItemNames.CH_RETURN_TEMP,
+        name=f"{NAME} CH return temp",
+        device_class=SensorDeviceClass.TEMPERATURE,
+        state_class=SensorStateClass.MEASUREMENT,
+        get_native_value=lambda entity: entity.device.ch_return_temp_value,
+        get_native_unit_of_measurement=lambda entity: entity.device.ch_return_temp_unit,
         system_types=[SystemType.GALEVO],
     ),
     AristonSensorEntityDescription(
