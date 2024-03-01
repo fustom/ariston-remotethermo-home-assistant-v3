@@ -9,7 +9,7 @@
   "iot_class": "cloud_polling",
   "issue_tracker": "https://github.com/fustom/ariston-remotethermo-home-assistant-v3/issues",
   "loggers": ["ariston"],
-  "requirements": ["ariston==0.19.0"],
+  "requirements": ["ariston==0.19.1"],
   "ssdp": [],
   "version": "0.19.0",
   "zeroconf": []
