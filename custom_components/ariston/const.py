@@ -51,9 +51,9 @@ BUS_ERRORS_COORDINATOR: final = "bus_errors_coordinator"
 BUS_ERRORS_SCAN_INTERVAL: final = "bus_errors_scan_interval"
 API_URL_SETTING: final = "api_url_setting"
 
-DEFAULT_SCAN_INTERVAL_SECONDS: final = 60
+DEFAULT_SCAN_INTERVAL_SECONDS: final = 180
 DEFAULT_ENERGY_SCAN_INTERVAL_MINUTES: final = 60
-DEFAULT_BUS_ERRORS_SCAN_INTERVAL_SECONDS: final = 30
+DEFAULT_BUS_ERRORS_SCAN_INTERVAL_SECONDS: final = 600
 
 ATTR_TARGET_TEMP_STEP: final = "target_temp_step"
 ATTR_HEAT_REQUEST: final = "heat_request"
