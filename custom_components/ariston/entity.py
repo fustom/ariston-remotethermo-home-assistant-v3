@@ -50,8 +50,9 @@ class AristonEntity(CoordinatorEntity, ABC):
 
     @property
     def model(self) -> str:
+        """Return device model."""
         if self.device.whe_model_type == 0:
-            if self.device.whe_type is WheType.Unknown:
+            if self.device.whe_type is WheType.UNKNOWN:
                 return f"{self.device.system_type.name}"
             return f"{self.device.system_type.name} {self.device.whe_type.name}"
         return f"{self.device.system_type.name} {self.device.whe_type.name} | Model {self.device.whe_model_type}"

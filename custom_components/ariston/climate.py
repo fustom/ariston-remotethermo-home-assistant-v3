@@ -267,9 +267,7 @@ class AristonThermostat(AristonEntity, ClimateEntity):
             self.name,
         )
 
-        await self.device.async_set_plant_mode(
-            PlantMode(self.device.plant_mode_opt_texts.index(preset_mode)),
-        )
+        await self.device.async_set_plant_mode(preset_mode)
         self.async_write_ha_state()
 
     async def async_set_temperature(self, **kwargs):

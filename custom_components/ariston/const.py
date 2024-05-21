@@ -7,6 +7,7 @@ from typing import final
 
 from homeassistant.components.binary_sensor import BinarySensorEntityDescription
 from homeassistant.components.climate import ClimateEntityDescription
+from homeassistant.components.climate.const import ATTR_HVAC_ACTION, HVACAction
 from homeassistant.components.number import NumberEntityDescription
 from homeassistant.components.select import SelectEntityDescription
 from homeassistant.components.sensor import (
@@ -181,6 +182,7 @@ ARISTON_CLIMATE_TYPES: list[AristonClimateEntityDescription] = (
 ARISTON_WATER_HEATER_TYPES: list[AristonWaterHeaterEntityDescription] = (
     AristonWaterHeaterEntityDescription(
         key="AristonWaterHeater",
+        icon="mdi:water-pump",
         extra_states=[
             {
                 EXTRA_STATE_ATTRIBUTE: ATTR_TARGET_TEMP_STEP,
@@ -192,6 +194,7 @@ ARISTON_WATER_HEATER_TYPES: list[AristonWaterHeaterEntityDescription] = (
     ),
     AristonWaterHeaterEntityDescription(
         key="AristonWaterHeater",
+        icon="mdi:water-pump",
         extra_states=[
             {
                 EXTRA_STATE_ATTRIBUTE: ATTR_TARGET_TEMP_STEP,
@@ -201,13 +204,35 @@ ARISTON_WATER_HEATER_TYPES: list[AristonWaterHeaterEntityDescription] = (
         device_features=[CustomDeviceFeatures.HAS_DHW],
         system_types=[SystemType.VELIS],
         whe_types=[
-            WheType.Andris2,
-            WheType.Evo2,
-            WheType.Lux,
-            WheType.Lux2,
-            WheType.Lydos,
-            WheType.LydosHybrid,
-            WheType.NuosSplit,
+            WheType.LUX,
+            WheType.LUX2,
+            WheType.NUOS_SPLIT,
+        ],
+    ),
+    AristonWaterHeaterEntityDescription(
+        key="AristonWaterHeater",
+        icon="mdi:water-pump",
+        extra_states=[
+            {
+                EXTRA_STATE_ATTRIBUTE: ATTR_TARGET_TEMP_STEP,
+                EXTRA_STATE_DEVICE_METHOD: lambda entity: entity.device.water_heater_temperature_step,
+            },
+            {
+                EXTRA_STATE_ATTRIBUTE: ATTR_HVAC_ACTION,
+                EXTRA_STATE_DEVICE_METHOD: lambda entity: HVACAction.OFF
+                if not entity.device.water_heater_power_value
+                else HVACAction.HEATING
+                if entity.device.is_heating
+                else HVACAction.IDLE,
+            },
+        ],
+        device_features=[CustomDeviceFeatures.HAS_DHW],
+        system_types=[SystemType.VELIS],
+        whe_types=[
+            WheType.ANDRIS2,
+            WheType.EVO2,
+            WheType.LYDOS,
+            WheType.LYDOS_HYBRID,
         ],
     ),
 )
@@ -279,13 +304,13 @@ ARISTON_SENSOR_TYPES: list[AristonSensorEntityDescription] = (
         native_unit_of_measurement="",
         system_types=[SystemType.VELIS],
         whe_types=[
-            WheType.Lux,
-            WheType.Evo,
-            WheType.Evo2,
-            WheType.Lydos,
-            WheType.LydosHybrid,
-            WheType.Andris2,
-            WheType.Lux2,
+            WheType.LUX,
+            WheType.EVO,
+            WheType.EVO2,
+            WheType.LYDOS,
+            WheType.LYDOS_HYBRID,
+            WheType.ANDRIS2,
+            WheType.LUX2,
         ],
     ),
     AristonSensorEntityDescription(
@@ -485,11 +510,11 @@ ARISTON_SENSOR_TYPES: list[AristonSensorEntityDescription] = (
         native_unit_of_measurement=UnitOfTime.MINUTES,
         system_types=[SystemType.VELIS],
         whe_types=[
-            WheType.Lux,
-            WheType.Evo,
-            WheType.Evo2,
-            WheType.Lux2,
-            WheType.Lydos,
+            WheType.LUX,
+            WheType.EVO,
+            WheType.EVO2,
+            WheType.LUX2,
+            WheType.LYDOS,
         ],
     ),
     AristonSensorEntityDescription(
@@ -500,7 +525,7 @@ ARISTON_SENSOR_TYPES: list[AristonSensorEntityDescription] = (
         get_native_value=lambda entity: entity.device.water_heater_heating_rate,
         native_unit_of_measurement="",
         system_types=[SystemType.VELIS],
-        whe_types=[WheType.NuosSplit],
+        whe_types=[WheType.NUOS_SPLIT],
     ),
     AristonSensorEntityDescription(
         key=ARISTON_BUS_ERRORS,
@@ -527,9 +552,7 @@ ARISTON_SENSOR_TYPES: list[AristonSensorEntityDescription] = (
         get_native_value=lambda entity: entity.device.water_heater_current_temperature,
         native_unit_of_measurement=UnitOfTemperature.CELSIUS,
         system_types=[SystemType.VELIS],
-        whe_types=[
-            WheType.Evo,
-        ],
+        whe_types=[WheType.EVO],
     ),
     AristonSensorEntityDescription(
         key=VelisDeviceProperties.PROC_REQ_TEMP,
@@ -541,13 +564,13 @@ ARISTON_SENSOR_TYPES: list[AristonSensorEntityDescription] = (
         native_unit_of_measurement=UnitOfTemperature.CELSIUS,
         system_types=[SystemType.VELIS],
         whe_types=[
-            WheType.NuosSplit,
-            WheType.Evo2,
-            WheType.LydosHybrid,
-            WheType.Lydos,
-            WheType.Andris2,
-            WheType.Lux,
-            WheType.Lux2,
+            WheType.NUOS_SPLIT,
+            WheType.EVO2,
+            WheType.LYDOS_HYBRID,
+            WheType.LYDOS,
+            WheType.ANDRIS2,
+            WheType.LUX,
+            WheType.LUX2,
         ],
     ),
 )
@@ -588,13 +611,13 @@ ARISTON_BINARY_SENSOR_TYPES: list[AristonBinarySensorEntityDescription] = (
         get_is_on=lambda entity: entity.device.is_heating,
         system_types=[SystemType.VELIS],
         whe_types=[
-            WheType.Lux,
-            WheType.Evo,
-            WheType.Evo2,
-            WheType.Lydos,
-            WheType.LydosHybrid,
-            WheType.Andris2,
-            WheType.Lux2,
+            WheType.LUX,
+            WheType.EVO,
+            WheType.EVO2,
+            WheType.LYDOS,
+            WheType.LYDOS_HYBRID,
+            WheType.ANDRIS2,
+            WheType.LUX2,
         ],
     ),
     AristonBinarySensorEntityDescription(
@@ -604,10 +627,10 @@ ARISTON_BINARY_SENSOR_TYPES: list[AristonBinarySensorEntityDescription] = (
         get_is_on=lambda entity: entity.device.is_antileg,
         system_types=[SystemType.VELIS],
         whe_types=[
-            WheType.Evo2,
-            WheType.Lydos,
-            WheType.LydosHybrid,
-            WheType.Andris2,
+            WheType.EVO2,
+            WheType.LYDOS,
+            WheType.LYDOS_HYBRID,
+            WheType.ANDRIS2,
         ],
     ),
 )
@@ -641,12 +664,12 @@ ARISTON_SWITCH_TYPES: list[AristonSwitchEntityDescription] = (
         get_is_on=lambda entity: entity.device.water_heater_eco_value,
         system_types=[SystemType.VELIS],
         whe_types=[
-            WheType.Lux,
-            WheType.Evo,
-            WheType.Evo2,
-            WheType.Lydos,
-            WheType.Andris2,
-            WheType.Lux2,
+            WheType.LUX,
+            WheType.EVO,
+            WheType.EVO2,
+            WheType.LYDOS,
+            WheType.ANDRIS2,
+            WheType.LUX2,
         ],
     ),
     AristonSwitchEntityDescription(
@@ -657,7 +680,7 @@ ARISTON_SWITCH_TYPES: list[AristonSwitchEntityDescription] = (
         value: entity.device.async_set_water_heater_power_option(value),
         get_is_on=lambda entity: entity.device.water_heater_power_option_value,
         system_types=[SystemType.VELIS],
-        whe_types=[WheType.Lux2],
+        whe_types=[WheType.LUX2],
     ),
     AristonSwitchEntityDescription(
         key=VelisDeviceProperties.ON,
@@ -676,13 +699,13 @@ ARISTON_SWITCH_TYPES: list[AristonSwitchEntityDescription] = (
         get_is_on=lambda entity: entity.device.water_anti_leg_value,
         system_types=[SystemType.VELIS],
         whe_types=[
-            WheType.Andris2,
-            WheType.Evo2,
-            WheType.Lux,
-            WheType.Lux2,
-            WheType.Lydos,
-            WheType.LydosHybrid,
-            WheType.NuosSplit,
+            WheType.ANDRIS2,
+            WheType.EVO2,
+            WheType.LUX,
+            WheType.LUX2,
+            WheType.LYDOS,
+            WheType.LYDOS_HYBRID,
+            WheType.NUOS_SPLIT,
         ],
     ),
     AristonSwitchEntityDescription(
@@ -693,7 +716,7 @@ ARISTON_SWITCH_TYPES: list[AristonSwitchEntityDescription] = (
         set_value=lambda entity, value: entity.device.async_set_preheating(value),
         get_is_on=lambda entity: entity.device.water_heater_preheating_on_off,
         system_types=[SystemType.VELIS],
-        whe_types=[WheType.NuosSplit],
+        whe_types=[WheType.NUOS_SPLIT],
     ),
     AristonSwitchEntityDescription(
         key=NuosSplitProperties.BOOST_ON,
@@ -705,7 +728,7 @@ ARISTON_SWITCH_TYPES: list[AristonSwitchEntityDescription] = (
         ),
         get_is_on=lambda entity: entity.device.water_heater_boost,
         system_types=[SystemType.VELIS],
-        whe_types=[WheType.NuosSplit],
+        whe_types=[WheType.NUOS_SPLIT],
     ),
     AristonSwitchEntityDescription(
         key=SeDeviceSettings.SE_PERMANENT_BOOST_ON_OFF,
@@ -717,7 +740,7 @@ ARISTON_SWITCH_TYPES: list[AristonSwitchEntityDescription] = (
         ),
         get_is_on=lambda entity: entity.device.permanent_boost_value,
         system_types=[SystemType.VELIS],
-        whe_types=[WheType.LydosHybrid],
+        whe_types=[WheType.LYDOS_HYBRID],
     ),
     AristonSwitchEntityDescription(
         key=SeDeviceSettings.SE_ANTI_COOLING_ON_OFF,
@@ -729,7 +752,7 @@ ARISTON_SWITCH_TYPES: list[AristonSwitchEntityDescription] = (
         ),
         get_is_on=lambda entity: entity.device.anti_cooling_value,
         system_types=[SystemType.VELIS],
-        whe_types=[WheType.LydosHybrid],
+        whe_types=[WheType.LYDOS_HYBRID],
     ),
     AristonSwitchEntityDescription(
         key=SeDeviceSettings.SE_NIGHT_MODE_ON_OFF,
@@ -739,7 +762,7 @@ ARISTON_SWITCH_TYPES: list[AristonSwitchEntityDescription] = (
         set_value=lambda entity, value: entity.device.async_set_night_mode_value(value),
         get_is_on=lambda entity: entity.device.night_mode_value,
         system_types=[SystemType.VELIS],
-        whe_types=[WheType.LydosHybrid],
+        whe_types=[WheType.LYDOS_HYBRID],
     ),
 )
 
@@ -787,13 +810,13 @@ ARISTON_NUMBER_TYPES: list[AristonNumberEntityDescription] = (
         value: entity.device.async_set_max_setpoint_temp(value),
         system_types=[SystemType.VELIS],
         whe_types=[
-            WheType.Andris2,
-            WheType.Evo2,
-            WheType.Lux,
-            WheType.Lux2,
-            WheType.Lydos,
-            WheType.LydosHybrid,
-            WheType.NuosSplit,
+            WheType.ANDRIS2,
+            WheType.EVO2,
+            WheType.LUX,
+            WheType.LUX2,
+            WheType.LYDOS,
+            WheType.LYDOS_HYBRID,
+            WheType.NUOS_SPLIT,
         ],
     ),
     AristonNumberEntityDescription(
@@ -808,7 +831,7 @@ ARISTON_NUMBER_TYPES: list[AristonNumberEntityDescription] = (
         set_native_value=lambda entity,
         value: entity.device.async_set_min_setpoint_temp(value),
         system_types=[SystemType.VELIS],
-        whe_types=[WheType.NuosSplit],
+        whe_types=[WheType.NUOS_SPLIT],
     ),
     AristonNumberEntityDescription(
         key=NuosSplitProperties.REDUCED_TEMP,
@@ -822,7 +845,7 @@ ARISTON_NUMBER_TYPES: list[AristonNumberEntityDescription] = (
         set_native_value=lambda entity,
         value: entity.device.async_set_water_heater_reduced_temperature(value),
         system_types=[SystemType.VELIS],
-        whe_types=[WheType.NuosSplit],
+        whe_types=[WheType.NUOS_SPLIT],
     ),
     AristonNumberEntityDescription(
         key=ThermostatProperties.HEATING_FLOW_TEMP,
@@ -878,7 +901,7 @@ ARISTON_NUMBER_TYPES: list[AristonNumberEntityDescription] = (
         get_native_value=lambda entity: entity.device.req_shower,
         set_native_value=lambda entity,
         value: entity.device.async_set_water_heater_number_of_showers(int(value)),
-        whe_types=[WheType.Evo],
+        whe_types=[WheType.EVO],
     ),
     AristonNumberEntityDescription(
         key=SeDeviceSettings.SE_ANTI_COOLING_TEMPERATURE,
@@ -891,7 +914,7 @@ ARISTON_NUMBER_TYPES: list[AristonNumberEntityDescription] = (
         get_native_value=lambda entity: entity.device.anti_cooling_temperature_value,
         set_native_value=lambda entity,
         value: entity.device.async_set_cooling_temperature_value(int(value)),
-        whe_types=[WheType.LydosHybrid],
+        whe_types=[WheType.LYDOS_HYBRID],
     ),
 )
 
@@ -969,6 +992,6 @@ ARISTON_SELECT_TYPES: list[AristonSelectEntityDescription] = (
         select_option=lambda entity,
         option: entity.device.async_set_water_heater_operation_mode(option),
         system_types=[SystemType.VELIS],
-        whe_types=[WheType.Evo],
+        whe_types=[WheType.EVO],
     ),
 )
