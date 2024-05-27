@@ -1,4 +1,5 @@
 """Config flow for Ariston integration."""
+
 from __future__ import annotations
 
 import logging
@@ -35,7 +36,7 @@ STEP_USER_DATA_SCHEMA = vol.Schema(
     {
         vol.Required(CONF_USERNAME): str,
         vol.Required(CONF_PASSWORD): str,
-        vol.Optional(API_URL_SETTING,default=ARISTON_API_URL): str
+        vol.Optional(API_URL_SETTING, default=ARISTON_API_URL): str,
     }
 )
 
@@ -108,8 +109,15 @@ class AristonConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
             cloud_device[DeviceAttribute.GW], raise_on_progress=False
         )
         if existing_entry:
-            data = existing_entry.data.copy()
-            self.hass.config_entries.async_update_entry(existing_entry, data=data)
+            self.hass.config_entries.async_update_entry(
+                existing_entry,
+                data={
+                    CONF_USERNAME: self.cloud_username,
+                    CONF_PASSWORD: self.cloud_password,
+                    API_URL_SETTING: self.cloud_api_url,
+                    CONF_DEVICE: cloud_device,
+                },
+            )
             await self.hass.config_entries.async_reload(existing_entry.entry_id)
             return self.async_abort(reason="reauth_successful")
 
@@ -182,7 +190,7 @@ class AristonOptionsFlow(config_entries.OptionsFlow):
                     vol.Optional(
                         BUS_ERRORS_SCAN_INTERVAL,
                         default=bus_errors_scan_interval,
-                    ): int
+                    ): int,
                 }
             ),
             last_step=True,
