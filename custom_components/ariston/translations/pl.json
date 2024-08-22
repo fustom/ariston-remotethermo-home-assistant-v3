@@ -1,0 +1,35 @@
+{
+  "config": {
+    "abort": {
+      "already_configured": "Urządzenie jest już skonfigurowane",
+      "reauth_successful": "Ponowna autoryzacja zakończona sukcesem"
+    },
+    "error": {
+      "cannot_connect": "Nie można połączyć",
+      "invalid_auth": "Nieprawidłowa autoryzacja",
+      "unknown": "Nieoczekiwany błąd"
+    },
+    "step": {
+      "user": {
+        "data": {
+          "password": "Hasło",
+          "username": "Nazwa użytkownika",
+          "api_url_setting": "Adres URL API Ariston"
+        }
+      }
+    }
+  },
+  "options": {
+    "step": {
+      "init": {
+        "data": {
+          "extra_energy_features": "Dodatkowe encje związane z energią",
+          "scan_interval": "Interwał skanowania strefy (sekundy)",
+          "energy_scan_interval": "Interwał skanowania energii (minuty)",
+          "bus_errors_scan_interval": "Interwał skanowania błędów magistrali (sekundy)"
+        },
+        "title": "Konfiguruj Ariston"
+      }
+    }
+  }
+}
