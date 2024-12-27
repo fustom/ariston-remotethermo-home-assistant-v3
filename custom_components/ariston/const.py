@@ -1,4 +1,5 @@
 """Constants for the Ariston integration."""
+
 import sys
 
 from collections.abc import Callable, Coroutine
@@ -15,7 +16,6 @@ from homeassistant.components.sensor import (
     SensorStateClass,
 )
 from homeassistant.components.switch import SwitchEntityDescription
-from homeassistant.components.water_heater import WaterHeaterEntityEntityDescription
 from homeassistant.const import UnitOfEnergy, UnitOfTime, UnitOfTemperature
 from homeassistant.helpers.entity import EntityCategory, EntityDescription
 
@@ -41,6 +41,14 @@ from ariston.const import (
     MenuItemNames,
     ARISTON_BUS_ERRORS,
 )
+
+try:
+    from homeassistant.components.water_heater import WaterHeaterEntityDescription
+except ImportError:
+    # compatibility code for HA < 2025.1
+    from homeassistant.components.water_heater import WaterHeaterEntityEntityDescription
+
+    WaterHeaterEntityDescription = WaterHeaterEntityEntityDescription
 
 DOMAIN: final = "ariston"
 NAME: final = "Ariston"
@@ -90,7 +98,7 @@ class AristonClimateEntityDescription(
 
 @dataclass(kw_only=True)
 class AristonWaterHeaterEntityDescription(
-    WaterHeaterEntityEntityDescription, AristonBaseEntityDescription
+    WaterHeaterEntityDescription, AristonBaseEntityDescription
 ):
     """A class that describes climate entities."""
 
