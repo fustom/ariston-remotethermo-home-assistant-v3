@@ -58,6 +58,7 @@ ENERGY_SCAN_INTERVAL: final = "energy_scan_interval"
 BUS_ERRORS_COORDINATOR: final = "bus_errors_coordinator"
 BUS_ERRORS_SCAN_INTERVAL: final = "bus_errors_scan_interval"
 API_URL_SETTING: final = "api_url_setting"
+API_USER_AGENT: final = "api_user_agent"
 
 DEFAULT_SCAN_INTERVAL_SECONDS: final = 180
 DEFAULT_ENERGY_SCAN_INTERVAL_MINUTES: final = 60

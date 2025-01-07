@@ -18,10 +18,11 @@ from homeassistant.core import callback
 from homeassistant.data_entry_flow import FlowResult
 
 from ariston import Ariston, DeviceAttribute
-from ariston.const import ARISTON_API_URL
+from ariston.const import ARISTON_API_URL, ARISTON_USER_AGENT
 
 from .const import (
     API_URL_SETTING,
+    API_USER_AGENT,
     BUS_ERRORS_SCAN_INTERVAL,
     DEFAULT_BUS_ERRORS_SCAN_INTERVAL_SECONDS,
     DEFAULT_ENERGY_SCAN_INTERVAL_MINUTES,
@@ -37,6 +38,7 @@ STEP_USER_DATA_SCHEMA = vol.Schema(
         vol.Required(CONF_USERNAME): str,
         vol.Required(CONF_PASSWORD): str,
         vol.Optional(API_URL_SETTING, default=ARISTON_API_URL): str,
+        vol.Optional(API_USER_AGENT, default=ARISTON_USER_AGENT): str,
     }
 )
 
@@ -71,10 +73,11 @@ class AristonConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
             self.cloud_username = user_input[CONF_USERNAME]
             self.cloud_password = user_input[CONF_PASSWORD]
             self.cloud_api_url = user_input[API_URL_SETTING]
+            self.cloud_api_user_agent = user_input[API_USER_AGENT]
             ariston = Ariston()
 
             reponse = await ariston.async_connect(
-                self.cloud_username, self.cloud_password, self.cloud_api_url
+                self.cloud_username, self.cloud_password, self.cloud_api_url, cloud_api_user_agent
             )
             if not reponse:
                 errors["base"] = "invalid_auth"
@@ -115,6 +118,7 @@ class AristonConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
                     CONF_USERNAME: self.cloud_username,
                     CONF_PASSWORD: self.cloud_password,
                     API_URL_SETTING: self.cloud_api_url,
+                    API_USER_AGENT: self.cloud_api_user_agent,
                     CONF_DEVICE: cloud_device,
                 },
             )
@@ -127,6 +131,7 @@ class AristonConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
                 CONF_USERNAME: self.cloud_username,
                 CONF_PASSWORD: self.cloud_password,
                 API_URL_SETTING: self.cloud_api_url,
+                API_USER_AGENT: self.cloud_api_user_agent,
                 CONF_DEVICE: cloud_device,
             },
         )
