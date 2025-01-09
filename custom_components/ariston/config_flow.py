@@ -52,6 +52,7 @@ class AristonConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
         self.cloud_username: str | None = None
         self.cloud_password: str | None = None
         self.cloud_api_url: str = ARISTON_API_URL
+        self.cloud_api_user_agent: str = ARISTON_USER_AGENT
         self.cloud_devices = {}
 
     async def async_step_reauth(self, user_input=None):
@@ -77,7 +78,10 @@ class AristonConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
             ariston = Ariston()
 
             reponse = await ariston.async_connect(
-                self.cloud_username, self.cloud_password, self.cloud_api_url, cloud_api_user_agent
+                self.cloud_username,
+                self.cloud_password,
+                self.cloud_api_url,
+                self.cloud_api_user_agent,
             )
             if not reponse:
                 errors["base"] = "invalid_auth"
