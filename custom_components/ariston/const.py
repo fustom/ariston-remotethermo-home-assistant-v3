@@ -1,11 +1,31 @@
 """Constants for the Ariston integration."""
 
-import sys
-
 from collections.abc import Callable, Coroutine
 from dataclasses import dataclass
-from typing import final
+import sys
+from typing import Any, Final
 
+from ariston.const import (
+    ARISTON_BUS_ERRORS,
+    ConsumptionProperties,
+    ConsumptionType,
+    CustomDeviceFeatures,
+    DeviceAttribute,
+    DeviceFeatures,
+    DeviceProperties,
+    EvoDeviceProperties,
+    EvoLydosDeviceProperties,
+    EvoOneDeviceProperties,
+    MedDeviceSettings,
+    MenuItemNames,
+    NuosSplitProperties,
+    SeDeviceSettings,
+    SlpDeviceSettings,
+    SystemType,
+    ThermostatProperties,
+    VelisDeviceProperties,
+    WheType,
+)
 from homeassistant.components.binary_sensor import BinarySensorEntityDescription
 from homeassistant.components.climate import ClimateEntityDescription
 from homeassistant.components.number import NumberEntityDescription
@@ -16,31 +36,8 @@ from homeassistant.components.sensor import (
     SensorStateClass,
 )
 from homeassistant.components.switch import SwitchEntityDescription
-from homeassistant.const import UnitOfEnergy, UnitOfTime, UnitOfTemperature
+from homeassistant.const import UnitOfEnergy, UnitOfTemperature, UnitOfTime
 from homeassistant.helpers.entity import EntityCategory, EntityDescription
-
-from ariston.device import AristonDevice
-from ariston.const import (
-    DeviceProperties,
-    VelisDeviceProperties,
-    SlpDeviceSettings,
-    EvoLydosDeviceProperties,
-    NuosSplitProperties,
-    EvoDeviceProperties,
-    EvoOneDeviceProperties,
-    ThermostatProperties,
-    ConsumptionProperties,
-    ConsumptionType,
-    DeviceFeatures,
-    CustomDeviceFeatures,
-    MedDeviceSettings,
-    SystemType,
-    WheType,
-    DeviceAttribute,
-    SeDeviceSettings,
-    MenuItemNames,
-    ARISTON_BUS_ERRORS,
-)
 
 try:
     from homeassistant.components.water_heater import WaterHeaterEntityDescription
@@ -50,115 +47,114 @@ except ImportError:
 
     WaterHeaterEntityDescription = WaterHeaterEntityEntityDescription
 
-DOMAIN: final = "ariston"
-NAME: final = "Ariston"
-COORDINATOR: final = "coordinator"
-ENERGY_COORDINATOR: final = "energy_coordinator"
-ENERGY_SCAN_INTERVAL: final = "energy_scan_interval"
-BUS_ERRORS_COORDINATOR: final = "bus_errors_coordinator"
-BUS_ERRORS_SCAN_INTERVAL: final = "bus_errors_scan_interval"
-API_URL_SETTING: final = "api_url_setting"
-API_USER_AGENT: final = "api_user_agent"
+import datetime as dt
 
-DEFAULT_SCAN_INTERVAL_SECONDS: final = 180
-DEFAULT_ENERGY_SCAN_INTERVAL_MINUTES: final = 60
-DEFAULT_BUS_ERRORS_SCAN_INTERVAL_SECONDS: final = 600
+DOMAIN: Final[str] = "ariston"
+NAME: Final[str] = "Ariston"
+COORDINATOR: Final[str] = "coordinator"
+ENERGY_COORDINATOR: Final[str] = "energy_coordinator"
+ENERGY_SCAN_INTERVAL: Final[str] = "energy_scan_interval"
+BUS_ERRORS_COORDINATOR: Final[str] = "bus_errors_coordinator"
+BUS_ERRORS_SCAN_INTERVAL: Final[str] = "bus_errors_scan_interval"
+API_URL_SETTING: Final[str] = "api_url_setting"
+API_USER_AGENT: Final[str] = "api_user_agent"
 
-ATTR_TARGET_TEMP_STEP: final = "target_temp_step"
-ATTR_HEAT_REQUEST: final = "heat_request"
-ATTR_ECONOMY_TEMP: final = "economy_temp"
-ATTR_HOLIDAY: final = "holiday"
-ATTR_ZONE: final = "zone_number"
-ATTR_ERRORS: final = "errors"
+DEFAULT_SCAN_INTERVAL_SECONDS: Final[int] = 180
+DEFAULT_ENERGY_SCAN_INTERVAL_MINUTES: Final[int] = 60
+DEFAULT_BUS_ERRORS_SCAN_INTERVAL_SECONDS: Final[int] = 600
 
-EXTRA_STATE_ATTRIBUTE: final = "Attribute"
-EXTRA_STATE_DEVICE_METHOD: final = "DeviceMethod"
+ATTR_TARGET_TEMP_STEP: Final[str] = "target_temp_step"
+ATTR_HEAT_REQUEST: Final[str] = "heat_request"
+ATTR_ECONOMY_TEMP: Final[str] = "economy_temp"
+ATTR_HOLIDAY: Final[str] = "holiday"
+ATTR_ZONE: Final[str] = "zone_number"
+ATTR_ERRORS: Final[str] = "errors"
+
+EXTRA_STATE_ATTRIBUTE: Final[str] = "Attribute"
+EXTRA_STATE_DEVICE_METHOD: Final[str] = "DeviceMethod"
 
 
-@dataclass(kw_only=True)
+@dataclass(kw_only=True, frozen=True)
 class AristonBaseEntityDescription(EntityDescription):
-    """An abstract class that describes Ariston entites"""
+    """An abstract class that describes Ariston entites."""
 
-    device_features: list[DeviceFeatures] = None
+    device_features: list[str] | None = None
     coordinator: str = COORDINATOR
-    extra_states: list[
-        dict[EXTRA_STATE_ATTRIBUTE:str],
-        dict[EXTRA_STATE_DEVICE_METHOD : Callable[[AristonDevice], Coroutine]],
-    ] = None
-    system_types: list[SystemType] = None
-    whe_types: list[WheType] = None
+    extra_states: list[dict[str, Any]] | None = None
+    system_types: list[SystemType] | None = None
+    whe_types: list[WheType] | None = None
     zone: bool = False
 
 
-@dataclass(kw_only=True)
+@dataclass(kw_only=True, frozen=True)
 class AristonClimateEntityDescription(
     ClimateEntityDescription, AristonBaseEntityDescription
 ):
     """A class that describes climate entities."""
 
 
-@dataclass(kw_only=True)
+@dataclass(kw_only=True, frozen=True)
 class AristonWaterHeaterEntityDescription(
     WaterHeaterEntityDescription, AristonBaseEntityDescription
 ):
     """A class that describes climate entities."""
 
 
-@dataclass(kw_only=True)
+@dataclass(kw_only=True, frozen=True)
 class AristonBinarySensorEntityDescription(
     BinarySensorEntityDescription, AristonBaseEntityDescription
 ):
     """A class that describes binary sensor entities."""
 
-    get_is_on: Callable[[AristonDevice], Coroutine] = None
+    get_is_on: Callable[[Any], bool]
 
 
-@dataclass(kw_only=True)
+@dataclass(kw_only=True, frozen=True)
 class AristonSwitchEntityDescription(
     SwitchEntityDescription, AristonBaseEntityDescription
 ):
     """A class that describes switch entities."""
 
-    set_value: Callable[[AristonDevice, bool], Coroutine] = None
-    get_is_on: Callable[[AristonDevice], Coroutine] = None
+    set_value: Callable[[Any, bool], Coroutine]
+    get_is_on: Callable[[Any], bool]
 
 
-@dataclass(kw_only=True)
+@dataclass(kw_only=True, frozen=True)
 class AristonNumberEntityDescription(
     NumberEntityDescription, AristonBaseEntityDescription
 ):
     """A class that describes switch entities."""
 
-    set_native_value: Callable[[AristonDevice, float], Coroutine] = None
-    get_native_value: Callable[[AristonDevice], Coroutine] = None
-    get_native_min_value: Callable[[AristonDevice], Coroutine] = None
-    get_native_max_value: Callable[[AristonDevice], Coroutine] = None
-    get_native_step: Callable[[AristonDevice], Coroutine] = None
+    set_native_value: Callable[[Any, float], Coroutine]
+    get_native_value: Callable[[Any], Coroutine]
+    get_native_min_value: Callable[[Any], float] | None = None
+    get_native_max_value: Callable[[Any], float | None] | None = None
+    get_native_step: Callable[[Any], Coroutine] | None = None
 
 
-@dataclass(kw_only=True)
+@dataclass(kw_only=True, frozen=True)
 class AristonSensorEntityDescription(
     SensorEntityDescription, AristonBaseEntityDescription
 ):
     """A class that describes sensor entities."""
 
-    get_native_unit_of_measurement: Callable[[AristonDevice], Coroutine] = None
-    get_last_reset: Callable[[AristonDevice], Coroutine] = None
-    get_native_value: Callable[[AristonDevice], Coroutine] = None
+    get_native_unit_of_measurement: Callable[[Any], str] | None = None
+    get_last_reset: Callable[[Any], dt.datetime] | None = None
+    get_native_value: Callable[[Any], Any]
 
 
-@dataclass(kw_only=True)
+@dataclass(kw_only=True, frozen=True)
 class AristonSelectEntityDescription(
     SelectEntityDescription, AristonBaseEntityDescription
 ):
     """A class that describes select entities."""
 
-    get_current_option: Callable[[AristonDevice], Coroutine] = None
-    get_options: Callable[[AristonDevice], Coroutine] = None
-    select_option: Callable[[AristonDevice, str], Coroutine] = None
+    get_current_option: Callable[[Any], str]
+    get_options: Callable[[Any], list[str]]
+    select_option: Callable[[Any, str], Coroutine]
 
 
-ARISTON_CLIMATE_TYPES: list[AristonClimateEntityDescription] = (
+ARISTON_CLIMATE_TYPES: list[AristonClimateEntityDescription] = [
     AristonClimateEntityDescription(
         key="AristonClimate",
         extra_states=[
@@ -185,9 +181,9 @@ ARISTON_CLIMATE_TYPES: list[AristonClimateEntityDescription] = (
         key="AristonClimate",
         system_types=[SystemType.BSB],
     ),
-)
+]
 
-ARISTON_WATER_HEATER_TYPES: list[AristonWaterHeaterEntityDescription] = (
+ARISTON_WATER_HEATER_TYPES: list[AristonWaterHeaterEntityDescription] = [
     AristonWaterHeaterEntityDescription(
         key="AristonWaterHeater",
         extra_states=[
@@ -219,9 +215,9 @@ ARISTON_WATER_HEATER_TYPES: list[AristonWaterHeaterEntityDescription] = (
             WheType.NuosSplit,
         ],
     ),
-)
+]
 
-ARISTON_SENSOR_TYPES: list[AristonSensorEntityDescription] = (
+ARISTON_SENSOR_TYPES: list[AristonSensorEntityDescription] = [
     AristonSensorEntityDescription(
         key=DeviceProperties.HEATING_CIRCUIT_PRESSURE,
         name=f"{NAME} heating circuit pressure",
@@ -252,7 +248,7 @@ ARISTON_SENSOR_TYPES: list[AristonSensorEntityDescription] = (
         system_types=[SystemType.GALEVO],
     ),
     AristonSensorEntityDescription(
-        key=MenuItemNames.SIGNAL_STRENGTH,
+        key=str(MenuItemNames.SIGNAL_STRENGTH),
         name=f"{NAME} signal strength",
         state_class=SensorStateClass.MEASUREMENT,
         entity_category=EntityCategory.DIAGNOSTIC,
@@ -261,7 +257,7 @@ ARISTON_SENSOR_TYPES: list[AristonSensorEntityDescription] = (
         system_types=[SystemType.GALEVO],
     ),
     AristonSensorEntityDescription(
-        key=MenuItemNames.CH_RETURN_TEMP,
+        key=str(MenuItemNames.CH_RETURN_TEMP),
         name=f"{NAME} CH return temp",
         device_class=SensorDeviceClass.TEMPERATURE,
         state_class=SensorStateClass.MEASUREMENT,
@@ -559,9 +555,9 @@ ARISTON_SENSOR_TYPES: list[AristonSensorEntityDescription] = (
             WheType.Lux2,
         ],
     ),
-)
+]
 
-ARISTON_BINARY_SENSOR_TYPES: list[AristonBinarySensorEntityDescription] = (
+ARISTON_BINARY_SENSOR_TYPES: list[AristonBinarySensorEntityDescription] = [
     AristonBinarySensorEntityDescription(
         key=DeviceProperties.IS_FLAME_ON,
         name=f"{NAME} is flame on",
@@ -619,9 +615,9 @@ ARISTON_BINARY_SENSOR_TYPES: list[AristonBinarySensorEntityDescription] = (
             WheType.Andris2,
         ],
     ),
-)
+]
 
-ARISTON_SWITCH_TYPES: list[AristonSwitchEntityDescription] = (
+ARISTON_SWITCH_TYPES: list[AristonSwitchEntityDescription] = [
     AristonSwitchEntityDescription(
         key=DeviceProperties.AUTOMATIC_THERMOREGULATION,
         name=f"{NAME} automatic thermoregulation",
@@ -750,9 +746,9 @@ ARISTON_SWITCH_TYPES: list[AristonSwitchEntityDescription] = (
         system_types=[SystemType.VELIS],
         whe_types=[WheType.LydosHybrid],
     ),
-)
+]
 
-ARISTON_NUMBER_TYPES: list[AristonNumberEntityDescription] = (
+ARISTON_NUMBER_TYPES: list[AristonNumberEntityDescription] = [
     AristonNumberEntityDescription(
         key=ConsumptionProperties.ELEC_COST,
         name=f"{NAME} elec cost",
@@ -902,9 +898,9 @@ ARISTON_NUMBER_TYPES: list[AristonNumberEntityDescription] = (
         value: entity.device.async_set_cooling_temperature_value(int(value)),
         whe_types=[WheType.LydosHybrid],
     ),
-)
+]
 
-ARISTON_SELECT_TYPES: list[AristonSelectEntityDescription] = (
+ARISTON_SELECT_TYPES: list[AristonSelectEntityDescription] = [
     AristonSelectEntityDescription(
         key=ConsumptionProperties.CURRENCY,
         name=f"{NAME} currency",
@@ -980,4 +976,4 @@ ARISTON_SELECT_TYPES: list[AristonSelectEntityDescription] = (
         system_types=[SystemType.VELIS],
         whe_types=[WheType.Evo],
     ),
-)
+]
