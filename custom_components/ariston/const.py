@@ -65,6 +65,7 @@ DEFAULT_ENERGY_SCAN_INTERVAL_MINUTES: final = 60
 DEFAULT_BUS_ERRORS_SCAN_INTERVAL_SECONDS: final = 600
 
 ATTR_TARGET_TEMP_STEP: final = "target_temp_step"
+ATTR_HVAC_ACTION: final = "hvac_action"
 ATTR_HEAT_REQUEST: final = "heat_request"
 ATTR_ECONOMY_TEMP: final = "economy_temp"
 ATTR_HOLIDAY: final = "holiday"
@@ -205,6 +206,10 @@ ARISTON_WATER_HEATER_TYPES: list[AristonWaterHeaterEntityDescription] = (
             {
                 EXTRA_STATE_ATTRIBUTE: ATTR_TARGET_TEMP_STEP,
                 EXTRA_STATE_DEVICE_METHOD: lambda entity: entity.device.water_heater_temperature_step,
+            },
+            {
+                EXTRA_STATE_ATTRIBUTE: ATTR_HVAC_ACTION,
+                EXTRA_STATE_DEVICE_METHOD: lambda entity: "heating" if entity.device.is_heating else "idle",
             }
         ],
         device_features=[CustomDeviceFeatures.HAS_DHW],
@@ -534,10 +539,11 @@ ARISTON_SENSOR_TYPES: list[AristonSensorEntityDescription] = (
         device_class=SensorDeviceClass.TEMPERATURE,
         state_class=SensorStateClass.MEASUREMENT,
         get_native_value=lambda entity: entity.device.water_heater_current_temperature,
-        native_unit_of_measurement=UnitOfTemperature.CELSIUS,
+        get_native_unit_of_measurement=lambda entity: entity.device.water_heater_temperature_unit,
         system_types=[SystemType.VELIS],
         whe_types=[
             WheType.Evo,
+            WheType.LydosHybrid,
         ],
     ),
     AristonSensorEntityDescription(
@@ -547,7 +553,7 @@ ARISTON_SENSOR_TYPES: list[AristonSensorEntityDescription] = (
         device_class=SensorDeviceClass.TEMPERATURE,
         state_class=SensorStateClass.MEASUREMENT,
         get_native_value=lambda entity: entity.device.proc_req_temp_value,
-        native_unit_of_measurement=UnitOfTemperature.CELSIUS,
+        get_native_unit_of_measurement=lambda entity: entity.device.water_heater_temperature_unit,
         system_types=[SystemType.VELIS],
         whe_types=[
             WheType.NuosSplit,
@@ -973,11 +979,15 @@ ARISTON_SELECT_TYPES: list[AristonSelectEntityDescription] = (
         key=EvoOneDeviceProperties.MODE,
         name=f"{NAME} operation mode",
         icon="mdi:cog",
+        entity_category=EntityCategory.CONFIG,
         get_current_option=lambda entity: entity.device.water_heater_current_mode_text,
         get_options=lambda entity: entity.device.water_heater_mode_operation_texts,
         select_option=lambda entity,
         option: entity.device.async_set_water_heater_operation_mode(option),
         system_types=[SystemType.VELIS],
-        whe_types=[WheType.Evo],
+        whe_types=[
+            WheType.Evo,
+            WheType.LydosHybrid,
+        ],
     ),
 )
