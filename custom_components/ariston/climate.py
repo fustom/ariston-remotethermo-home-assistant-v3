@@ -1,27 +1,23 @@
 """Support for Ariston boilers."""
+
 from __future__ import annotations
 
 import logging
 
-from .entity import AristonEntity
-from .const import (
-    ARISTON_CLIMATE_TYPES,
-    DOMAIN,
-    AristonClimateEntityDescription,
-)
-from .coordinator import DeviceDataUpdateCoordinator
-
 from ariston.const import PlantMode, ZoneMode
-
-from homeassistant.config_entries import ConfigEntry
-from homeassistant.core import HomeAssistant
-from homeassistant.const import ATTR_TEMPERATURE
 from homeassistant.components.climate import (
     ClimateEntity,
-    HVACMode,
-    HVACAction,
     ClimateEntityFeature,
+    HVACAction,
+    HVACMode,
 )
+from homeassistant.config_entries import ConfigEntry
+from homeassistant.const import ATTR_TEMPERATURE
+from homeassistant.core import HomeAssistant
+
+from .const import ARISTON_CLIMATE_TYPES, DOMAIN, AristonClimateEntityDescription
+from .coordinator import DeviceDataUpdateCoordinator
+from .entity import AristonEntity
 
 _LOGGER = logging.getLogger(__name__)
 
@@ -30,7 +26,7 @@ async def async_setup_entry(
     hass: HomeAssistant, entry: ConfigEntry, async_add_entities
 ):
     """Set up the Ariston device from config entry."""
-    ariston_climates: list[ClimateEntity] = []
+    ariston_climates: list[AristonThermostat] = []
 
     for description in ARISTON_CLIMATE_TYPES:
         coordinator: DeviceDataUpdateCoordinator = hass.data[DOMAIN][entry.unique_id][
@@ -66,7 +62,7 @@ class AristonThermostat(AristonEntity, ClimateEntity):
         coordinator: DeviceDataUpdateCoordinator,
         description: AristonClimateEntityDescription,
     ) -> None:
-        """Initialize the thermostat"""
+        """Initialize the thermostat."""
         super().__init__(coordinator, description, zone)
 
     @property
@@ -84,8 +80,7 @@ class AristonThermostat(AristonEntity, ClimateEntity):
         """Return the icon of the thermostat device."""
         if self.device.is_plant_in_heat_mode:
             return "mdi:radiator"
-        else:
-            return "mdi:radiator-off"
+        return "mdi:radiator-off"
 
     @property
     def temperature_unit(self) -> str:
@@ -220,12 +215,11 @@ class AristonThermostat(AristonEntity, ClimateEntity):
                 elif current_plant_mode == PlantMode.SUMMER:
                     # DHW is working, so use Winter where CH and DHW are active
                     await self.device.async_set_plant_mode(PlantMode.WINTER)
+                # hvac is OFF, so use heating only, if not supported then winter
+                elif PlantMode.HEATING_ONLY in plant_modes:
+                    await self.device.async_set_plant_mode(PlantMode.HEATING_ONLY)
                 else:
-                    # hvac is OFF, so use heating only, if not supported then winter
-                    if PlantMode.HEATING_ONLY in plant_modes:
-                        await self.device.async_set_plant_mode(PlantMode.HEATING_ONLY)
-                    else:
-                        await self.device.async_set_plant_mode(PlantMode.WINTER)
+                    await self.device.async_set_plant_mode(PlantMode.WINTER)
                 await self.device.async_set_zone_mode(ZoneMode.TIME_PROGRAM, self.zone)
             elif hvac_mode == HVACMode.HEAT:
                 if current_plant_mode in [PlantMode.WINTER, PlantMode.HEATING_ONLY]:
@@ -234,12 +228,11 @@ class AristonThermostat(AristonEntity, ClimateEntity):
                 elif current_plant_mode in [PlantMode.SUMMER, PlantMode.COOLING]:
                     # DHW is working, so use Winter and change mode
                     await self.device.async_set_plant_mode(PlantMode.WINTER)
+                # hvac is OFF, so use heating only, if not supported then winter
+                elif PlantMode.HEATING_ONLY in plant_modes:
+                    await self.device.async_set_plant_mode(PlantMode.HEATING_ONLY)
                 else:
-                    # hvac is OFF, so use heating only, if not supported then winter
-                    if PlantMode.HEATING_ONLY in plant_modes:
-                        await self.device.async_set_plant_mode(PlantMode.HEATING_ONLY)
-                    else:
-                        await self.device.async_set_plant_mode(PlantMode.WINTER)
+                    await self.device.async_set_plant_mode(PlantMode.WINTER)
                 if ZoneMode.MANUAL_NIGHT in zone_modes:
                     await self.device.async_set_zone_mode(
                         ZoneMode.MANUAL_NIGHT, self.zone

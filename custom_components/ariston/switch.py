@@ -1,16 +1,16 @@
 """Support for Ariston switches."""
+
 from __future__ import annotations
 
 import logging
 
-from homeassistant.core import HomeAssistant
-from homeassistant.config_entries import ConfigEntry
 from homeassistant.components.switch import SwitchEntity
+from homeassistant.config_entries import ConfigEntry
+from homeassistant.core import HomeAssistant
 
-from .entity import AristonEntity
 from .const import ARISTON_SWITCH_TYPES, DOMAIN, AristonSwitchEntityDescription
 from .coordinator import DeviceDataUpdateCoordinator
-
+from .entity import AristonEntity
 
 _LOGGER = logging.getLogger(__name__)
 
@@ -44,7 +44,7 @@ async def async_setup_entry(
 
 
 class AristonSwitch(AristonEntity, SwitchEntity):
-    """Base class for specific ariston switches"""
+    """Base class for specific ariston switches."""
 
     def __init__(
         self,

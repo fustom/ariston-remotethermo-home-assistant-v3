@@ -3,10 +3,12 @@
 from __future__ import annotations
 
 import logging
-import voluptuous as vol
-
 from typing import Any
 
+import voluptuous as vol
+
+from ariston import Ariston, DeviceAttribute
+from ariston.const import ARISTON_API_URL, ARISTON_USER_AGENT
 from homeassistant import config_entries
 from homeassistant.const import (
     CONF_DEVICE,
@@ -15,10 +17,6 @@ from homeassistant.const import (
     CONF_USERNAME,
 )
 from homeassistant.core import callback
-from homeassistant.data_entry_flow import FlowResult
-
-from ariston import Ariston, DeviceAttribute
-from ariston.const import ARISTON_API_URL, ARISTON_USER_AGENT
 
 from .const import (
     API_URL_SETTING,
@@ -49,8 +47,9 @@ class AristonConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
     VERSION = 1
 
     def __init__(self) -> None:
-        self.cloud_username: str | None = None
-        self.cloud_password: str | None = None
+        """Initialize Ariston config flow."""
+        self.cloud_username: str = ""
+        self.cloud_password: str = ""
         self.cloud_api_url: str = ARISTON_API_URL
         self.cloud_api_user_agent: str = ARISTON_USER_AGENT
         self.cloud_devices = {}
@@ -61,7 +60,7 @@ class AristonConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
 
     async def async_step_user(
         self, user_input: dict[str, Any] | None = None
-    ) -> FlowResult:
+    ) -> config_entries.ConfigFlowResult:
         """Handle the initial step."""
         if user_input is None:
             return self.async_show_form(
@@ -111,7 +110,7 @@ class AristonConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
         )
 
     async def async_create_or_update_entry(self, cloud_device):
-        """Create or update config entry"""
+        """Create or update config entry."""
         existing_entry = await self.async_set_unique_id(
             cloud_device[DeviceAttribute.GW], raise_on_progress=False
         )
@@ -141,7 +140,7 @@ class AristonConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
         )
 
     async def async_step_select(self, user_input=None):
-        """Multiple device found, select one of them"""
+        """Multiple device found, select one of them."""
         errors = {}
         if user_input is not None:
             return await self.async_create_or_update_entry(

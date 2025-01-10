@@ -1,23 +1,18 @@
 """Support for Ariston sensors."""
+
 from __future__ import annotations
 
 import logging
+
 import voluptuous as vol
 
-from homeassistant.components.binary_sensor import (
-    BinarySensorEntity,
-)
+from ariston.const import DeviceProperties, SystemType
+from homeassistant.components.binary_sensor import BinarySensorEntity
+from homeassistant.config_entries import ConfigEntry
 from homeassistant.const import ATTR_DEVICE_ID
 from homeassistant.core import HomeAssistant
-from homeassistant.config_entries import ConfigEntry
-from homeassistant.helpers import (
-    config_validation as cv,
-    device_registry as dr,
-)
+from homeassistant.helpers import config_validation as cv, device_registry as dr
 
-from ariston.const import DeviceProperties, SystemType
-
-from .entity import AristonEntity
 from .const import (
     ARISTON_BINARY_SENSOR_TYPES,
     COORDINATOR,
@@ -25,6 +20,7 @@ from .const import (
     AristonBinarySensorEntityDescription,
 )
 from .coordinator import DeviceDataUpdateCoordinator
+from .entity import AristonEntity
 
 _LOGGER = logging.getLogger(__name__)
 
@@ -94,13 +90,14 @@ async def async_setup_entry(
 
 
 class AristonBinarySensor(AristonEntity, BinarySensorEntity):
-    """Base class for specific ariston binary sensors"""
+    """Base class for specific ariston binary sensors."""
 
     def __init__(
         self,
         coordinator: DeviceDataUpdateCoordinator,
         description: AristonBinarySensorEntityDescription,
     ) -> None:
+        """Initialize the entity."""
         super().__init__(coordinator, description)
 
     @property

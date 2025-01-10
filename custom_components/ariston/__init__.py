@@ -1,10 +1,13 @@
 """The Ariston integration."""
+
 from __future__ import annotations
 
 import logging
 
 import voluptuous as vol
 
+from ariston import Ariston, DeviceAttribute, SystemType
+from ariston.const import ARISTON_API_URL, ARISTON_USER_AGENT
 from homeassistant.config_entries import ConfigEntry
 from homeassistant.const import (
     ATTR_DEVICE_ID,
@@ -19,33 +22,30 @@ from homeassistant.exceptions import ConfigEntryAuthFailed, ConfigEntryNotReady
 from homeassistant.helpers import config_validation as cv, device_registry as dr
 from homeassistant.util.unit_system import METRIC_SYSTEM
 
-from ariston import Ariston, DeviceAttribute, SystemType
-from ariston.const import ARISTON_API_URL, ARISTON_USER_AGENT
-
 from .const import (
     API_URL_SETTING,
     API_USER_AGENT,
+    BUS_ERRORS_COORDINATOR,
+    BUS_ERRORS_SCAN_INTERVAL,
     COORDINATOR,
+    DEFAULT_BUS_ERRORS_SCAN_INTERVAL_SECONDS,
     DEFAULT_ENERGY_SCAN_INTERVAL_MINUTES,
     DEFAULT_SCAN_INTERVAL_SECONDS,
     DOMAIN,
     ENERGY_COORDINATOR,
     ENERGY_SCAN_INTERVAL,
-    DEFAULT_BUS_ERRORS_SCAN_INTERVAL_SECONDS,
-    BUS_ERRORS_COORDINATOR,
-    BUS_ERRORS_SCAN_INTERVAL,
 )
 from .coordinator import DeviceDataUpdateCoordinator
 
 _LOGGER = logging.getLogger(__name__)
 
 PLATFORMS: list[str] = [
-    Platform.CLIMATE,
-    Platform.SENSOR,
     Platform.BINARY_SENSOR,
-    Platform.SWITCH,
-    Platform.SELECT,
+    Platform.CLIMATE,
     Platform.NUMBER,
+    Platform.SELECT,
+    Platform.SENSOR,
+    Platform.SWITCH,
     Platform.WATER_HEATER,
 ]
 
@@ -68,23 +68,22 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
     """Set up Ariston from a config entry."""
     ariston = Ariston()
     try:
-        api_url_setting = entry.data.get(
-            API_URL_SETTING, ARISTON_API_URL
-        )
+        api_url_setting = entry.data.get(API_URL_SETTING, ARISTON_API_URL)
 
-        api_user_agent =  entry.data.get(
-            API_USER_AGENT, ARISTON_USER_AGENT
-        )
+        api_user_agent = entry.data.get(API_USER_AGENT, ARISTON_USER_AGENT)
 
         reponse = await ariston.async_connect(
-            entry.data[CONF_USERNAME], entry.data[CONF_PASSWORD], api_url_setting, api_user_agent
+            entry.data[CONF_USERNAME],
+            entry.data[CONF_PASSWORD],
+            api_url_setting,
+            api_user_agent,
         )
         if not reponse:
             _LOGGER.error(
                 "Failed to connect to Ariston with device: %s",
                 entry.data[CONF_DEVICE].get(DeviceAttribute.NAME),
             )
-            raise ConfigEntryAuthFailed()
+            raise ConfigEntryAuthFailed
 
         device = await ariston.async_hello(
             entry.data[CONF_DEVICE].get(DeviceAttribute.GW),
@@ -119,9 +118,9 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
             BUS_ERRORS_COORDINATOR,
             device.async_get_bus_errors,
         )
-        hass.data[DOMAIN][entry.unique_id][
-            BUS_ERRORS_COORDINATOR
-        ] = bus_errors_coordinator
+        hass.data[DOMAIN][entry.unique_id][BUS_ERRORS_COORDINATOR] = (
+            bus_errors_coordinator
+        )
         await bus_errors_coordinator.async_config_entry_first_refresh()
 
         if device.has_metering:
@@ -168,11 +167,11 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
                 async_set_item_by_id_service,
                 schema=SET_ITEM_BY_ID_SCHEMA,
             )
-    except ConfigEntryAuthFailed as ex:
-        raise ex
+    except ConfigEntryAuthFailed:
+        raise
     except Exception as error:
         _LOGGER.exception("")
-        raise ConfigEntryNotReady() from error
+        raise ConfigEntryNotReady from error
 
     return True
 
