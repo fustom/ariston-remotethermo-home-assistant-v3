@@ -4,7 +4,7 @@ from __future__ import annotations
 
 import logging
 
-from ariston.const import PlantMode, ZoneMode
+from ariston.const import PlantMode, ZoneMode, BsbZoneMode
 from homeassistant.components.climate import (
     ClimateEntity,
     ClimateEntityFeature,
@@ -247,8 +247,13 @@ class AristonThermostat(AristonEntity, ClimateEntity):
                     )
                 else:
                     await self.device.async_set_zone_mode(ZoneMode.MANUAL, self.zone)
-        else:
-            await self.device.async_set_zone_mode(hvac_mode, self.zone)
+        # Plant mode is not supported (BSB device)
+        elif hvac_mode == HVACMode.OFF:
+            await self.device.async_set_zone_mode(BsbZoneMode.OFF, self.zone)
+        elif hvac_mode == HVACMode.AUTO:
+            await self.device.async_set_zone_mode(BsbZoneMode.TIME_PROGRAM, self.zone)
+        elif hvac_mode == HVACMode.HEAT:
+            await self.device.async_set_zone_mode(BsbZoneMode.MANUAL, self.zone)
 
         self.async_write_ha_state()
 
