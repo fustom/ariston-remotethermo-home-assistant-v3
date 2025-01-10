@@ -14,7 +14,8 @@
         "data": {
           "password": "Password",
           "username": "Username",
-          "api_url_setting": "Ariston API url"
+          "api_url_setting": "Ariston API url",
+          "api_user_agent": "Ariston API user agent"
         }
       }
     }
