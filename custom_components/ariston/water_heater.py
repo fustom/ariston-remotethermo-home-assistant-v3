@@ -1,26 +1,25 @@
 """Support for Ariston water heaters."""
+
 from __future__ import annotations
 
 import logging
 
-from .entity import AristonEntity
+from ariston.const import SystemType
+from homeassistant.components.water_heater import (
+    WaterHeaterEntity,
+    WaterHeaterEntityFeature,
+)
+from homeassistant.config_entries import ConfigEntry
+from homeassistant.const import ATTR_TEMPERATURE
+from homeassistant.core import HomeAssistant
+
 from .const import (
     ARISTON_WATER_HEATER_TYPES,
     DOMAIN,
     AristonWaterHeaterEntityDescription,
 )
 from .coordinator import DeviceDataUpdateCoordinator
-
-from ariston.const import SystemType
-from homeassistant.core import HomeAssistant
-from homeassistant.config_entries import ConfigEntry
-from homeassistant.components.water_heater import (
-    WaterHeaterEntityFeature,
-    WaterHeaterEntity,
-)
-from homeassistant.const import (
-    ATTR_TEMPERATURE,
-)
+from .entity import AristonEntity
 
 _LOGGER = logging.getLogger(__name__)
 
@@ -63,7 +62,7 @@ class AristonWaterHeater(AristonEntity, WaterHeaterEntity):
     @property
     def name(self) -> str:
         """Return the name of the device."""
-        return self.device.name
+        return self.device.name or ""
 
     @property
     def unique_id(self) -> str:
@@ -72,11 +71,12 @@ class AristonWaterHeater(AristonEntity, WaterHeaterEntity):
 
     @property
     def icon(self):
+        """Return the icon to use in the frontend."""
         return "mdi:water-pump"
 
     @property
     def current_temperature(self):
-        """Return the temperature"""
+        """Return the temperature."""
         return self.device.water_heater_current_temperature
 
     @property
@@ -125,7 +125,7 @@ class AristonWaterHeater(AristonEntity, WaterHeaterEntity):
 
     @property
     def current_operation(self):
-        """Return current operation"""
+        """Return current operation."""
         return self.device.water_heater_current_mode_text
 
     async def async_set_temperature(self, **kwargs):

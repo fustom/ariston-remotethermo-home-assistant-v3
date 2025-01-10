@@ -1,14 +1,14 @@
 """Coordinator class for Ariston module."""
+
 from __future__ import annotations
+
 from collections.abc import Callable
 from datetime import timedelta
-
 import logging
 
+from ariston.base_device import AristonBaseDevice
 from homeassistant.core import HomeAssistant
 from homeassistant.helpers.update_coordinator import DataUpdateCoordinator
-
-from ariston.device import AristonDevice
 
 from .const import DOMAIN
 
@@ -21,7 +21,7 @@ class DeviceDataUpdateCoordinator(DataUpdateCoordinator):
     def __init__(
         self,
         hass: HomeAssistant,
-        device: AristonDevice,
+        device: AristonBaseDevice,
         scan_interval_seconds: int,
         coordinator_name: str,
         async_update_state: Callable,

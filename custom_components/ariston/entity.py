@@ -1,10 +1,11 @@
 """Entity object for shared properties of Ariston entities."""
+
 from __future__ import annotations
 
+from abc import ABC
 import logging
 
-from abc import ABC
-
+from ariston.const import WheType
 from homeassistant.helpers.entity import DeviceInfo
 from homeassistant.helpers.update_coordinator import CoordinatorEntity
 
@@ -16,8 +17,6 @@ from .const import (
 )
 from .coordinator import DeviceDataUpdateCoordinator
 
-from ariston.const import WheType
-
 _LOGGER = logging.getLogger(__name__)
 
 
@@ -28,7 +27,7 @@ class AristonEntity(CoordinatorEntity, ABC):
         self,
         coordinator: DeviceDataUpdateCoordinator,
         description: AristonBaseEntityDescription,
-        zone: int | None = None,
+        zone: int = 0,
     ) -> None:
         """Initialize the entity."""
         super().__init__(coordinator)
@@ -41,7 +40,7 @@ class AristonEntity(CoordinatorEntity, ABC):
     def device_info(self) -> DeviceInfo:
         """Return device specific attributes."""
         return DeviceInfo(
-            identifiers={(DOMAIN, self.device.serial_number)},
+            identifiers={(DOMAIN, self.device.serial_number or "")},
             manufacturer=DOMAIN,
             name=self.device.name,
             sw_version=self.device.firmware_version,
@@ -50,6 +49,7 @@ class AristonEntity(CoordinatorEntity, ABC):
 
     @property
     def model(self) -> str:
+        """Return the model of the entity."""
         if self.device.whe_model_type == 0:
             if self.device.whe_type is WheType.Unknown:
                 return f"{self.device.system_type.name}"
