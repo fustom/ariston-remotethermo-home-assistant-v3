@@ -159,15 +159,11 @@ class AristonConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
     @callback
     def async_get_options_flow(config_entry):
         """Get the options flow for this handler."""
-        return AristonOptionsFlow(config_entry)
+        return AristonOptionsFlow()
 
 
 class AristonOptionsFlow(config_entries.OptionsFlow):
     """Handle Ariston options."""
-
-    def __init__(self, config_entry) -> None:
-        """Initialize Ariston options flow."""
-        self.config_entry = config_entry
 
     async def async_step_init(self, user_input=None):
         """Manage the options."""
