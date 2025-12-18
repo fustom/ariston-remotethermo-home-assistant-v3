@@ -159,18 +159,22 @@ class AristonConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
     @callback
     def async_get_options_flow(config_entry):
         """Get the options flow for this handler."""
-        return AristonOptionsFlow()
+        return AristonOptionsFlow(config_entry)
 
 
 class AristonOptionsFlow(config_entries.OptionsFlow):
     """Handle Ariston options."""
+
+    def __init__(self, config_entry) -> None:
+        """Initialize Ariston options flow."""
+        self._entry = config_entry
 
     async def async_step_init(self, user_input=None):
         """Manage the options."""
         if user_input is not None:
             return self.async_create_entry(title="", data=user_input)
 
-        options = self.config_entry.options
+        options = self._entry.options
         scan_interval = options.get(CONF_SCAN_INTERVAL, DEFAULT_SCAN_INTERVAL_SECONDS)
         energy_scan_interval = options.get(
             ENERGY_SCAN_INTERVAL, DEFAULT_ENERGY_SCAN_INTERVAL_MINUTES
