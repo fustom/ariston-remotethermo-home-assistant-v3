@@ -259,6 +259,11 @@ class AristonThermostat(AristonEntity, ClimateEntity):
 
     async def async_set_preset_mode(self, preset_mode):
         """Set new target preset mode."""
+        _LOGGER.debug(
+            "Setting preset mode to %s for %s",
+            preset_mode,
+            self.name,
+        )
 
         # Don't assume index maps to enum value directly
         preset_index = self.device.plant_mode_opt_texts.index(preset_mode)
