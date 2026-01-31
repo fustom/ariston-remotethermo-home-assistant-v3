@@ -42,6 +42,39 @@ async def async_setup_entry(
             )
         ):
             for zone_number in coordinator.device.zone_numbers:
+                # Skip hidden zones
+                try:
+                    # Check if zone is hidden
+                    if hasattr(coordinator.device, 'is_zone_hidden'):
+                        if coordinator.device.is_zone_hidden(zone_number):
+                            _LOGGER.debug(
+                                "Skipping hidden zone %d for device %s",
+                                zone_number,
+                                coordinator.device.name
+                            )
+                            continue
+                    # Alternative: Check zone attributes from device features
+                    elif hasattr(coordinator.device, 'features'):
+                        features = coordinator.device.features
+                        if features and 'zones' in features:
+                            zones = features.get('zones', [])
+                            if zone_number - 1 < len(zones):
+                                zone_info = zones[zone_number - 1]
+                                if zone_info.get('isHidden', False):
+                                    _LOGGER.debug(
+                                        "Skipping hidden zone %d (from features)",
+                                        zone_number
+                                    )
+                                    continue
+                except Exception as e:
+                    _LOGGER.debug(
+                        "Error checking if zone %d is hidden: %s",
+                        zone_number,
+                        e
+                    )
+                    # If we can't determine, create the entity anyway
+                    pass
+                
                 ariston_climates.append(
                     AristonThermostat(
                         zone_number,
