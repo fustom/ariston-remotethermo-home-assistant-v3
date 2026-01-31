@@ -159,8 +159,8 @@ class AristonThermostat(AristonEntity, ClimateEntity):
                     supported_modes.append(HVACMode.COOL)
         if self.device.is_zone_mode_options_contains_time_program(self.zone):
             supported_modes.append(HVACMode.AUTO)
-        if self.device.is_zone_mode_options_contains_off(self.zone):
-            supported_modes.append(HVACMode.OFF)
+        # Always include OFF mode in the UI
+        supported_modes.append(HVACMode.OFF)
 
         return supported_modes
 
@@ -203,9 +203,12 @@ class AristonThermostat(AristonEntity, ClimateEntity):
             current_plant_mode = self.device.plant_mode
 
             if hvac_mode == HVACMode.OFF:
-                if self.device.is_plant_mode_options_contains_off:
+                # If OFF mode is supported, use it. Otherwise use SUMMER mode
+                # to avoid shutting down the entire system
+                if PlantMode.OFF in plant_modes:
                     await self.device.async_set_plant_mode(PlantMode.OFF)
                 else:
+                    # Use SUMMER mode instead of OFF to keep DHW active
                     await self.device.async_set_plant_mode(PlantMode.SUMMER)
             elif hvac_mode == HVACMode.AUTO:
                 if current_plant_mode in [
@@ -252,7 +255,10 @@ class AristonThermostat(AristonEntity, ClimateEntity):
                     await self.device.async_set_zone_mode(ZoneMode.MANUAL, self.zone)
         # Plant mode is not supported (BSB device)
         elif hvac_mode == HVACMode.OFF:
-            await self.device.async_set_zone_mode(BsbZoneMode.OFF, self.zone)
+            if self.device.is_zone_mode_options_contains_off(self.zone):
+                await self.device.async_set_zone_mode(BsbZoneMode.OFF, self.zone)
+            # If OFF is not natively supported, do nothing
+            # OFF is already in the UI but won't do anything for BSB devices
         elif hvac_mode == HVACMode.AUTO:
             await self.device.async_set_zone_mode(BsbZoneMode.TIME_PROGRAM, self.zone)
         elif hvac_mode == HVACMode.HEAT:
