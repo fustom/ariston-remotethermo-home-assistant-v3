@@ -1,7 +1,11 @@
 """Constants for the Ariston integration."""
 
+from __future__ import annotations
+
 from collections.abc import Callable, Coroutine
 from dataclasses import dataclass
+import datetime as dt
+import logging
 import sys
 from typing import Any, Final
 
@@ -16,6 +20,7 @@ from ariston.const import (
     EvoDeviceProperties,
     EvoLydosDeviceProperties,
     EvoOneDeviceProperties,
+    GasType,
     MedDeviceSettings,
     MenuItemNames,
     NuosSplitProperties,
@@ -26,6 +31,7 @@ from ariston.const import (
     VelisDeviceProperties,
     WheType,
 )
+
 from homeassistant.components.binary_sensor import BinarySensorEntityDescription
 from homeassistant.components.climate import ClimateEntityDescription
 from homeassistant.components.number import NumberEntityDescription
@@ -36,18 +42,17 @@ from homeassistant.components.sensor import (
     SensorStateClass,
 )
 from homeassistant.components.switch import SwitchEntityDescription
-from homeassistant.const import UnitOfEnergy, UnitOfTemperature, UnitOfTime
+from homeassistant.const import UnitOfEnergy, UnitOfTemperature, UnitOfTime, UnitOfVolume
 from homeassistant.helpers.entity import EntityCategory, EntityDescription
 
 try:
     from homeassistant.components.water_heater import WaterHeaterEntityDescription
-except ImportError:
-    # compatibility code for HA < 2025.1
-    from homeassistant.components.water_heater import WaterHeaterEntityEntityDescription
+except ImportError:  # HA < 2025.1
+    from homeassistant.components.water_heater import (
+        WaterHeaterEntityEntityDescription as WaterHeaterEntityDescription,
+    )
 
-    WaterHeaterEntityDescription = WaterHeaterEntityEntityDescription
-
-import datetime as dt
+_LOGGER = logging.getLogger(__name__)
 
 DOMAIN: Final[str] = "ariston"
 NAME: Final[str] = "Ariston"
@@ -73,6 +78,181 @@ ATTR_ERRORS: Final[str] = "errors"
 EXTRA_STATE_ATTRIBUTE: Final[str] = "Attribute"
 EXTRA_STATE_DEVICE_METHOD: Final[str] = "DeviceMethod"
 
+# ==================== CONSUMPTION KEYS (API TRUTH) ====================
+GAS_HEATING_KEY: Final[int] = 1      # Central Heating Gas (kWh)
+GAS_DHW_KEY: Final[int] = 2          # Domestic Hot Water Gas (kWh)
+ELEC_HEATING_KEY: Final[int] = 10    # Central Heating Electricity (kWh)
+ELEC_DHW_KEY: Final[int] = 21        # Domestic Hot Water Electricity (kWh)
+
+# ==================== RAW ACCESS ====================
+
+def get_consumption_sequence(entity, key: int, period: int) -> list[float] | None:
+    sequences = getattr(entity.device, "consumptions_sequences", None)
+    if not sequences:
+        return None
+    for seq in sequences:
+        if seq.get("k") == key and seq.get("p") == period:
+            return seq.get("v", [])
+    return None
+
+
+# ==================== PRIMITIVES ====================
+
+def _last(values: list[float]) -> float | None:
+    return round(values[-1], 2) if values and values[-1] > 0 else None
+
+
+def _last_nonzero(values: list[float]) -> float | None:
+    for v in reversed(values or []):
+        if v > 0:
+            return round(v, 2)
+    return None
+
+
+def _rolling(values: list[float], length: int) -> float | None:
+    if not values or len(values) < length:
+        return None
+    return round(sum(values[-length:]), 2)
+
+
+def _current_month(values: list[float]) -> float | None:
+    """
+    API returns finalized daily values.
+    Today is excluded because it may be partial.
+    """
+    if not values:
+        return None
+    days_completed = dt.datetime.now().day - 1
+    return round(sum(values[:days_completed]), 2)
+
+
+# ==================== SEMANTIC ACCESS ====================
+
+def yesterday(entity, key: int) -> float | None:
+    return _last(get_consumption_sequence(entity, key, 3) or [])
+
+
+def current_month(entity, key: int) -> float | None:
+    return _current_month(get_consumption_sequence(entity, key, 3) or [])
+
+
+def last_month(entity, key: int) -> float | None:
+    return _last_nonzero(get_consumption_sequence(entity, key, 4) or [])
+
+
+def rolling(entity, key: int, period: int, length: int) -> float | None:
+    return _rolling(get_consumption_sequence(entity, key, period) or [], length)
+
+
+# ==================== GAS CONFIG ====================
+
+GAS_CALORIFIC_VALUES_KWH_PER_M3 = {
+    GasType.NATURAL_GAS: 11.2,       # Natural Gas: 10.5-11.5 kWh/m³
+    GasType.LPG: 26.0,               # LPG: 25-28 kWh/m³
+    GasType.PROPANE: 25.5,           # Propane: 25-28 kWh/m³
+    GasType.AIR_PROPANED: 8.5,       # Air-Propane mix: variable, ~8.5 kWh/m³
+    GasType.GPO: 10.0,               # GPO: region-specific
+}
+
+DEFAULT_CALORIFIC_VALUE = 11.2
+DEFAULT_GAS_TYPE = GasType.NATURAL_GAS
+
+
+def get_gas_type_from_config(entity) -> GasType:
+    try:
+        return GasType(getattr(entity.device, "gas_type", None))
+    except Exception:
+        return DEFAULT_GAS_TYPE
+
+
+def get_gas_calorific_value(entity) -> float:
+    return GAS_CALORIFIC_VALUES_KWH_PER_M3.get(
+        get_gas_type_from_config(entity),
+        DEFAULT_CALORIFIC_VALUE,
+    )
+
+
+def gas_kwh_to_m3(entity, value: float | None) -> float | None:
+    if value is None:
+        return None
+    return round(value / get_gas_calorific_value(entity), 3)
+
+
+# ==================== FACTORIES ====================
+
+def make_kwh(fn, key: int):
+    return lambda entity: fn(entity, key)
+
+
+def make_roll(key: int, period: int, length: int):
+    return lambda entity: rolling(entity, key, period, length)
+
+
+def make_m3(kwh_fn):
+    return lambda entity: gas_kwh_to_m3(entity, kwh_fn(entity))
+
+
+# ==================== GAS (kWh) ====================
+
+get_yesterday_heating_gas_kwh = make_kwh(yesterday, GAS_HEATING_KEY)
+get_yesterday_dhw_gas_kwh = make_kwh(yesterday, GAS_DHW_KEY)
+
+get_current_month_heating_gas_kwh = make_kwh(current_month, GAS_HEATING_KEY)
+get_current_month_dhw_gas_kwh = make_kwh(current_month, GAS_DHW_KEY)
+
+get_last_month_heating_gas_kwh = make_kwh(last_month, GAS_HEATING_KEY)
+get_last_month_dhw_gas_kwh = make_kwh(last_month, GAS_DHW_KEY)
+
+get_rolling_24h_heating_gas_kwh = make_roll(GAS_HEATING_KEY, 1, 24)
+get_rolling_24h_dhw_gas_kwh = make_roll(GAS_DHW_KEY, 1, 24)
+
+get_rolling_7day_heating_gas_kwh = make_roll(GAS_HEATING_KEY, 2, 7)
+get_rolling_7day_dhw_gas_kwh = make_roll(GAS_DHW_KEY, 2, 7)
+
+get_rolling_30day_heating_gas_kwh = make_roll(GAS_HEATING_KEY, 3, 30)
+get_rolling_30day_dhw_gas_kwh = make_roll(GAS_DHW_KEY, 3, 30)
+
+
+# ==================== GAS (m³) ====================
+
+get_yesterday_heating_gas_m3 = make_m3(get_yesterday_heating_gas_kwh)
+get_yesterday_dhw_gas_m3 = make_m3(get_yesterday_dhw_gas_kwh)
+
+get_current_month_heating_gas_m3 = make_m3(get_current_month_heating_gas_kwh)
+get_current_month_dhw_gas_m3 = make_m3(get_current_month_dhw_gas_kwh)
+
+get_last_month_heating_gas_m3 = make_m3(get_last_month_heating_gas_kwh)
+get_last_month_dhw_gas_m3 = make_m3(get_last_month_dhw_gas_kwh)
+
+get_rolling_24h_heating_gas_m3 = make_m3(get_rolling_24h_heating_gas_kwh)
+get_rolling_24h_dhw_gas_m3 = make_m3(get_rolling_24h_dhw_gas_kwh)
+
+get_rolling_7day_heating_gas_m3 = make_m3(get_rolling_7day_heating_gas_kwh)
+get_rolling_7day_dhw_gas_m3 = make_m3(get_rolling_7day_dhw_gas_kwh)
+
+get_rolling_30day_heating_gas_m3 = make_m3(get_rolling_30day_heating_gas_kwh)
+get_rolling_30day_dhw_gas_m3 = make_m3(get_rolling_30day_dhw_gas_kwh)
+
+
+# ==================== ELECTRICITY (kWh) ====================
+
+get_yesterday_heating_electricity_kwh = make_kwh(yesterday, ELEC_HEATING_KEY)
+get_yesterday_dhw_electricity_kwh = make_kwh(yesterday, ELEC_DHW_KEY)
+
+get_current_month_heating_electricity_kwh = make_kwh(current_month, ELEC_HEATING_KEY)
+get_current_month_dhw_electricity_kwh = make_kwh(current_month, ELEC_DHW_KEY)
+
+get_last_month_heating_electricity_kwh = make_kwh(last_month, ELEC_HEATING_KEY)
+get_last_month_dhw_electricity_kwh = make_kwh(last_month, ELEC_DHW_KEY)
+
+get_rolling_24h_heating_electricity_kwh = make_roll(ELEC_HEATING_KEY, 1, 24)
+get_rolling_24h_dhw_electricity_kwh = make_roll(ELEC_DHW_KEY, 1, 24)
+
+get_rolling_7day_heating_electricity_kwh = make_roll(ELEC_HEATING_KEY, 2, 7)
+get_rolling_7day_dhw_electricity_kwh = make_roll(ELEC_DHW_KEY, 2, 7)
+
+get_rolling_30day_heating_electricity_kwh = make_roll(ELEC_HEATING_KEY, 3, 30)
+get_rolling_30day_dhw_electricity_kwh = make_roll(ELEC_DHW_KEY, 3, 30)
 
 @dataclass(kw_only=True, frozen=True)
 class AristonBaseEntityDescription(EntityDescription):
@@ -85,20 +265,17 @@ class AristonBaseEntityDescription(EntityDescription):
     whe_types: list[WheType] | None = None
     zone: bool = False
 
-
 @dataclass(kw_only=True, frozen=True)
 class AristonClimateEntityDescription(
     ClimateEntityDescription, AristonBaseEntityDescription
 ):
     """A class that describes climate entities."""
 
-
 @dataclass(kw_only=True, frozen=True)
 class AristonWaterHeaterEntityDescription(
     WaterHeaterEntityDescription, AristonBaseEntityDescription
 ):
     """A class that describes climate entities."""
-
 
 @dataclass(kw_only=True, frozen=True)
 class AristonBinarySensorEntityDescription(
@@ -108,7 +285,6 @@ class AristonBinarySensorEntityDescription(
 
     get_is_on: Callable[[Any], bool]
 
-
 @dataclass(kw_only=True, frozen=True)
 class AristonSwitchEntityDescription(
     SwitchEntityDescription, AristonBaseEntityDescription
@@ -117,7 +293,6 @@ class AristonSwitchEntityDescription(
 
     set_value: Callable[[Any, bool], Coroutine]
     get_is_on: Callable[[Any], bool]
-
 
 @dataclass(kw_only=True, frozen=True)
 class AristonNumberEntityDescription(
@@ -131,7 +306,6 @@ class AristonNumberEntityDescription(
     get_native_max_value: Callable[[Any], float | None] | None = None
     get_native_step: Callable[[Any], Coroutine] | None = None
 
-
 @dataclass(kw_only=True, frozen=True)
 class AristonSensorEntityDescription(
     SensorEntityDescription, AristonBaseEntityDescription
@@ -142,7 +316,6 @@ class AristonSensorEntityDescription(
     get_last_reset: Callable[[Any], dt.datetime] | None = None
     get_native_value: Callable[[Any], Any]
 
-
 @dataclass(kw_only=True, frozen=True)
 class AristonSelectEntityDescription(
     SelectEntityDescription, AristonBaseEntityDescription
@@ -152,7 +325,6 @@ class AristonSelectEntityDescription(
     get_current_option: Callable[[Any], str]
     get_options: Callable[[Any], list[str]]
     select_option: Callable[[Any, str], Coroutine]
-
 
 ARISTON_CLIMATE_TYPES: list[AristonClimateEntityDescription] = [
     AristonClimateEntityDescription(
@@ -218,6 +390,7 @@ ARISTON_WATER_HEATER_TYPES: list[AristonWaterHeaterEntityDescription] = [
 ]
 
 ARISTON_SENSOR_TYPES: list[AristonSensorEntityDescription] = [
+    # Existing device sensors
     AristonSensorEntityDescription(
         key=DeviceProperties.HEATING_CIRCUIT_PRESSURE,
         name=f"{NAME} heating circuit pressure",
@@ -299,101 +472,24 @@ ARISTON_SENSOR_TYPES: list[AristonSensorEntityDescription] = [
             WheType.Lux2,
         ],
     ),
+    
+    # ==================== GAS CALORIFIC VALUE ====================
     AristonSensorEntityDescription(
-        key="Gas consumption for heating last month",
-        name=f"{NAME} gas consumption for heating last month",
+        key="gas_calorific_value",
+        name=f"{NAME} gas calorific value",
         icon="mdi:gas-cylinder",
         entity_category=EntityCategory.DIAGNOSTIC,
-        device_class=SensorDeviceClass.ENERGY,
-        native_unit_of_measurement=UnitOfEnergy.KILO_WATT_HOUR,
+        native_unit_of_measurement=f"{UnitOfEnergy.KILO_WATT_HOUR}/{UnitOfVolume.CUBIC_METERS}",
         device_features=[DeviceFeatures.HAS_METERING],
         coordinator=ENERGY_COORDINATOR,
-        get_native_value=lambda entity: entity.device.gas_consumption_for_heating_last_month,
-        system_types=[SystemType.GALEVO],
+        get_native_value=get_gas_calorific_value,
     ),
+    
+    # ==================== YESTERDAY CONSUMPTION ====================
+    # Gas - kWh
     AristonSensorEntityDescription(
-        key="Electricity consumption for heating last month",
-        name=f"{NAME} electricity consumption for heating last month",
-        icon="mdi:cash",
-        entity_category=EntityCategory.DIAGNOSTIC,
-        device_class=SensorDeviceClass.ENERGY,
-        native_unit_of_measurement=UnitOfEnergy.KILO_WATT_HOUR,
-        device_features=[DeviceFeatures.HAS_METERING],
-        coordinator=ENERGY_COORDINATOR,
-        get_native_value=lambda entity: entity.device.electricity_consumption_for_heating_last_month,
-        system_types=[SystemType.GALEVO],
-    ),
-    AristonSensorEntityDescription(
-        key="Electricity consumption for cooling last month",
-        name=f"{NAME} electricity consumption for cooling last month",
-        icon="mdi:lightning-bolt",
-        entity_category=EntityCategory.DIAGNOSTIC,
-        device_class=SensorDeviceClass.ENERGY,
-        native_unit_of_measurement=UnitOfEnergy.KILO_WATT_HOUR,
-        device_features=[DeviceFeatures.HAS_METERING, DeviceAttribute.HPMP_SYS],
-        coordinator=ENERGY_COORDINATOR,
-        get_native_value=lambda entity: entity.device.electricity_consumption_for_cooling_last_month,
-        system_types=[SystemType.GALEVO],
-    ),
-    AristonSensorEntityDescription(
-        key="Gas consumption for water last month",
-        name=f"{NAME} gas consumption for water last month",
-        icon="mdi:gas-cylinder",
-        entity_category=EntityCategory.DIAGNOSTIC,
-        device_class=SensorDeviceClass.ENERGY,
-        native_unit_of_measurement=UnitOfEnergy.KILO_WATT_HOUR,
-        device_features=[DeviceFeatures.HAS_METERING, CustomDeviceFeatures.HAS_DHW],
-        coordinator=ENERGY_COORDINATOR,
-        get_native_value=lambda entity: entity.device.gas_consumption_for_water_last_month,
-        system_types=[SystemType.GALEVO],
-    ),
-    AristonSensorEntityDescription(
-        key="Electricity consumption for water last month",
-        name=f"{NAME} electricity consumption for water last month",
-        icon="mdi:lightning-bolt",
-        entity_category=EntityCategory.DIAGNOSTIC,
-        device_class=SensorDeviceClass.ENERGY,
-        native_unit_of_measurement=UnitOfEnergy.KILO_WATT_HOUR,
-        device_features=[DeviceFeatures.HAS_METERING, CustomDeviceFeatures.HAS_DHW],
-        coordinator=ENERGY_COORDINATOR,
-        get_native_value=lambda entity: entity.device.electricity_consumption_for_water_last_month,
-        system_types=[SystemType.GALEVO],
-    ),
-    AristonSensorEntityDescription(
-        key="Central heating total energy consumption",
-        name=f"{NAME} central heating total energy consumption",
-        icon="mdi:lightning-bolt",
-        entity_category=EntityCategory.DIAGNOSTIC,
-        state_class=SensorStateClass.TOTAL,
-        device_class=SensorDeviceClass.ENERGY,
-        native_unit_of_measurement=UnitOfEnergy.KILO_WATT_HOUR,
-        device_features=[
-            DeviceFeatures.HAS_METERING,
-            ConsumptionType.CENTRAL_HEATING_TOTAL_ENERGY.name,
-        ],
-        coordinator=ENERGY_COORDINATOR,
-        get_native_value=lambda entity: entity.device.central_heating_total_energy_consumption,
-        get_last_reset=lambda entity: entity.device.consumption_sequence_last_changed_utc,
-    ),
-    AristonSensorEntityDescription(
-        key="Domestic hot water total energy consumption",
-        name=f"{NAME} domestic hot water total energy consumption",
-        icon="mdi:lightning-bolt",
-        entity_category=EntityCategory.DIAGNOSTIC,
-        state_class=SensorStateClass.TOTAL,
-        device_class=SensorDeviceClass.ENERGY,
-        native_unit_of_measurement=UnitOfEnergy.KILO_WATT_HOUR,
-        device_features=[
-            DeviceFeatures.HAS_METERING,
-            ConsumptionType.DOMESTIC_HOT_WATER_TOTAL_ENERGY.name,
-        ],
-        coordinator=ENERGY_COORDINATOR,
-        get_native_value=lambda entity: entity.device.domestic_hot_water_total_energy_consumption,
-        get_last_reset=lambda entity: entity.device.consumption_sequence_last_changed_utc,
-    ),
-    AristonSensorEntityDescription(
-        key="Central heating gas consumption",
-        name=f"{NAME} central heating gas consumption",
+        key="yesterday_heating_gas_kwh",
+        name=f"{NAME} yesterday heating gas energy",
         icon="mdi:gas-cylinder",
         entity_category=EntityCategory.DIAGNOSTIC,
         state_class=SensorStateClass.TOTAL,
@@ -404,44 +500,11 @@ ARISTON_SENSOR_TYPES: list[AristonSensorEntityDescription] = [
             ConsumptionType.CENTRAL_HEATING_GAS.name,
         ],
         coordinator=ENERGY_COORDINATOR,
-        get_native_value=lambda entity: entity.device.central_heating_gas_consumption,
-        get_last_reset=lambda entity: entity.device.consumption_sequence_last_changed_utc,
+        get_native_value=get_yesterday_heating_gas_kwh,
     ),
     AristonSensorEntityDescription(
-        key="Domestic hot water heating pump electricity consumption",
-        name=f"{NAME} domestic hot water heating pump electricity consumption",
-        icon="mdi:lightning-bolt",
-        entity_category=EntityCategory.DIAGNOSTIC,
-        state_class=SensorStateClass.TOTAL,
-        device_class=SensorDeviceClass.ENERGY,
-        native_unit_of_measurement=UnitOfEnergy.KILO_WATT_HOUR,
-        device_features=[
-            DeviceFeatures.HAS_METERING,
-            ConsumptionType.DOMESTIC_HOT_WATER_HEATING_PUMP_ELECTRICITY.name,
-        ],
-        coordinator=ENERGY_COORDINATOR,
-        get_native_value=lambda entity: entity.device.domestic_hot_water_heating_pump_electricity_consumption,
-        get_last_reset=lambda entity: entity.device.consumption_sequence_last_changed_utc,
-    ),
-    AristonSensorEntityDescription(
-        key="Domestic hot water resistor electricity consumption",
-        name=f"{NAME} domestic hot water resistor electricity consumption",
-        icon="mdi:lightning-bolt",
-        entity_category=EntityCategory.DIAGNOSTIC,
-        state_class=SensorStateClass.TOTAL,
-        device_class=SensorDeviceClass.ENERGY,
-        native_unit_of_measurement=UnitOfEnergy.KILO_WATT_HOUR,
-        device_features=[
-            DeviceFeatures.HAS_METERING,
-            ConsumptionType.DOMESTIC_HOT_WATER_RESISTOR_ELECTRICITY.name,
-        ],
-        coordinator=ENERGY_COORDINATOR,
-        get_native_value=lambda entity: entity.device.domestic_hot_water_resistor_electricity_consumption,
-        get_last_reset=lambda entity: entity.device.consumption_sequence_last_changed_utc,
-    ),
-    AristonSensorEntityDescription(
-        key="Domestic hot water gas consumption",
-        name=f"{NAME} domestic hot water gas consumption",
+        key="yesterday_dhw_gas_kwh",
+        name=f"{NAME} yesterday DHW gas energy",
         icon="mdi:gas-cylinder",
         entity_category=EntityCategory.DIAGNOSTIC,
         state_class=SensorStateClass.TOTAL,
@@ -452,12 +515,43 @@ ARISTON_SENSOR_TYPES: list[AristonSensorEntityDescription] = [
             ConsumptionType.DOMESTIC_HOT_WATER_GAS.name,
         ],
         coordinator=ENERGY_COORDINATOR,
-        get_native_value=lambda entity: entity.device.domestic_hot_water_gas_consumption,
-        get_last_reset=lambda entity: entity.device.consumption_sequence_last_changed_utc,
+        get_native_value=get_yesterday_dhw_gas_kwh,
+    ),
+    # Gas - m³
+    AristonSensorEntityDescription(
+        key="yesterday_heating_gas_m3",
+        name=f"{NAME} yesterday heating gas",
+        icon="mdi:gas-cylinder",
+        entity_category=EntityCategory.DIAGNOSTIC,
+        state_class=SensorStateClass.TOTAL,
+        device_class=SensorDeviceClass.GAS,
+        native_unit_of_measurement=UnitOfVolume.CUBIC_METERS,
+        device_features=[
+            DeviceFeatures.HAS_METERING,
+            ConsumptionType.CENTRAL_HEATING_GAS.name,
+        ],
+        coordinator=ENERGY_COORDINATOR,
+        get_native_value=get_yesterday_heating_gas_m3,
     ),
     AristonSensorEntityDescription(
-        key="Central heating electricity consumption",
-        name=f"{NAME} central heating electricity consumption",
+        key="yesterday_dhw_gas_m3",
+        name=f"{NAME} yesterday DHW gas",
+        icon="mdi:gas-cylinder",
+        entity_category=EntityCategory.DIAGNOSTIC,
+        state_class=SensorStateClass.TOTAL,
+        device_class=SensorDeviceClass.GAS,
+        native_unit_of_measurement=UnitOfVolume.CUBIC_METERS,
+        device_features=[
+            DeviceFeatures.HAS_METERING,
+            ConsumptionType.DOMESTIC_HOT_WATER_GAS.name,
+        ],
+        coordinator=ENERGY_COORDINATOR,
+        get_native_value=get_yesterday_dhw_gas_m3,
+    ),
+    # Electricity
+    AristonSensorEntityDescription(
+        key="yesterday_heating_electricity_kwh",
+        name=f"{NAME} yesterday heating electricity",
         icon="mdi:lightning-bolt",
         entity_category=EntityCategory.DIAGNOSTIC,
         state_class=SensorStateClass.TOTAL,
@@ -468,12 +562,11 @@ ARISTON_SENSOR_TYPES: list[AristonSensorEntityDescription] = [
             ConsumptionType.CENTRAL_HEATING_ELECTRICITY.name,
         ],
         coordinator=ENERGY_COORDINATOR,
-        get_native_value=lambda entity: entity.device.central_heating_electricity_consumption,
-        get_last_reset=lambda entity: entity.device.consumption_sequence_last_changed_utc,
+        get_native_value=get_yesterday_heating_electricity_kwh,
     ),
     AristonSensorEntityDescription(
-        key="Domestic hot water electricity consumption",
-        name=f"{NAME} domestic hot water electricity consumption",
+        key="yesterday_dhw_electricity_kwh",
+        name=f"{NAME} yesterday DHW electricity",
         icon="mdi:lightning-bolt",
         entity_category=EntityCategory.DIAGNOSTIC,
         state_class=SensorStateClass.TOTAL,
@@ -484,9 +577,485 @@ ARISTON_SENSOR_TYPES: list[AristonSensorEntityDescription] = [
             ConsumptionType.DOMESTIC_HOT_WATER_ELECTRICITY.name,
         ],
         coordinator=ENERGY_COORDINATOR,
-        get_native_value=lambda entity: entity.device.domestic_hot_water_electricity_consumption,
-        get_last_reset=lambda entity: entity.device.consumption_sequence_last_changed_utc,
+        get_native_value=get_yesterday_dhw_electricity_kwh,
     ),
+    
+    # ==================== CURRENT MONTH CONSUMPTION ====================
+    # Gas - kWh
+    AristonSensorEntityDescription(
+        key="current_month_heating_gas_kwh",
+        name=f"{NAME} current month heating gas energy",
+        icon="mdi:gas-cylinder",
+        entity_category=EntityCategory.DIAGNOSTIC,
+        state_class=SensorStateClass.TOTAL_INCREASING,
+        device_class=SensorDeviceClass.ENERGY,
+        native_unit_of_measurement=UnitOfEnergy.KILO_WATT_HOUR,
+        device_features=[
+            DeviceFeatures.HAS_METERING,
+            ConsumptionType.CENTRAL_HEATING_GAS.name,
+        ],
+        coordinator=ENERGY_COORDINATOR,
+        get_native_value=get_current_month_heating_gas_kwh,
+    ),
+    AristonSensorEntityDescription(
+        key="current_month_dhw_gas_kwh",
+        name=f"{NAME} current month DHW gas energy",
+        icon="mdi:gas-cylinder",
+        entity_category=EntityCategory.DIAGNOSTIC,
+        state_class=SensorStateClass.TOTAL_INCREASING,
+        device_class=SensorDeviceClass.ENERGY,
+        native_unit_of_measurement=UnitOfEnergy.KILO_WATT_HOUR,
+        device_features=[
+            DeviceFeatures.HAS_METERING,
+            ConsumptionType.DOMESTIC_HOT_WATER_GAS.name,
+        ],
+        coordinator=ENERGY_COORDINATOR,
+        get_native_value=get_current_month_dhw_gas_kwh,
+    ),
+    # Gas - m³
+    AristonSensorEntityDescription(
+        key="current_month_heating_gas_m3",
+        name=f"{NAME} current month heating gas",
+        icon="mdi:gas-cylinder",
+        entity_category=EntityCategory.DIAGNOSTIC,
+        state_class=SensorStateClass.TOTAL_INCREASING,
+        device_class=SensorDeviceClass.GAS,
+        native_unit_of_measurement=UnitOfVolume.CUBIC_METERS,
+        device_features=[
+            DeviceFeatures.HAS_METERING,
+            ConsumptionType.CENTRAL_HEATING_GAS.name,
+        ],
+        coordinator=ENERGY_COORDINATOR,
+        get_native_value=get_current_month_heating_gas_m3,
+    ),
+    AristonSensorEntityDescription(
+        key="current_month_dhw_gas_m3",
+        name=f"{NAME} current month DHW gas",
+        icon="mdi:gas-cylinder",
+        entity_category=EntityCategory.DIAGNOSTIC,
+        state_class=SensorStateClass.TOTAL_INCREASING,
+        device_class=SensorDeviceClass.GAS,
+        native_unit_of_measurement=UnitOfVolume.CUBIC_METERS,
+        device_features=[
+            DeviceFeatures.HAS_METERING,
+            ConsumptionType.DOMESTIC_HOT_WATER_GAS.name,
+        ],
+        coordinator=ENERGY_COORDINATOR,
+        get_native_value=get_current_month_dhw_gas_m3,
+    ),
+    # Electricity
+    AristonSensorEntityDescription(
+        key="current_month_heating_electricity_kwh",
+        name=f"{NAME} current month heating electricity",
+        icon="mdi:lightning-bolt",
+        entity_category=EntityCategory.DIAGNOSTIC,
+        state_class=SensorStateClass.TOTAL_INCREASING,
+        device_class=SensorDeviceClass.ENERGY,
+        native_unit_of_measurement=UnitOfEnergy.KILO_WATT_HOUR,
+        device_features=[
+            DeviceFeatures.HAS_METERING,
+            ConsumptionType.CENTRAL_HEATING_ELECTRICITY.name,
+        ],
+        coordinator=ENERGY_COORDINATOR,
+        get_native_value=get_current_month_heating_electricity_kwh,
+    ),
+    AristonSensorEntityDescription(
+        key="current_month_dhw_electricity_kwh",
+        name=f"{NAME} current month DHW electricity",
+        icon="mdi:lightning-bolt",
+        entity_category=EntityCategory.DIAGNOSTIC,
+        state_class=SensorStateClass.TOTAL_INCREASING,
+        device_class=SensorDeviceClass.ENERGY,
+        native_unit_of_measurement=UnitOfEnergy.KILO_WATT_HOUR,
+        device_features=[
+            DeviceFeatures.HAS_METERING,
+            ConsumptionType.DOMESTIC_HOT_WATER_ELECTRICITY.name,
+        ],
+        coordinator=ENERGY_COORDINATOR,
+        get_native_value=get_current_month_dhw_electricity_kwh,
+    ),
+    
+    # ==================== LAST MONTH CONSUMPTION ====================
+    # Gas - kWh
+    AristonSensorEntityDescription(
+        key="last_month_heating_gas_kwh",
+        name=f"{NAME} last month heating gas energy",
+        icon="mdi:gas-cylinder",
+        entity_category=EntityCategory.DIAGNOSTIC,
+        state_class=SensorStateClass.TOTAL,
+        device_class=SensorDeviceClass.ENERGY,
+        native_unit_of_measurement=UnitOfEnergy.KILO_WATT_HOUR,
+        device_features=[
+            DeviceFeatures.HAS_METERING,
+            ConsumptionType.CENTRAL_HEATING_GAS.name,
+        ],
+        coordinator=ENERGY_COORDINATOR,
+        get_native_value=get_last_month_heating_gas_kwh,
+    ),
+    AristonSensorEntityDescription(
+        key="last_month_dhw_gas_kwh",
+        name=f"{NAME} last month DHW gas energy",
+        icon="mdi:gas-cylinder",
+        entity_category=EntityCategory.DIAGNOSTIC,
+        state_class=SensorStateClass.TOTAL,
+        device_class=SensorDeviceClass.ENERGY,
+        native_unit_of_measurement=UnitOfEnergy.KILO_WATT_HOUR,
+        device_features=[
+            DeviceFeatures.HAS_METERING,
+            ConsumptionType.DOMESTIC_HOT_WATER_GAS.name,
+        ],
+        coordinator=ENERGY_COORDINATOR,
+        get_native_value=get_last_month_dhw_gas_kwh,
+    ),
+    # Gas - m³
+    AristonSensorEntityDescription(
+        key="last_month_heating_gas_m3",
+        name=f"{NAME} last month heating gas",
+        icon="mdi:gas-cylinder",
+        entity_category=EntityCategory.DIAGNOSTIC,
+        state_class=SensorStateClass.TOTAL,
+        device_class=SensorDeviceClass.GAS,
+        native_unit_of_measurement=UnitOfVolume.CUBIC_METERS,
+        device_features=[
+            DeviceFeatures.HAS_METERING,
+            ConsumptionType.CENTRAL_HEATING_GAS.name,
+        ],
+        coordinator=ENERGY_COORDINATOR,
+        get_native_value=get_last_month_heating_gas_m3,
+    ),
+    AristonSensorEntityDescription(
+        key="last_month_dhw_gas_m3",
+        name=f"{NAME} last month DHW gas",
+        icon="mdi:gas-cylinder",
+        entity_category=EntityCategory.DIAGNOSTIC,
+        state_class=SensorStateClass.TOTAL,
+        device_class=SensorDeviceClass.GAS,
+        native_unit_of_measurement=UnitOfVolume.CUBIC_METERS,
+        device_features=[
+            DeviceFeatures.HAS_METERING,
+            ConsumptionType.DOMESTIC_HOT_WATER_GAS.name,
+        ],
+        coordinator=ENERGY_COORDINATOR,
+        get_native_value=get_last_month_dhw_gas_m3,
+    ),
+    # Electricity
+    AristonSensorEntityDescription(
+        key="last_month_heating_electricity_kwh",
+        name=f"{NAME} last month heating electricity",
+        icon="mdi:lightning-bolt",
+        entity_category=EntityCategory.DIAGNOSTIC,
+        state_class=SensorStateClass.TOTAL,
+        device_class=SensorDeviceClass.ENERGY,
+        native_unit_of_measurement=UnitOfEnergy.KILO_WATT_HOUR,
+        device_features=[
+            DeviceFeatures.HAS_METERING,
+            ConsumptionType.CENTRAL_HEATING_ELECTRICITY.name,
+        ],
+        coordinator=ENERGY_COORDINATOR,
+        get_native_value=get_last_month_heating_electricity_kwh,
+    ),
+    AristonSensorEntityDescription(
+        key="last_month_dhw_electricity_kwh",
+        name=f"{NAME} last month DHW electricity",
+        icon="mdi:lightning-bolt",
+        entity_category=EntityCategory.DIAGNOSTIC,
+        state_class=SensorStateClass.TOTAL,
+        device_class=SensorDeviceClass.ENERGY,
+        native_unit_of_measurement=UnitOfEnergy.KILO_WATT_HOUR,
+        device_features=[
+            DeviceFeatures.HAS_METERING,
+            ConsumptionType.DOMESTIC_HOT_WATER_ELECTRICITY.name,
+        ],
+        coordinator=ENERGY_COORDINATOR,
+        get_native_value=get_last_month_dhw_electricity_kwh,
+    ),
+    
+    # ==================== ROLLING 24H CONSUMPTION ====================
+    # Gas - kWh
+    AristonSensorEntityDescription(
+        key="rolling_24h_heating_gas_kwh",
+        name=f"{NAME} rolling 24h heating gas energy",
+        icon="mdi:gas-cylinder",
+        entity_category=EntityCategory.DIAGNOSTIC,
+        state_class=SensorStateClass.MEASUREMENT,
+        device_class=SensorDeviceClass.ENERGY,
+        native_unit_of_measurement=UnitOfEnergy.KILO_WATT_HOUR,
+        device_features=[
+            DeviceFeatures.HAS_METERING,
+            ConsumptionType.CENTRAL_HEATING_GAS.name,
+        ],
+        coordinator=ENERGY_COORDINATOR,
+        get_native_value=get_rolling_24h_heating_gas_kwh,
+    ),
+    AristonSensorEntityDescription(
+        key="rolling_24h_dhw_gas_kwh",
+        name=f"{NAME} rolling 24h DHW gas energy",
+        icon="mdi:gas-cylinder",
+        entity_category=EntityCategory.DIAGNOSTIC,
+        state_class=SensorStateClass.MEASUREMENT,
+        device_class=SensorDeviceClass.ENERGY,
+        native_unit_of_measurement=UnitOfEnergy.KILO_WATT_HOUR,
+        device_features=[
+            DeviceFeatures.HAS_METERING,
+            ConsumptionType.DOMESTIC_HOT_WATER_GAS.name,
+        ],
+        coordinator=ENERGY_COORDINATOR,
+        get_native_value=get_rolling_24h_dhw_gas_kwh,
+    ),
+    # Gas - m³
+    AristonSensorEntityDescription(
+        key="rolling_24h_heating_gas_m3",
+        name=f"{NAME} rolling 24h heating gas",
+        icon="mdi:gas-cylinder",
+        entity_category=EntityCategory.DIAGNOSTIC,
+        state_class=SensorStateClass.MEASUREMENT,
+        device_class=SensorDeviceClass.GAS,
+        native_unit_of_measurement=UnitOfVolume.CUBIC_METERS,
+        device_features=[
+            DeviceFeatures.HAS_METERING,
+            ConsumptionType.CENTRAL_HEATING_GAS.name,
+        ],
+        coordinator=ENERGY_COORDINATOR,
+        get_native_value=get_rolling_24h_heating_gas_m3,
+    ),
+    AristonSensorEntityDescription(
+        key="rolling_24h_dhw_gas_m3",
+        name=f"{NAME} rolling 24h DHW gas",
+        icon="mdi:gas-cylinder",
+        entity_category=EntityCategory.DIAGNOSTIC,
+        state_class=SensorStateClass.MEASUREMENT,
+        device_class=SensorDeviceClass.GAS,
+        native_unit_of_measurement=UnitOfVolume.CUBIC_METERS,
+        device_features=[
+            DeviceFeatures.HAS_METERING,
+            ConsumptionType.DOMESTIC_HOT_WATER_GAS.name,
+        ],
+        coordinator=ENERGY_COORDINATOR,
+        get_native_value=get_rolling_24h_dhw_gas_m3,
+    ),
+    # Electricity
+    AristonSensorEntityDescription(
+        key="rolling_24h_heating_electricity_kwh",
+        name=f"{NAME} rolling 24h heating electricity",
+        icon="mdi:lightning-bolt",
+        entity_category=EntityCategory.DIAGNOSTIC,
+        state_class=SensorStateClass.MEASUREMENT,
+        device_class=SensorDeviceClass.ENERGY,
+        native_unit_of_measurement=UnitOfEnergy.KILO_WATT_HOUR,
+        device_features=[
+            DeviceFeatures.HAS_METERING,
+            ConsumptionType.CENTRAL_HEATING_ELECTRICITY.name,
+        ],
+        coordinator=ENERGY_COORDINATOR,
+        get_native_value=get_rolling_24h_heating_electricity_kwh,
+    ),
+    AristonSensorEntityDescription(
+        key="rolling_24h_dhw_electricity_kwh",
+        name=f"{NAME} rolling 24h DHW electricity",
+        icon="mdi:lightning-bolt",
+        entity_category=EntityCategory.DIAGNOSTIC,
+        state_class=SensorStateClass.MEASUREMENT,
+        device_class=SensorDeviceClass.ENERGY,
+        native_unit_of_measurement=UnitOfEnergy.KILO_WATT_HOUR,
+        device_features=[
+            DeviceFeatures.HAS_METERING,
+            ConsumptionType.DOMESTIC_HOT_WATER_ELECTRICITY.name,
+        ],
+        coordinator=ENERGY_COORDINATOR,
+        get_native_value=get_rolling_24h_dhw_electricity_kwh,
+    ),
+    
+    # ==================== ROLLING 7DAY CONSUMPTION ====================
+    # Gas - kWh
+    AristonSensorEntityDescription(
+        key="rolling_7day_heating_gas_kwh",
+        name=f"{NAME} rolling 7d heating gas energy",
+        icon="mdi:gas-cylinder",
+        entity_category=EntityCategory.DIAGNOSTIC,
+        state_class=SensorStateClass.MEASUREMENT,
+        device_class=SensorDeviceClass.ENERGY,
+        native_unit_of_measurement=UnitOfEnergy.KILO_WATT_HOUR,
+        device_features=[
+            DeviceFeatures.HAS_METERING,
+            ConsumptionType.CENTRAL_HEATING_GAS.name,
+        ],
+        coordinator=ENERGY_COORDINATOR,
+        get_native_value=get_rolling_7day_heating_gas_kwh,
+    ),
+    AristonSensorEntityDescription(
+        key="rolling_7day_dhw_gas_kwh",
+        name=f"{NAME} rolling 7d DHW gas energy",
+        icon="mdi:gas-cylinder",
+        entity_category=EntityCategory.DIAGNOSTIC,
+        state_class=SensorStateClass.MEASUREMENT,
+        device_class=SensorDeviceClass.ENERGY,
+        native_unit_of_measurement=UnitOfEnergy.KILO_WATT_HOUR,
+        device_features=[
+            DeviceFeatures.HAS_METERING,
+            ConsumptionType.DOMESTIC_HOT_WATER_GAS.name,
+        ],
+        coordinator=ENERGY_COORDINATOR,
+        get_native_value=get_rolling_7day_dhw_gas_kwh,
+    ),
+    # Gas - m³
+    AristonSensorEntityDescription(
+        key="rolling_7day_heating_gas_m3",
+        name=f"{NAME} rolling 7d heating gas",
+        icon="mdi:gas-cylinder",
+        entity_category=EntityCategory.DIAGNOSTIC,
+        state_class=SensorStateClass.MEASUREMENT,
+        device_class=SensorDeviceClass.GAS,
+        native_unit_of_measurement=UnitOfVolume.CUBIC_METERS,
+        device_features=[
+            DeviceFeatures.HAS_METERING,
+            ConsumptionType.CENTRAL_HEATING_GAS.name,
+        ],
+        coordinator=ENERGY_COORDINATOR,
+        get_native_value=get_rolling_7day_heating_gas_m3,
+    ),
+    AristonSensorEntityDescription(
+        key="rolling_7day_dhw_gas_m3",
+        name=f"{NAME} rolling 7d DHW gas",
+        icon="mdi:gas-cylinder",
+        entity_category=EntityCategory.DIAGNOSTIC,
+        state_class=SensorStateClass.MEASUREMENT,
+        device_class=SensorDeviceClass.GAS,
+        native_unit_of_measurement=UnitOfVolume.CUBIC_METERS,
+        device_features=[
+            DeviceFeatures.HAS_METERING,
+            ConsumptionType.DOMESTIC_HOT_WATER_GAS.name,
+        ],
+        coordinator=ENERGY_COORDINATOR,
+        get_native_value=get_rolling_7day_dhw_gas_m3,
+    ),
+    # Electricity
+    AristonSensorEntityDescription(
+        key="rolling_7day_heating_electricity_kwh",
+        name=f"{NAME} rolling 7d heating electricity",
+        icon="mdi:lightning-bolt",
+        entity_category=EntityCategory.DIAGNOSTIC,
+        state_class=SensorStateClass.MEASUREMENT,
+        device_class=SensorDeviceClass.ENERGY,
+        native_unit_of_measurement=UnitOfEnergy.KILO_WATT_HOUR,
+        device_features=[
+            DeviceFeatures.HAS_METERING,
+            ConsumptionType.CENTRAL_HEATING_ELECTRICITY.name,
+        ],
+        coordinator=ENERGY_COORDINATOR,
+        get_native_value=get_rolling_7day_heating_electricity_kwh,
+    ),
+    AristonSensorEntityDescription(
+        key="rolling_7day_dhw_electricity_kwh",
+        name=f"{NAME} rolling 7d DHW electricity",
+        icon="mdi:lightning-bolt",
+        entity_category=EntityCategory.DIAGNOSTIC,
+        state_class=SensorStateClass.MEASUREMENT,
+        device_class=SensorDeviceClass.ENERGY,
+        native_unit_of_measurement=UnitOfEnergy.KILO_WATT_HOUR,
+        device_features=[
+            DeviceFeatures.HAS_METERING,
+            ConsumptionType.DOMESTIC_HOT_WATER_ELECTRICITY.name,
+        ],
+        coordinator=ENERGY_COORDINATOR,
+        get_native_value=get_rolling_7day_dhw_electricity_kwh,
+    ),
+    
+    # ==================== ROLLING 30DAY CONSUMPTION ====================
+    # Gas - kWh
+    AristonSensorEntityDescription(
+        key="rolling_30day_heating_gas_kwh",
+        name=f"{NAME} rolling 30d heating gas energy",
+        icon="mdi:gas-cylinder",
+        entity_category=EntityCategory.DIAGNOSTIC,
+        state_class=SensorStateClass.MEASUREMENT,
+        device_class=SensorDeviceClass.ENERGY,
+        native_unit_of_measurement=UnitOfEnergy.KILO_WATT_HOUR,
+        device_features=[
+            DeviceFeatures.HAS_METERING,
+            ConsumptionType.CENTRAL_HEATING_GAS.name,
+        ],
+        coordinator=ENERGY_COORDINATOR,
+        get_native_value=get_rolling_30day_heating_gas_kwh,
+    ),
+    AristonSensorEntityDescription(
+        key="rolling_30day_dhw_gas_kwh",
+        name=f"{NAME} rolling 30d DHW gas energy",
+        icon="mdi:gas-cylinder",
+        entity_category=EntityCategory.DIAGNOSTIC,
+        state_class=SensorStateClass.MEASUREMENT,
+        device_class=SensorDeviceClass.ENERGY,
+        native_unit_of_measurement=UnitOfEnergy.KILO_WATT_HOUR,
+        device_features=[
+            DeviceFeatures.HAS_METERING,
+            ConsumptionType.DOMESTIC_HOT_WATER_GAS.name,
+        ],
+        coordinator=ENERGY_COORDINATOR,
+        get_native_value=get_rolling_30day_dhw_gas_kwh,
+    ),
+    # Gas - m³
+    AristonSensorEntityDescription(
+        key="rolling_30day_heating_gas_m3",
+        name=f"{NAME} rolling 30d heating gas",
+        icon="mdi:gas-cylinder",
+        entity_category=EntityCategory.DIAGNOSTIC,
+        state_class=SensorStateClass.MEASUREMENT,
+        device_class=SensorDeviceClass.GAS,
+        native_unit_of_measurement=UnitOfVolume.CUBIC_METERS,
+        device_features=[
+            DeviceFeatures.HAS_METERING,
+            ConsumptionType.CENTRAL_HEATING_GAS.name,
+        ],
+        coordinator=ENERGY_COORDINATOR,
+        get_native_value=get_rolling_30day_heating_gas_m3,
+    ),
+    AristonSensorEntityDescription(
+        key="rolling_30day_dhw_gas_m3",
+        name=f"{NAME} rolling 30d DHW gas",
+        icon="mdi:gas-cylinder",
+        entity_category=EntityCategory.DIAGNOSTIC,
+        state_class=SensorStateClass.MEASUREMENT,
+        device_class=SensorDeviceClass.GAS,
+        native_unit_of_measurement=UnitOfVolume.CUBIC_METERS,
+        device_features=[
+            DeviceFeatures.HAS_METERING,
+            ConsumptionType.DOMESTIC_HOT_WATER_GAS.name,
+        ],
+        coordinator=ENERGY_COORDINATOR,
+        get_native_value=get_rolling_30day_dhw_gas_m3,
+    ),
+    # Electricity
+    AristonSensorEntityDescription(
+        key="rolling_30day_heating_electricity_kwh",
+        name=f"{NAME} rolling 30d heating electricity",
+        icon="mdi:lightning-bolt",
+        entity_category=EntityCategory.DIAGNOSTIC,
+        state_class=SensorStateClass.MEASUREMENT,
+        device_class=SensorDeviceClass.ENERGY,
+        native_unit_of_measurement=UnitOfEnergy.KILO_WATT_HOUR,
+        device_features=[
+            DeviceFeatures.HAS_METERING,
+            ConsumptionType.CENTRAL_HEATING_ELECTRICITY.name,
+        ],
+        coordinator=ENERGY_COORDINATOR,
+        get_native_value=get_rolling_30day_heating_electricity_kwh,
+    ),
+    AristonSensorEntityDescription(
+        key="rolling_30day_dhw_electricity_kwh",
+        name=f"{NAME} rolling 30d DHW electricity",
+        icon="mdi:lightning-bolt",
+        entity_category=EntityCategory.DIAGNOSTIC,
+        state_class=SensorStateClass.MEASUREMENT,
+        device_class=SensorDeviceClass.ENERGY,
+        native_unit_of_measurement=UnitOfEnergy.KILO_WATT_HOUR,
+        device_features=[
+            DeviceFeatures.HAS_METERING,
+            ConsumptionType.DOMESTIC_HOT_WATER_ELECTRICITY.name,
+        ],
+        coordinator=ENERGY_COORDINATOR,
+        get_native_value=get_rolling_30day_dhw_electricity_kwh,
+    ),
+    
+    # ==================== EXISTING SENSORS ====================
     AristonSensorEntityDescription(
         key=EvoDeviceProperties.RM_TM,
         name=f"{NAME} remaining time",
@@ -563,6 +1132,8 @@ ARISTON_SENSOR_TYPES: list[AristonSensorEntityDescription] = [
     ),
 ]
 
+# ==================== BINARY SENSOR ENTITIES ====================
+
 ARISTON_BINARY_SENSOR_TYPES: list[AristonBinarySensorEntityDescription] = [
     AristonBinarySensorEntityDescription(
         key=DeviceProperties.IS_FLAME_ON,
@@ -622,6 +1193,8 @@ ARISTON_BINARY_SENSOR_TYPES: list[AristonBinarySensorEntityDescription] = [
         ],
     ),
 ]
+
+# ==================== SWITCH ENTITIES ====================
 
 ARISTON_SWITCH_TYPES: list[AristonSwitchEntityDescription] = [
     AristonSwitchEntityDescription(
@@ -753,6 +1326,8 @@ ARISTON_SWITCH_TYPES: list[AristonSwitchEntityDescription] = [
         whe_types=[WheType.LydosHybrid],
     ),
 ]
+
+# ==================== NUMBER ENTITIES ====================
 
 ARISTON_NUMBER_TYPES: list[AristonNumberEntityDescription] = [
     AristonNumberEntityDescription(
@@ -907,6 +1482,8 @@ ARISTON_NUMBER_TYPES: list[AristonNumberEntityDescription] = [
         whe_types=[WheType.LydosHybrid],
     ),
 ]
+
+# ==================== SELECT ENTITIES ====================
 
 ARISTON_SELECT_TYPES: list[AristonSelectEntityDescription] = [
     AristonSelectEntityDescription(
