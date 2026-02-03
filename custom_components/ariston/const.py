@@ -221,6 +221,7 @@ ARISTON_SENSOR_TYPES: list[AristonSensorEntityDescription] = [
     AristonSensorEntityDescription(
         key=DeviceProperties.HEATING_CIRCUIT_PRESSURE,
         name=f"{NAME} heating circuit pressure",
+        icon="mdi:gauge",
         device_class=SensorDeviceClass.PRESSURE,
         entity_category=EntityCategory.DIAGNOSTIC,
         state_class=SensorStateClass.MEASUREMENT,
@@ -231,6 +232,7 @@ ARISTON_SENSOR_TYPES: list[AristonSensorEntityDescription] = [
     AristonSensorEntityDescription(
         key=DeviceProperties.CH_FLOW_SETPOINT_TEMP,
         name=f"{NAME} CH flow setpoint temp",
+        icon="mdi:thermometer",
         device_class=SensorDeviceClass.TEMPERATURE,
         state_class=SensorStateClass.MEASUREMENT,
         get_native_value=lambda entity: entity.device.ch_flow_setpoint_temp_value,
@@ -240,6 +242,7 @@ ARISTON_SENSOR_TYPES: list[AristonSensorEntityDescription] = [
     AristonSensorEntityDescription(
         key=DeviceProperties.CH_FLOW_TEMP,
         name=f"{NAME} CH flow temp",
+        icon="mdi:thermometer",
         device_class=SensorDeviceClass.TEMPERATURE,
         state_class=SensorStateClass.MEASUREMENT,
         get_native_value=lambda entity: entity.device.ch_flow_temp_value,
@@ -250,6 +253,7 @@ ARISTON_SENSOR_TYPES: list[AristonSensorEntityDescription] = [
     AristonSensorEntityDescription(
         key=str(MenuItemNames.SIGNAL_STRENGTH),
         name=f"{NAME} signal strength",
+        icon="mdi:wifi",
         state_class=SensorStateClass.MEASUREMENT,
         entity_category=EntityCategory.DIAGNOSTIC,
         get_native_value=lambda entity: entity.device.signal_strength_value,
@@ -259,6 +263,7 @@ ARISTON_SENSOR_TYPES: list[AristonSensorEntityDescription] = [
     AristonSensorEntityDescription(
         key=str(MenuItemNames.CH_RETURN_TEMP),
         name=f"{NAME} CH return temp",
+        icon="mdi:thermometer",
         device_class=SensorDeviceClass.TEMPERATURE,
         state_class=SensorStateClass.MEASUREMENT,
         get_native_value=lambda entity: entity.device.ch_return_temp_value,
@@ -268,6 +273,7 @@ ARISTON_SENSOR_TYPES: list[AristonSensorEntityDescription] = [
     AristonSensorEntityDescription(
         key=DeviceProperties.OUTSIDE_TEMP,
         name=f"{NAME} Outside temp",
+        icon="mdi:thermometer",
         device_class=SensorDeviceClass.TEMPERATURE,
         state_class=SensorStateClass.MEASUREMENT,
         device_features=[CustomDeviceFeatures.HAS_OUTSIDE_TEMP],
@@ -296,7 +302,7 @@ ARISTON_SENSOR_TYPES: list[AristonSensorEntityDescription] = [
     AristonSensorEntityDescription(
         key="Gas consumption for heating last month",
         name=f"{NAME} gas consumption for heating last month",
-        icon="mdi:cash",
+        icon="mdi:gas-cylinder",
         entity_category=EntityCategory.DIAGNOSTIC,
         device_class=SensorDeviceClass.ENERGY,
         native_unit_of_measurement=UnitOfEnergy.KILO_WATT_HOUR,
@@ -320,7 +326,7 @@ ARISTON_SENSOR_TYPES: list[AristonSensorEntityDescription] = [
     AristonSensorEntityDescription(
         key="Electricity consumption for cooling last month",
         name=f"{NAME} electricity consumption for cooling last month",
-        icon="mdi:cash",
+        icon="mdi:lightning-bolt",
         entity_category=EntityCategory.DIAGNOSTIC,
         device_class=SensorDeviceClass.ENERGY,
         native_unit_of_measurement=UnitOfEnergy.KILO_WATT_HOUR,
@@ -332,7 +338,7 @@ ARISTON_SENSOR_TYPES: list[AristonSensorEntityDescription] = [
     AristonSensorEntityDescription(
         key="Gas consumption for water last month",
         name=f"{NAME} gas consumption for water last month",
-        icon="mdi:cash",
+        icon="mdi:gas-cylinder",
         entity_category=EntityCategory.DIAGNOSTIC,
         device_class=SensorDeviceClass.ENERGY,
         native_unit_of_measurement=UnitOfEnergy.KILO_WATT_HOUR,
@@ -344,7 +350,7 @@ ARISTON_SENSOR_TYPES: list[AristonSensorEntityDescription] = [
     AristonSensorEntityDescription(
         key="Electricity consumption for water last month",
         name=f"{NAME} electricity consumption for water last month",
-        icon="mdi:cash",
+        icon="mdi:lightning-bolt",
         entity_category=EntityCategory.DIAGNOSTIC,
         device_class=SensorDeviceClass.ENERGY,
         native_unit_of_measurement=UnitOfEnergy.KILO_WATT_HOUR,
@@ -356,7 +362,7 @@ ARISTON_SENSOR_TYPES: list[AristonSensorEntityDescription] = [
     AristonSensorEntityDescription(
         key="Central heating total energy consumption",
         name=f"{NAME} central heating total energy consumption",
-        icon="mdi:cash",
+        icon="mdi:lightning-bolt",
         entity_category=EntityCategory.DIAGNOSTIC,
         state_class=SensorStateClass.TOTAL,
         device_class=SensorDeviceClass.ENERGY,
@@ -372,7 +378,7 @@ ARISTON_SENSOR_TYPES: list[AristonSensorEntityDescription] = [
     AristonSensorEntityDescription(
         key="Domestic hot water total energy consumption",
         name=f"{NAME} domestic hot water total energy consumption",
-        icon="mdi:cash",
+        icon="mdi:lightning-bolt",
         entity_category=EntityCategory.DIAGNOSTIC,
         state_class=SensorStateClass.TOTAL,
         device_class=SensorDeviceClass.ENERGY,
@@ -388,7 +394,7 @@ ARISTON_SENSOR_TYPES: list[AristonSensorEntityDescription] = [
     AristonSensorEntityDescription(
         key="Central heating gas consumption",
         name=f"{NAME} central heating gas consumption",
-        icon="mdi:cash",
+        icon="mdi:gas-cylinder",
         entity_category=EntityCategory.DIAGNOSTIC,
         state_class=SensorStateClass.TOTAL,
         device_class=SensorDeviceClass.ENERGY,
@@ -404,7 +410,7 @@ ARISTON_SENSOR_TYPES: list[AristonSensorEntityDescription] = [
     AristonSensorEntityDescription(
         key="Domestic hot water heating pump electricity consumption",
         name=f"{NAME} domestic hot water heating pump electricity consumption",
-        icon="mdi:cash",
+        icon="mdi:lightning-bolt",
         entity_category=EntityCategory.DIAGNOSTIC,
         state_class=SensorStateClass.TOTAL,
         device_class=SensorDeviceClass.ENERGY,
@@ -420,7 +426,7 @@ ARISTON_SENSOR_TYPES: list[AristonSensorEntityDescription] = [
     AristonSensorEntityDescription(
         key="Domestic hot water resistor electricity consumption",
         name=f"{NAME} domestic hot water resistor electricity consumption",
-        icon="mdi:cash",
+        icon="mdi:lightning-bolt",
         entity_category=EntityCategory.DIAGNOSTIC,
         state_class=SensorStateClass.TOTAL,
         device_class=SensorDeviceClass.ENERGY,
@@ -436,7 +442,7 @@ ARISTON_SENSOR_TYPES: list[AristonSensorEntityDescription] = [
     AristonSensorEntityDescription(
         key="Domestic hot water gas consumption",
         name=f"{NAME} domestic hot water gas consumption",
-        icon="mdi:cash",
+        icon="mdi:gas-cylinder",
         entity_category=EntityCategory.DIAGNOSTIC,
         state_class=SensorStateClass.TOTAL,
         device_class=SensorDeviceClass.ENERGY,
@@ -452,7 +458,7 @@ ARISTON_SENSOR_TYPES: list[AristonSensorEntityDescription] = [
     AristonSensorEntityDescription(
         key="Central heating electricity consumption",
         name=f"{NAME} central heating electricity consumption",
-        icon="mdi:cash",
+        icon="mdi:lightning-bolt",
         entity_category=EntityCategory.DIAGNOSTIC,
         state_class=SensorStateClass.TOTAL,
         device_class=SensorDeviceClass.ENERGY,
@@ -468,7 +474,7 @@ ARISTON_SENSOR_TYPES: list[AristonSensorEntityDescription] = [
     AristonSensorEntityDescription(
         key="Domestic hot water electricity consumption",
         name=f"{NAME} domestic hot water electricity consumption",
-        icon="mdi:cash",
+        icon="mdi:lightning-bolt",
         entity_category=EntityCategory.DIAGNOSTIC,
         state_class=SensorStateClass.TOTAL,
         device_class=SensorDeviceClass.ENERGY,
@@ -833,6 +839,7 @@ ARISTON_NUMBER_TYPES: list[AristonNumberEntityDescription] = [
         key=ThermostatProperties.HEATING_FLOW_TEMP,
         name=f"{NAME} heating flow temperature",
         icon="mdi:thermometer",
+        native_unit_of_measurement=UnitOfTemperature.CELSIUS,
         entity_category=EntityCategory.CONFIG,
         zone=True,
         get_native_min_value=lambda entity: entity.device.get_heating_flow_temp_min(
@@ -855,6 +862,7 @@ ARISTON_NUMBER_TYPES: list[AristonNumberEntityDescription] = [
         key=ThermostatProperties.HEATING_FLOW_OFFSET,
         name=f"{NAME} heating flow offset",
         icon="mdi:progress-wrench",
+        native_unit_of_measurement=UnitOfTemperature.CELSIUS,
         entity_category=EntityCategory.CONFIG,
         zone=True,
         get_native_min_value=lambda entity: entity.device.get_heating_flow_offset_min(
