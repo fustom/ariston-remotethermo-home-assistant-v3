@@ -268,9 +268,30 @@ class AristonThermostat(AristonEntity, ClimateEntity):
             self.name,
         )
 
-        await self.device.async_set_plant_mode(
-            PlantMode(self.device.plant_mode_opt_texts.index(preset_mode)),
-        )
+        # Don't assume index maps to enum value directly
+        preset_index = self.device.plant_mode_opt_texts.index(preset_mode)
+        plant_mode = PlantMode(self.device.plant_mode_options[preset_index])
+
+        # Get current states
+        current_plant_in_cool = self.device.is_plant_in_cool_mode
+        zone_modes = self.device.get_zone_mode_options(self.zone)
+
+        # When switching away from cooling mode, ensure zone is in appropriate state
+        if current_plant_in_cool and plant_mode != PlantMode.COOLING:
+            # Set zone to manual heat mode before changing plant mode
+            if ZoneMode.MANUAL in zone_modes:
+                await self.device.async_set_zone_mode(ZoneMode.MANUAL, self.zone)
+
+        # Set the plant mode
+        await self.device.async_set_plant_mode(plant_mode)
+
+        # Special handling for OFF mode
+        if plant_mode == PlantMode.OFF:
+            if self.device.is_zone_mode_options_contains_off(self.zone):
+                await self.device.async_set_zone_mode(BsbZoneMode.OFF, self.zone)
+
+        # Refresh coordinator to get updated device state
+        await self.coordinator.async_request_refresh()
         self.async_write_ha_state()
 
     async def async_set_temperature(self, **kwargs):
