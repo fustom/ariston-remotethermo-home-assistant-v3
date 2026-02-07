@@ -42,6 +42,39 @@ async def async_setup_entry(
             )
         ):
             for zone_number in coordinator.device.zone_numbers:
+                # Skip hidden zones
+                try:
+                    # Check if zone is hidden
+                    if hasattr(coordinator.device, 'is_zone_hidden'):
+                        if coordinator.device.is_zone_hidden(zone_number):
+                            _LOGGER.debug(
+                                "Skipping hidden zone %d for device %s",
+                                zone_number,
+                                coordinator.device.name
+                            )
+                            continue
+                    # Alternative: Check zone attributes from device features
+                    elif hasattr(coordinator.device, 'features'):
+                        features = coordinator.device.features
+                        if features and 'zones' in features:
+                            zones = features.get('zones', [])
+                            if zone_number - 1 < len(zones):
+                                zone_info = zones[zone_number - 1]
+                                if zone_info.get('isHidden', False):
+                                    _LOGGER.debug(
+                                        "Skipping hidden zone %d (from features)",
+                                        zone_number
+                                    )
+                                    continue
+                except Exception as e:
+                    _LOGGER.debug(
+                        "Error checking if zone %d is hidden: %s",
+                        zone_number,
+                        e
+                    )
+                    # If we can't determine, create the entity anyway
+                    pass
+                
                 ariston_climates.append(
                     AristonThermostat(
                         zone_number,
@@ -56,6 +89,8 @@ async def async_setup_entry(
 class AristonThermostat(AristonEntity, ClimateEntity):
     """Ariston Thermostat Device."""
 
+    _attr_has_thermostat: bool = False  # Use attribute instead of property
+    
     def __init__(
         self,
         zone: int,
@@ -64,11 +99,66 @@ class AristonThermostat(AristonEntity, ClimateEntity):
     ) -> None:
         """Initialize the thermostat."""
         super().__init__(coordinator, description, zone)
+        self._attr_has_thermostat = False  # Initialize attribute
+
+    async def async_added_to_hass(self):
+        """Run when entity about to be added."""
+        await super().async_added_to_hass()
+        
+        # Check if zone has thermostat using roomSens
+        try:
+            # Default to no thermostat
+            self._attr_has_thermostat = False
+            
+            # Method 1: Check from device features
+            if hasattr(self.device, 'features'):
+                features = self.device.features
+                if features and isinstance(features, dict) and 'zones' in features:
+                    zones = features.get('zones', [])
+                    # zones is a list of dicts: [{"num": 1, "roomSens": false, ...}, ...]
+                    for zone_info in zones:
+                        if zone_info.get('num') == self.zone:
+                            room_sens = zone_info.get('roomSens', False)
+                            self._attr_has_thermostat = bool(room_sens)
+                            _LOGGER.debug(
+                                "Zone %d - roomSens from features: %s (has thermostat: %s)",
+                                self.zone, room_sens, self._attr_has_thermostat
+                            )
+                            break
+                    else:
+                        _LOGGER.warning("Zone %d not found in features zones", self.zone)
+            
+            # Method 2: Check if we can get temperature value
+            if not self._attr_has_thermostat:
+                try:
+                    temp_value = self.device.get_measured_temp_value(self.zone)
+                    # If temperature is not None and not 0.0, assume there's some sensor
+                    if temp_value is not None and float(temp_value) != 0.0:
+                        self._attr_has_thermostat = True
+                        _LOGGER.debug(
+                            "Zone %d - temperature %s indicates possible sensor",
+                            self.zone, temp_value
+                        )
+                except Exception as temp_err:
+                    _LOGGER.debug("Could not check temperature for zone %d: %s", 
+                                self.zone, temp_err)
+            
+            _LOGGER.info(
+                "Zone %d - Final has_thermostat: %s",
+                self.zone, self._attr_has_thermostat
+            )
+                
+        except Exception as e:
+            _LOGGER.error("Error checking thermostat for zone %d: %s", self.zone, e, exc_info=True)
+            self._attr_has_thermostat = False  # Default to no thermostat on error
 
     @property
     def name(self) -> str:
         """Return the name of the device."""
-        return f"{self.device.name}"
+        # Always use zone number in the name
+        if not self._attr_has_thermostat:
+            return f"Ariston Zone {self.zone} (no thermostat)"
+        return f"Ariston Zone {self.zone}"
 
     @property
     def unique_id(self) -> str:
@@ -78,7 +168,9 @@ class AristonThermostat(AristonEntity, ClimateEntity):
     @property
     def icon(self):
         """Return the icon of the thermostat device."""
-        if self.device.is_plant_in_heat_mode:
+        if not self._attr_has_thermostat:
+            return "mdi:radiator-disabled"
+        elif self.device.is_plant_in_heat_mode:
             return "mdi:radiator"
         return "mdi:radiator-off"
 
@@ -90,50 +182,66 @@ class AristonThermostat(AristonEntity, ClimateEntity):
     @property
     def precision(self) -> float:
         """Return the precision of temperature for the device."""
+        if not self._attr_has_thermostat:
+            return None
         return 1 / 10 ** self.device.get_measured_temp_decimals(self.zone)
 
     @property
     def min_temp(self):
         """Return minimum temperature."""
+        if not self._attr_has_thermostat:
+            return None
         return self.device.get_comfort_temp_min(self.zone)
 
     @property
     def max_temp(self):
         """Return the maximum temperature."""
+        if not self._attr_has_thermostat:
+            return None
         return self.device.get_comfort_temp_max(self.zone)
 
     @property
     def target_temperature_step(self) -> float:
         """Return the target temperature step support by the device."""
+        if not self._attr_has_thermostat:
+            return None
         return self.device.get_target_temp_step(self.zone)
 
     @property
     def current_temperature(self) -> float:
         """Return the reported current temperature for the device."""
+        if not self._attr_has_thermostat:
+            return None  # This will hide temperature in UI
         return self.device.get_measured_temp_value(self.zone)
 
     @property
     def target_temperature(self) -> float:
         """Return the target temperature for the device."""
+        if not self._attr_has_thermostat:
+            return None  # This will disable temperature adjustment
         return self.device.get_target_temp_value(self.zone)
 
     @property
     def supported_features(self) -> int:
         """Return the supported features for this device integration."""
-        features = ClimateEntityFeature.TARGET_TEMPERATURE
+        features = ClimateEntityFeature.PRESET_MODE if self.device.plant_mode_supported else 0
+        
+        # Only add temperature control if zone has thermostat
+        if self._attr_has_thermostat:
+            features |= ClimateEntityFeature.TARGET_TEMPERATURE
+        
+        # Always allow turning on/off regardless of thermostat
         if hasattr(ClimateEntityFeature, "TURN_OFF"):
             features |= ClimateEntityFeature.TURN_OFF
         if hasattr(ClimateEntityFeature, "TURN_ON"):
             features |= ClimateEntityFeature.TURN_ON
-        return (
-            features | ClimateEntityFeature.PRESET_MODE
-            if self.device.plant_mode_supported
-            else features
-        )
+        
+        return features
 
     @property
     def hvac_mode(self) -> str:
         """Return the current HVAC mode for the device."""
+        # Always return current mode regardless of thermostat
         curr_hvac_mode = HVACMode.OFF
 
         if self.device.is_plant_in_heat_mode:
@@ -152,6 +260,9 @@ class AristonThermostat(AristonEntity, ClimateEntity):
     def hvac_modes(self) -> list[str]:
         """Return the HVAC modes support by the device."""
         supported_modes = []
+        
+        # Zones without thermostats still support all HVAC modes
+        # They just don't show/control temperature
         if self.device.is_zone_mode_options_contains_manual(self.zone):
             supported_modes.append(HVACMode.HEAT)
             if self.device.plant_mode_supported:
@@ -159,14 +270,15 @@ class AristonThermostat(AristonEntity, ClimateEntity):
                     supported_modes.append(HVACMode.COOL)
         if self.device.is_zone_mode_options_contains_time_program(self.zone):
             supported_modes.append(HVACMode.AUTO)
-        if self.device.is_zone_mode_options_contains_off(self.zone):
-            supported_modes.append(HVACMode.OFF)
+        # Always include OFF mode in the UI
+        supported_modes.append(HVACMode.OFF)
 
         return supported_modes
 
     @property
     def hvac_action(self):
         """Return the current running hvac operation."""
+        # Always return action regardless of thermostat
         if_flame_on = bool(self.device.is_flame_on_value)
         if_heating_pump_on = bool(getattr(self.device, 'is_heating_pump_on_value', False))
 
@@ -197,15 +309,21 @@ class AristonThermostat(AristonEntity, ClimateEntity):
 
     async def async_set_hvac_mode(self, hvac_mode):
         """Set new target hvac mode."""
+        # Always allow setting HVAC mode regardless of thermostat
+        # The thermostat only affects temperature control
+        
         if self.device.plant_mode_supported:
             plant_modes = self.device.plant_mode_options
             zone_modes = self.device.get_zone_mode_options(self.zone)
             current_plant_mode = self.device.plant_mode
 
             if hvac_mode == HVACMode.OFF:
-                if self.device.is_plant_mode_options_contains_off:
+                # If OFF mode is supported, use it. Otherwise use SUMMER mode
+                # to avoid shutting down the entire system
+                if PlantMode.OFF in plant_modes:
                     await self.device.async_set_plant_mode(PlantMode.OFF)
                 else:
+                    # Use SUMMER mode instead of OFF to keep DHW active
                     await self.device.async_set_plant_mode(PlantMode.SUMMER)
             elif hvac_mode == HVACMode.AUTO:
                 if current_plant_mode in [
@@ -252,7 +370,10 @@ class AristonThermostat(AristonEntity, ClimateEntity):
                     await self.device.async_set_zone_mode(ZoneMode.MANUAL, self.zone)
         # Plant mode is not supported (BSB device)
         elif hvac_mode == HVACMode.OFF:
-            await self.device.async_set_zone_mode(BsbZoneMode.OFF, self.zone)
+            if self.device.is_zone_mode_options_contains_off(self.zone):
+                await self.device.async_set_zone_mode(BsbZoneMode.OFF, self.zone)
+            # If OFF is not natively supported, do nothing
+            # OFF is already in the UI but won't do anything for BSB devices
         elif hvac_mode == HVACMode.AUTO:
             await self.device.async_set_zone_mode(BsbZoneMode.TIME_PROGRAM, self.zone)
         elif hvac_mode == HVACMode.HEAT:
@@ -296,6 +417,13 @@ class AristonThermostat(AristonEntity, ClimateEntity):
 
     async def async_set_temperature(self, **kwargs):
         """Set new target temperature."""
+        if not self._attr_has_thermostat:
+            _LOGGER.warning(
+                "Cannot set temperature for zone %d - no thermostat present",
+                self.zone
+            )
+            return
+            
         if ATTR_TEMPERATURE not in kwargs:
             raise ValueError(f"Missing parameter {ATTR_TEMPERATURE}")
 

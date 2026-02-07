@@ -36,6 +36,41 @@ async def async_setup_entry(
         ):
             if description.zone:
                 for zone_number in coordinator.device.zone_numbers:
+                    # Check if zone is hidden
+                    try:
+                        # Check if zone is hidden
+                        if hasattr(coordinator.device, 'is_zone_hidden'):
+                            if coordinator.device.is_zone_hidden(zone_number):
+                                _LOGGER.debug(
+                                    "Skipping hidden zone %d for number entity %s",
+                                    zone_number,
+                                    description.key
+                                )
+                                continue
+                        # Alternative: Check zone attributes from device features
+                        elif hasattr(coordinator.device, 'features'):
+                            features = coordinator.device.features
+                            if features and 'zones' in features:
+                                zones = features.get('zones', [])
+                                if zone_number - 1 < len(zones):
+                                    zone_info = zones[zone_number - 1]
+                                    if zone_info.get('isHidden', False):
+                                        _LOGGER.debug(
+                                            "Skipping hidden zone %d for number entity %s (from features)",
+                                            zone_number,
+                                            description.key
+                                        )
+                                        continue
+                    except Exception as e:
+                        _LOGGER.debug(
+                            "Error checking if zone %d is hidden for number entity %s: %s",
+                            zone_number,
+                            description.key,
+                            e
+                        )
+                        # If we can't determine, create the entity anyway
+                        pass
+                    
                     ariston_numbers.append(
                         AristonNumber(
                             coordinator,
