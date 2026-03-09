@@ -59,9 +59,9 @@ BUS_ERRORS_SCAN_INTERVAL: Final[str] = "bus_errors_scan_interval"
 API_URL_SETTING: Final[str] = "api_url_setting"
 API_USER_AGENT: Final[str] = "api_user_agent"
 
-DEFAULT_SCAN_INTERVAL_SECONDS: Final[int] = 180
+DEFAULT_SCAN_INTERVAL_SECONDS: Final[int] = 300
 DEFAULT_ENERGY_SCAN_INTERVAL_MINUTES: Final[int] = 60
-DEFAULT_BUS_ERRORS_SCAN_INTERVAL_SECONDS: Final[int] = 600
+DEFAULT_BUS_ERRORS_SCAN_INTERVAL_SECONDS: Final[int] = 900
 
 ATTR_TARGET_TEMP_STEP: Final[str] = "target_temp_step"
 ATTR_HEAT_REQUEST: Final[str] = "heat_request"
