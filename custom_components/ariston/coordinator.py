@@ -36,3 +36,4 @@ class DeviceDataUpdateCoordinator(DataUpdateCoordinator):
         )
 
         self.device = device
+        self.rated_power_w: int | None = None
