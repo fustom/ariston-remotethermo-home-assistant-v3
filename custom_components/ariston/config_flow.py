@@ -22,6 +22,7 @@ from .const import (
     API_URL_SETTING,
     API_USER_AGENT,
     BUS_ERRORS_SCAN_INTERVAL,
+    CONF_WATER_HEATER_TEMPERATURE_UNIT_OVERRIDE,
     DEFAULT_BUS_ERRORS_SCAN_INTERVAL_SECONDS,
     DEFAULT_ENERGY_SCAN_INTERVAL_MINUTES,
     DEFAULT_SCAN_INTERVAL_SECONDS,
@@ -178,6 +179,9 @@ class AristonOptionsFlow(config_entries.OptionsFlow):
         bus_errors_scan_interval = options.get(
             BUS_ERRORS_SCAN_INTERVAL, DEFAULT_BUS_ERRORS_SCAN_INTERVAL_SECONDS
         )
+        water_heater_temp_unit_override = options.get(
+            CONF_WATER_HEATER_TEMPERATURE_UNIT_OVERRIDE, "auto"
+        )
 
         return self.async_show_form(
             step_id="init",
@@ -195,6 +199,10 @@ class AristonOptionsFlow(config_entries.OptionsFlow):
                         BUS_ERRORS_SCAN_INTERVAL,
                         default=bus_errors_scan_interval,
                     ): int,
+                    vol.Optional(
+                        CONF_WATER_HEATER_TEMPERATURE_UNIT_OVERRIDE,
+                        default=water_heater_temp_unit_override,
+                    ): vol.In(["auto", "celsius", "fahrenheit"]),
                 }
             ),
             last_step=True,
