@@ -5,6 +5,7 @@ from __future__ import annotations
 import logging
 
 from ariston.const import SystemType
+from ariston.nuos_split_device import AristonNuosSplitDevice
 from homeassistant.components.water_heater import (
     WaterHeaterEntity,
     WaterHeaterEntityFeature,
@@ -22,6 +23,23 @@ from .coordinator import DeviceDataUpdateCoordinator
 from .entity import AristonEntity
 
 _LOGGER = logging.getLogger(__name__)
+
+# Current modes of the NUOS Plus 200 according to reverse engineering of the web API
+# The ariston==0.19.9 library has COMFORT=1 which does not exist in this equipment
+# and lacks GREEN_PLUS=6.
+_NUOS_MODES: dict[str, int] = {
+    "GREEN": 0,
+    "FAST": 2,
+    "IMEMORY": 3,
+    "GREEN_PLUS": 6,
+}
+
+
+class _NuosModeValue:
+    """Wrapper mínimo que expone .value para async_set_nuos_mode."""
+
+    def __init__(self, value: int) -> None:
+        self.value = value
 
 
 async def async_setup_entry(
@@ -121,11 +139,16 @@ class AristonWaterHeater(AristonEntity, WaterHeaterEntity):
     @property
     def operation_list(self):
         """List of available operation modes."""
+        if isinstance(self.device, AristonNuosSplitDevice):
+            return list(_NUOS_MODES.keys())
         return self.device.water_heater_mode_operation_texts
 
     @property
     def current_operation(self):
         """Return current operation."""
+        if isinstance(self.device, AristonNuosSplitDevice):
+            val = self.device.water_heater_mode_value
+            return next((k for k, v in _NUOS_MODES.items() if v == val), "UNKNOWN")
         return self.device.water_heater_current_mode_text
 
     async def async_set_temperature(self, **kwargs):
@@ -145,7 +168,20 @@ class AristonWaterHeater(AristonEntity, WaterHeaterEntity):
 
     async def async_set_operation_mode(self, operation_mode):
         """Set operation mode."""
-        await self.device.async_set_water_heater_operation_mode(operation_mode)
+        if isinstance(self.device, AristonNuosSplitDevice):
+            if operation_mode not in _NUOS_MODES:
+                _LOGGER.error(
+                    "Unknown mode for NUOS Split: %s. Available modes: %s",
+                    operation_mode,
+                    list(_NUOS_MODES.keys()),
+                )
+                return
+            await self.device.api.async_set_nuos_mode(
+                self.device.gw, _NuosModeValue(_NUOS_MODES[operation_mode])
+            )
+            self.device.data["opMode"] = _NUOS_MODES[operation_mode]
+        else:
+            await self.device.async_set_water_heater_operation_mode(operation_mode)
         self.async_write_ha_state()
 
     async def async_turn_off(self, **kwargs) -> None:
