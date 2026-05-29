@@ -1,0 +1,52 @@
+{
+  "config": {
+    "abort": {
+      "already_configured": "Gerät ist bereits konfiguriert",
+      "reauth_successful": "Erneute Authentifizierung war erfolgreich"
+    },
+    "error": {
+      "cannot_connect": "Verbindung fehlgeschlagen",
+      "invalid_auth": "Ungültige Anmeldedaten",
+      "unknown": "Unerwarteter Fehler"
+    },
+    "step": {
+      "user": {
+        "data": {
+          "password": "Passwort",
+          "username": "Benutzername",
+          "api_url_setting": "Ariston API URL",
+          "api_user_agent": "Ariston API User Agent"
+        }
+      }
+    }
+  },
+  "options": {
+    "step": {
+      "init": {
+        "data": {
+          "extra_energy_features": "Zusätzliche Energie-Entitäten",
+          "scan_interval": "Zonen-Abfrageintervall (Sekunden)",
+          "energy_scan_interval": "Energie-Abfrageintervall (Minuten)",
+          "bus_errors_scan_interval": "Bus-Fehler-Abfrageintervall (Sekunden)"
+        },
+        "title": "Ariston konfigurieren"
+      }
+    }
+  },
+  "entity": {
+    "climate": {
+      "ariston_thermostat": {
+        "state_attributes": {
+          "preset_mode": {
+            "state": {
+              "protection": "Schutzbetrieb",
+              "automatic": "Automatik",
+              "reduced": "Reduziert",
+              "comfort": "Komfort"
+            }
+          }
+        }
+      }
+    }
+  }
+}
