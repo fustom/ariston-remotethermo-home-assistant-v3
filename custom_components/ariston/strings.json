@@ -5,8 +5,9 @@
         "data": {
           "username": "[%key:common::config_flow::data::username%]",
           "password": "[%key:common::config_flow::data::password%]",
-          "api_url_setting": "[%key:common::config_flow::data::api_url_setting%]",
-          "api_user_agent": "[%key:common::config_flow::data::api_user_agent%]"
+          "brand": "Brand / Service",
+          "api_url_setting": "API URL (Leave empty for default)",
+          "api_user_agent": "API User Agent (Leave empty for default)"
         }
       }
     },
@@ -23,13 +24,21 @@
   "options": {
     "step": {
       "init": {
-        "title": "Configure Ariston",
+        "title": "Configure Integration",
         "data": {
           "extra_energy_features": "Extra energy related entities",
           "scan_interval": "Zone Scan Interval (seconds)",
           "energy_scan_interval": "Energy Scan Interval (minutes)",
           "bus_errors_scan_interval": "Bus Errors Scan Interval (seconds)"
         }
+      }
+    }
+  },
+  "selector": {
+    "brand": {
+      "options": {
+        "ariston": "Ariston Net",
+        "elco": "Elco Remocon Net"
       }
     }
   }

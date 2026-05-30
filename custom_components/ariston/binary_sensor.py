@@ -53,7 +53,15 @@ async def async_setup_entry(
                 description.whe_types,
             )
         ):
-            ariston_binary_sensors.append(AristonBinarySensor(coordinator, description))
+            if description.zone:
+                for zone_number in coordinator.device.zone_numbers:
+                    ariston_binary_sensors.append(
+                        AristonBinarySensor(coordinator, description, zone_number)
+                    )
+            else:
+                ariston_binary_sensors.append(
+                    AristonBinarySensor(coordinator, description)
+                )
 
     async_add_entities(ariston_binary_sensors)
 
@@ -96,9 +104,17 @@ class AristonBinarySensor(AristonEntity, BinarySensorEntity):
         self,
         coordinator: DeviceDataUpdateCoordinator,
         description: AristonBinarySensorEntityDescription,
+        zone: int = 0,
     ) -> None:
         """Initialize the entity."""
-        super().__init__(coordinator, description)
+        super().__init__(coordinator, description, zone)
+
+    @property
+    def name(self):
+        """Return the name of the entity."""
+        if self.zone:
+            return f"{self.entity_description.name} {self.zone}"
+        return self.entity_description.name
 
     @property
     def is_on(self):

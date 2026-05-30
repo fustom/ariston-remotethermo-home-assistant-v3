@@ -4,7 +4,7 @@ from __future__ import annotations
 
 import logging
 
-from ariston.const import PlantMode, ZoneMode, BsbZoneMode
+from ariston.const import BsbDeviceProperties, BsbZoneMode, PlantMode, SystemType, ZoneMode
 from homeassistant.components.climate import (
     ClimateEntity,
     ClimateEntityFeature,
@@ -15,7 +15,13 @@ from homeassistant.config_entries import ConfigEntry
 from homeassistant.const import ATTR_TEMPERATURE
 from homeassistant.core import HomeAssistant
 
-from .const import ARISTON_CLIMATE_TYPES, DOMAIN, AristonClimateEntityDescription
+from .const import (
+    ARISTON_CLIMATE_TYPES,
+    BSB_PRESET_COMFORT,
+    BSB_PRESET_REDUCED,
+    DOMAIN,
+    AristonClimateEntityDescription,
+)
 from .coordinator import DeviceDataUpdateCoordinator
 from .entity import AristonEntity
 
@@ -95,11 +101,21 @@ class AristonThermostat(AristonEntity, ClimateEntity):
     @property
     def min_temp(self):
         """Return minimum temperature."""
+        if (
+            self.device.system_type == SystemType.BSB
+            and self.device.get_zone_mode(self.zone) == BsbZoneMode.MANUAL_NIGHT
+        ):
+            return self.device.get_reduced_temp_min(self.zone)
         return self.device.get_comfort_temp_min(self.zone)
 
     @property
     def max_temp(self):
         """Return the maximum temperature."""
+        if (
+            self.device.system_type == SystemType.BSB
+            and self.device.get_zone_mode(self.zone) == BsbZoneMode.MANUAL_NIGHT
+        ):
+            return self.device.get_reduced_temp_max(self.zone)
         return self.device.get_comfort_temp_max(self.zone)
 
     @property
@@ -115,6 +131,11 @@ class AristonThermostat(AristonEntity, ClimateEntity):
     @property
     def target_temperature(self) -> float:
         """Return the target temperature for the device."""
+        if (
+            self.device.system_type == SystemType.BSB
+            and self.device.get_zone_mode(self.zone) == BsbZoneMode.MANUAL_NIGHT
+        ):
+            return self.device.get_reduced_temp_value(self.zone)
         return self.device.get_target_temp_value(self.zone)
 
     @property
@@ -125,11 +146,9 @@ class AristonThermostat(AristonEntity, ClimateEntity):
             features |= ClimateEntityFeature.TURN_OFF
         if hasattr(ClimateEntityFeature, "TURN_ON"):
             features |= ClimateEntityFeature.TURN_ON
-        return (
-            features | ClimateEntityFeature.PRESET_MODE
-            if self.device.plant_mode_supported
-            else features
-        )
+        if self.device.plant_mode_supported or self.device.system_type == SystemType.BSB:
+            features |= ClimateEntityFeature.PRESET_MODE
+        return features
 
     @property
     def hvac_mode(self) -> str:
@@ -168,7 +187,14 @@ class AristonThermostat(AristonEntity, ClimateEntity):
     def hvac_action(self):
         """Return the current running hvac operation."""
         if_flame_on = bool(self.device.is_flame_on_value)
-        if_heating_pump_on = bool(getattr(self.device, 'is_heating_pump_on_value', False))
+        if self.device.system_type == SystemType.BSB:
+            if_heating_pump_on = bool(
+                self.device.data.get(BsbDeviceProperties.HP_ON, False)
+            )
+        else:
+            if_heating_pump_on = bool(
+                getattr(self.device, 'is_heating_pump_on_value', False)
+            )
 
         if_not_idle = if_flame_on or if_heating_pump_on
 
@@ -186,14 +212,23 @@ class AristonThermostat(AristonEntity, ClimateEntity):
         return curr_hvac_action
 
     @property
-    def preset_mode(self) -> str:
-        """Return the current preset mode, e.g., home, away, temp."""
-        return self.device.plant_mode_text
-
-    @property
     def preset_modes(self) -> list[str]:
         """Return a list of available preset modes."""
+        if self.device.system_type == SystemType.BSB:
+            return [BSB_PRESET_COMFORT, BSB_PRESET_REDUCED]
         return self.device.plant_mode_opt_texts
+
+    @property
+    def preset_mode(self) -> str | None:
+        """Return the current preset mode."""
+        if self.device.system_type == SystemType.BSB:
+            zone_mode = self.device.get_zone_mode(self.zone)
+            if zone_mode == BsbZoneMode.MANUAL:
+                return BSB_PRESET_COMFORT
+            if zone_mode == BsbZoneMode.MANUAL_NIGHT:
+                return BSB_PRESET_REDUCED
+            return None
+        return self.device.plant_mode_text
 
     async def async_set_hvac_mode(self, hvac_mode):
         """Set new target hvac mode."""
@@ -260,7 +295,7 @@ class AristonThermostat(AristonEntity, ClimateEntity):
 
         self.async_write_ha_state()
 
-    async def async_set_preset_mode(self, preset_mode):
+    async def async_set_preset_mode(self, preset_mode: str) -> None:
         """Set new target preset mode."""
         _LOGGER.debug(
             "Setting preset mode to %s for %s",
@@ -268,29 +303,34 @@ class AristonThermostat(AristonEntity, ClimateEntity):
             self.name,
         )
 
-        # Don't assume index maps to enum value directly
+        if self.device.system_type == SystemType.BSB:
+            if preset_mode == BSB_PRESET_COMFORT:
+                await self.device.async_set_zone_mode(BsbZoneMode.MANUAL, self.zone)
+            elif preset_mode == BSB_PRESET_REDUCED:
+                await self.device.async_set_zone_mode(BsbZoneMode.MANUAL_NIGHT, self.zone)
+            else:
+                raise ValueError(f"Unsupported preset mode: {preset_mode}")
+            await self.coordinator.async_request_refresh()
+            self.async_write_ha_state()
+            return
+
+        # GALEVO path — existing logic below unchanged
         preset_index = self.device.plant_mode_opt_texts.index(preset_mode)
         plant_mode = PlantMode(self.device.plant_mode_options[preset_index])
 
-        # Get current states
         current_plant_in_cool = self.device.is_plant_in_cool_mode
         zone_modes = self.device.get_zone_mode_options(self.zone)
 
-        # When switching away from cooling mode, ensure zone is in appropriate state
         if current_plant_in_cool and plant_mode != PlantMode.COOLING:
-            # Set zone to manual heat mode before changing plant mode
             if ZoneMode.MANUAL in zone_modes:
                 await self.device.async_set_zone_mode(ZoneMode.MANUAL, self.zone)
 
-        # Set the plant mode
         await self.device.async_set_plant_mode(plant_mode)
 
-        # Special handling for OFF mode
         if plant_mode == PlantMode.OFF:
             if self.device.is_zone_mode_options_contains_off(self.zone):
                 await self.device.async_set_zone_mode(BsbZoneMode.OFF, self.zone)
 
-        # Refresh coordinator to get updated device state
         await self.coordinator.async_request_refresh()
         self.async_write_ha_state()
 
@@ -306,5 +346,11 @@ class AristonThermostat(AristonEntity, ClimateEntity):
             self.name,
         )
 
-        await self.device.async_set_comfort_temp(temperature, self.zone)
+        if (
+            self.device.system_type == SystemType.BSB
+            and self.device.get_zone_mode(self.zone) == BsbZoneMode.MANUAL_NIGHT
+        ):
+            await self.device.async_set_reduced_temp(temperature, self.zone)
+        else:
+            await self.device.async_set_comfort_temp(temperature, self.zone)
         self.async_write_ha_state()

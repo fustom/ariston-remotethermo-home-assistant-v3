@@ -1,8 +1,6 @@
 {
-  "name": "Ariston NET",
-  "zip_release": true,
+  "name": "Ariston / Elco NET",
   "hide_default_branch": true,
   "render_readme": true,
-  "homeassistant": "2023.1.1",
-  "filename": "ariston-remotethermo-home-assistant-v3.zip"
+  "homeassistant": "2023.1.1"
 }

@@ -36,3 +36,4 @@ class DeviceDataUpdateCoordinator(DataUpdateCoordinator):
         )
 
         self.device = device
+        self.brand: str = "ariston"

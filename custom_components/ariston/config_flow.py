@@ -17,15 +17,22 @@ from homeassistant.const import (
     CONF_USERNAME,
 )
 from homeassistant.core import callback
+from homeassistant.helpers.selector import (
+    SelectSelector,
+    SelectSelectorConfig,
+    SelectSelectorMode,
+)
 
 from .const import (
     API_URL_SETTING,
     API_USER_AGENT,
     BUS_ERRORS_SCAN_INTERVAL,
+    CONF_BRAND,
     DEFAULT_BUS_ERRORS_SCAN_INTERVAL_SECONDS,
     DEFAULT_ENERGY_SCAN_INTERVAL_MINUTES,
     DEFAULT_SCAN_INTERVAL_SECONDS,
     DOMAIN,
+    ELCO_API_URL,
     ENERGY_SCAN_INTERVAL,
 )
 
@@ -35,8 +42,15 @@ STEP_USER_DATA_SCHEMA = vol.Schema(
     {
         vol.Required(CONF_USERNAME): str,
         vol.Required(CONF_PASSWORD): str,
-        vol.Optional(API_URL_SETTING, default=ARISTON_API_URL): str,
-        vol.Optional(API_USER_AGENT, default=ARISTON_USER_AGENT): str,
+        vol.Required(CONF_BRAND, default="ariston"): SelectSelector(
+            SelectSelectorConfig(
+                options=["ariston", "elco"],
+                translation_key="brand",
+                mode=SelectSelectorMode.DROPDOWN,
+            )
+        ),
+        vol.Optional(API_URL_SETTING): str,
+        vol.Optional(API_USER_AGENT): str,
     }
 )
 
@@ -50,6 +64,7 @@ class AristonConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
         """Initialize Ariston config flow."""
         self.cloud_username: str = ""
         self.cloud_password: str = ""
+        self.brand: str = "ariston"
         self.cloud_api_url: str = ARISTON_API_URL
         self.cloud_api_user_agent: str = ARISTON_USER_AGENT
         self.cloud_devices = {}
@@ -72,8 +87,10 @@ class AristonConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
         try:
             self.cloud_username = user_input[CONF_USERNAME]
             self.cloud_password = user_input[CONF_PASSWORD]
-            self.cloud_api_url = user_input[API_URL_SETTING]
-            self.cloud_api_user_agent = user_input[API_USER_AGENT]
+            self.brand = user_input.get(CONF_BRAND, "ariston")
+            default_api_url = ELCO_API_URL if self.brand == "elco" else ARISTON_API_URL
+            self.cloud_api_url = user_input.get(API_URL_SETTING) or default_api_url
+            self.cloud_api_user_agent = user_input.get(API_USER_AGENT) or ARISTON_USER_AGENT
             ariston = Ariston()
 
             reponse = await ariston.async_connect(
@@ -120,6 +137,7 @@ class AristonConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
                 data={
                     CONF_USERNAME: self.cloud_username,
                     CONF_PASSWORD: self.cloud_password,
+                    CONF_BRAND: self.brand,
                     API_URL_SETTING: self.cloud_api_url,
                     API_USER_AGENT: self.cloud_api_user_agent,
                     CONF_DEVICE: cloud_device,
@@ -133,6 +151,7 @@ class AristonConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
             data={
                 CONF_USERNAME: self.cloud_username,
                 CONF_PASSWORD: self.cloud_password,
+                "brand": self.brand,
                 API_URL_SETTING: self.cloud_api_url,
                 API_USER_AGENT: self.cloud_api_user_agent,
                 CONF_DEVICE: cloud_device,

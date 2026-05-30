@@ -35,12 +35,13 @@ async def async_setup_entry(
                 description.whe_types,
             )
         ):
-            ariston_sensors.append(
-                AristonSensor(
-                    coordinator,
-                    description,
-                )
-            )
+            if description.zone:
+                for zone_number in coordinator.device.zone_numbers:
+                    ariston_sensors.append(
+                        AristonSensor(coordinator, description, zone_number)
+                    )
+            else:
+                ariston_sensors.append(AristonSensor(coordinator, description))
 
     async_add_entities(ariston_sensors)
 
@@ -52,9 +53,17 @@ class AristonSensor(AristonEntity, SensorEntity):
         self,
         coordinator: DeviceDataUpdateCoordinator,
         description: AristonSensorEntityDescription,
+        zone: int = 0,
     ) -> None:
         """Initialize the entity."""
-        super().__init__(coordinator, description)
+        super().__init__(coordinator, description, zone)
+
+    @property
+    def name(self):
+        """Return the name of the entity."""
+        if self.zone:
+            return f"{self.entity_description.name} {self.zone}"
+        return self.entity_description.name
 
     @property
     def native_value(self):

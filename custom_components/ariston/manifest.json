@@ -1,16 +1,16 @@
 {
   "domain": "ariston",
-  "name": "Ariston",
-  "codeowners": ["@fustom"],
+  "name": "Ariston / Elco",
+  "codeowners": ["@c3dcmps"],
   "config_flow": true,
   "dependencies": [],
-  "documentation": "https://github.com/fustom/ariston-remotethermo-home-assistant-v3",
+  "documentation": "https://github.com/c3dcmps/ariston-remotethermo-home-assistant-v3",
   "homekit": {},
   "iot_class": "cloud_polling",
-  "issue_tracker": "https://github.com/fustom/ariston-remotethermo-home-assistant-v3/issues",
+  "issue_tracker": "https://github.com/c3dcmps/ariston-remotethermo-home-assistant-v3/issues",
   "loggers": ["ariston"],
   "requirements": ["ariston==0.19.9"],
   "ssdp": [],
-  "version": "0.19.9",
+  "version": "0.20.2",
   "zeroconf": []
 }
