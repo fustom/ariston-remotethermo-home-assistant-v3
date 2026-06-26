@@ -135,7 +135,19 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
                 device.async_update_energy,
             )
             hass.data[DOMAIN][entry.unique_id][ENERGY_COORDINATOR] = energy_coordinator
-            await energy_coordinator.async_config_entry_first_refresh()
+            # The energy/consumption endpoint is optional and the Ariston cloud
+            # occasionally returns errors (e.g. HTTP 500) for it. Don't let that
+            # failure tear down the whole config entry: log it and continue so the
+            # climate, water heater and status entities still load. The energy
+            # sensors will populate on a later successful refresh.
+            try:
+                await energy_coordinator.async_config_entry_first_refresh()
+            except ConfigEntryNotReady as error:
+                _LOGGER.warning(
+                    "Could not fetch Ariston energy data, continuing without "
+                    "energy sensors for now: %s",
+                    error,
+                )
 
         await hass.config_entries.async_forward_entry_setups(entry, PLATFORMS)
 
