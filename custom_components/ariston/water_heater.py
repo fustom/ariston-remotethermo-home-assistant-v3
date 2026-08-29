@@ -18,7 +18,7 @@ from .const import (
     DOMAIN,
     AristonWaterHeaterEntityDescription,
 )
-from .coordinator import DeviceDataUpdateCoordinator
+from .coordinator import DeviceDataUpdateCoordinator, PendingWrite
 from .entity import AristonEntity
 
 _LOGGER = logging.getLogger(__name__)
@@ -141,11 +141,17 @@ class AristonWaterHeater(AristonEntity, WaterHeaterEntity):
         )
 
         await self.device.async_set_water_heater_temperature(temperature)
+        self.coordinator.pending_writes["temperature"] = PendingWrite(
+            prop="temperature", expected=temperature
+        )
         self.async_write_ha_state()
 
     async def async_set_operation_mode(self, operation_mode):
         """Set operation mode."""
         await self.device.async_set_water_heater_operation_mode(operation_mode)
+        self.coordinator.pending_writes["operation_mode"] = PendingWrite(
+            prop="operation_mode", expected=operation_mode
+        )
         self.async_write_ha_state()
 
     async def async_turn_off(self, **kwargs) -> None:
