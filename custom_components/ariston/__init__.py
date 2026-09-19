@@ -5,9 +5,6 @@ from __future__ import annotations
 import logging
 
 import voluptuous as vol
-
-from ariston import Ariston, DeviceAttribute, SystemType
-from ariston.const import ARISTON_API_URL, ARISTON_USER_AGENT
 from homeassistant.config_entries import ConfigEntry
 from homeassistant.const import (
     ATTR_DEVICE_ID,
@@ -19,8 +16,12 @@ from homeassistant.const import (
 )
 from homeassistant.core import HomeAssistant
 from homeassistant.exceptions import ConfigEntryAuthFailed, ConfigEntryNotReady
-from homeassistant.helpers import config_validation as cv, device_registry as dr
+from homeassistant.helpers import config_validation as cv
+from homeassistant.helpers import device_registry as dr
 from homeassistant.util.unit_system import METRIC_SYSTEM
+
+from ariston import Ariston, DeviceAttribute, SystemType
+from ariston.const import ARISTON_API_URL, ARISTON_USER_AGENT
 
 from .const import (
     API_URL_SETTING,
@@ -99,7 +100,12 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
             CONF_SCAN_INTERVAL, DEFAULT_SCAN_INTERVAL_SECONDS
         )
         coordinator = DeviceDataUpdateCoordinator(
-            hass, device, scan_interval_seconds, COORDINATOR, device.async_update_state
+            hass,
+            entry,
+            device,
+            scan_interval_seconds,
+            COORDINATOR,
+            device.async_update_state,
         )
 
         # Load persisted gas calorific overrides from disk
@@ -117,6 +123,7 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
         )
         bus_errors_coordinator = DeviceDataUpdateCoordinator(
             hass,
+            entry,
             device,
             bus_errors_scan_interval_seconds,
             BUS_ERRORS_COORDINATOR,
@@ -133,6 +140,7 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
             )
             energy_coordinator = DeviceDataUpdateCoordinator(
                 hass,
+                entry,
                 device,
                 energy_interval_minutes * 60,
                 ENERGY_COORDINATOR,

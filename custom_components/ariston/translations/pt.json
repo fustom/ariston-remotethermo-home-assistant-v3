@@ -7,6 +7,7 @@
     "error": {
       "cannot_connect": "Falha na ligação",
       "invalid_auth": "Falha na autenticação",
+      "no_device_found": "Nenhum dispositivo encontrado",
       "unknown": "Erro desconhecido"
     },
     "step": {
@@ -14,7 +15,13 @@
         "data": {
           "password": "Senha",
           "username": "Utilizador",
-          "api_url_setting": "Link de API Ariston"
+          "api_url_setting": "Link de API Ariston",
+          "api_user_agent": "Agente de utilizador da API Ariston"
+        }
+      },
+      "select": {
+        "data": {
+          "select_device": "Dispositivo"
         }
       }
     }
@@ -23,7 +30,10 @@
     "step": {
       "init": {
         "data": {
-          "extra_energy_features": "Entidades relacionadas com energia",
+          "username": "Utilizador",
+          "password": "Senha",
+          "api_url_setting": "Link de API Ariston",
+          "api_user_agent": "Agente de utilizador da API Ariston",
           "scan_interval": "Pesquisa de zonas (segundos)",
           "energy_scan_interval": "Pesquisa de energia (minutos)",
           "bus_errors_scan_interval": "Pesquisa de erros bus (segundos)"

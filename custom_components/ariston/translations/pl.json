@@ -7,6 +7,7 @@
     "error": {
       "cannot_connect": "Nie można połączyć",
       "invalid_auth": "Nieprawidłowa autoryzacja",
+      "no_device_found": "Nie znaleziono urządzeń",
       "unknown": "Nieoczekiwany błąd"
     },
     "step": {
@@ -14,7 +15,13 @@
         "data": {
           "password": "Hasło",
           "username": "Nazwa użytkownika",
-          "api_url_setting": "Adres URL API Ariston"
+          "api_url_setting": "Adres URL API Ariston",
+          "api_user_agent": "Agent użytkownika API Ariston"
+        }
+      },
+      "select": {
+        "data": {
+          "select_device": "Urządzenie"
         }
       }
     }
@@ -23,7 +30,10 @@
     "step": {
       "init": {
         "data": {
-          "extra_energy_features": "Dodatkowe encje związane z energią",
+          "username": "Nazwa użytkownika",
+          "password": "Hasło",
+          "api_url_setting": "Adres URL API Ariston",
+          "api_user_agent": "Agent użytkownika API Ariston",
           "scan_interval": "Interwał skanowania strefy (sekundy)",
           "energy_scan_interval": "Interwał skanowania energii (minuty)",
           "bus_errors_scan_interval": "Interwał skanowania błędów magistrali (sekundy)"

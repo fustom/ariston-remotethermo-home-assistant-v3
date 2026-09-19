@@ -7,13 +7,21 @@
     "error": {
       "cannot_connect": "Impossibile connettersi",
       "invalid_auth": "Autenticazione errata",
+      "no_device_found": "Nessun dispositivo trovato",
       "unknown": "Errore generico"
     },
     "step": {
       "user": {
         "data": {
           "password": "Password",
-          "username": "Nome Utente"
+          "username": "Nome Utente",
+          "api_url_setting": "URL API Ariston",
+          "api_user_agent": "User agent API Ariston"
+        }
+      },
+      "select": {
+        "data": {
+          "select_device": "Dispositivo"
         }
       }
     }
@@ -22,9 +30,13 @@
     "step": {
       "init": {
         "data": {
-          "extra_energy_features": "Entità Extra relative al controllo energetico",
+          "username": "Nome Utente",
+          "password": "Password",
+          "api_url_setting": "URL API Ariston",
+          "api_user_agent": "User agent API Ariston",
           "scan_interval": "Intervallo scansione dati zone (in secondi)",
-          "energy_scan_interval": "Intervallo scansione dati energetici (in minuti)"
+          "energy_scan_interval": "Intervallo scansione dati energetici (in minuti)",
+          "bus_errors_scan_interval": "Intervallo scansione errori bus (in secondi)"
         },
         "title": "Configura Ariston"
       }

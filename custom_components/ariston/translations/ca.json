@@ -7,6 +7,7 @@
     "error": {
       "cannot_connect": "No s'ha pogut connectar",
       "invalid_auth": "L'autenticació ha fallat",
+      "no_device_found": "No s'ha trobat cap dispositiu",
       "unknown": "Error inesperat"
     },
     "step": {
@@ -14,7 +15,13 @@
         "data": {
           "password": "Contrasenya",
           "username": "Nom d'usuari",
-          "api_url_setting": "URL de l'API d'Ariston"
+          "api_url_setting": "URL de l'API d'Ariston",
+          "api_user_agent": "Agent d'usuari de l'API d'Ariston"
+        }
+      },
+      "select": {
+        "data": {
+          "select_device": "Dispositiu"
         }
       }
     }
@@ -23,7 +30,10 @@
     "step": {
       "init": {
         "data": {
-          "extra_energy_features": "Entitats extres relacionades amb l'energia",
+          "username": "Nom d'usuari",
+          "password": "Contrasenya",
+          "api_url_setting": "URL de l'API d'Ariston",
+          "api_user_agent": "Agent d'usuari de l'API d'Ariston",
           "scan_interval": "Interval d'exploració de zones (segons)",
           "energy_scan_interval": "Interval d'exploració d'energia (minuts)",
           "bus_errors_scan_interval": "Interval d'exploració d'errors de bus (segons)"
