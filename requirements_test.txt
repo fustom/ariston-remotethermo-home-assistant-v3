@@ -1,0 +1,3 @@
+ariston==0.19.9
+homeassistant==2026.9.3
+pytest

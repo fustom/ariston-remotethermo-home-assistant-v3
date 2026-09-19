@@ -2,8 +2,9 @@
 
 from __future__ import annotations
 
-from abc import ABC
 import logging
+from abc import ABC
+from typing import Any
 
 from ariston.const import WheType
 from homeassistant.helpers.entity import DeviceInfo
@@ -18,6 +19,38 @@ from .const import (
 from .coordinator import DeviceDataUpdateCoordinator
 
 _LOGGER = logging.getLogger(__name__)
+
+
+def description_is_supported(
+    coordinator: DeviceDataUpdateCoordinator,
+    description: AristonBaseEntityDescription,
+) -> bool:
+    """Return whether a coordinator supports an entity description."""
+    if not coordinator.device.are_device_features_available(
+        description.device_features,
+        description.system_types,
+        description.whe_types,
+    ):
+        return False
+    return (
+        description.get_is_supported is None
+        or description.get_is_supported(coordinator)
+    )
+
+
+def get_coordinator_for_description(
+    hass: Any, entry: Any, description: AristonBaseEntityDescription
+) -> DeviceDataUpdateCoordinator | None:
+    """Return a supported coordinator or skip a missing optional data source."""
+    entry_data = hass.data.get(DOMAIN, {}).get(entry.unique_id, {})
+    coordinator = entry_data.get(description.coordinator)
+    if (
+        coordinator is None
+        or getattr(coordinator, "device", None) is None
+        or not description_is_supported(coordinator, description)
+    ):
+        return None
+    return coordinator
 
 
 class AristonEntity(CoordinatorEntity, ABC):
@@ -35,6 +68,14 @@ class AristonEntity(CoordinatorEntity, ABC):
         self.device = coordinator.device
         self.entity_description: AristonBaseEntityDescription = description
         self.zone = zone
+
+    @property
+    def available(self) -> bool:
+        """Return whether coordinator data and entity-specific state are usable."""
+        return super().available and (
+            self.entity_description.get_is_available is None
+            or self.entity_description.get_is_available(self)
+        )
 
     @property
     def device_info(self) -> DeviceInfo:

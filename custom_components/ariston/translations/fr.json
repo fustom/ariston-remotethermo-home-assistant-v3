@@ -1,12 +1,13 @@
 {
   "config": {
-    "avort": {
+    "abort": {
       "already_configured": "L'appareil est déjà configuré",
       "reauth_successful": "La réauthentification a réussi"
     },
     "error": {
       "cannot_connect": "Échec de la connexion",
       "invalid_auth": "Authentification invalide",
+      "no_device_found": "Aucun appareil trouvé",
       "unknown": "Erreur inattendue"
     },
     "step": {
@@ -14,7 +15,13 @@
         "data": {
           "password": "Mot de passe",
           "username": "Nom d'utilisateur",
-          "api_url_setting": "URL de l'API Ariston"
+          "api_url_setting": "URL de l'API Ariston",
+          "api_user_agent": "Agent utilisateur de l'API Ariston"
+        }
+      },
+      "select": {
+        "data": {
+          "select_device": "Appareil"
         }
       }
     }
@@ -22,13 +29,32 @@
   "options": {
     "step": {
       "init": {
-        "données": {
-          "extra_energy_features": "Entités supplémentaires liées à l'énergie",
+        "data": {
+          "username": "Nom d'utilisateur",
+          "password": "Mot de passe",
+          "api_url_setting": "URL de l'API Ariston",
+          "api_user_agent": "Agent utilisateur de l'API Ariston",
           "scan_interval": "Intervalle de scan de zone (secondes)",
           "energy_scan_interval": "Intervalle d'analyse énergétique (minutes)",
           "bus_errors_scan_interval": "Intervalle d'analyse des erreurs de bus (secondes)"
         },
         "title": "Configurer Ariston"
+      }
+    }
+  },
+  "entity": {
+    "climate": {
+      "ariston_thermostat": {
+        "state_attributes": {
+          "preset_mode": {
+            "state": {
+              "protection": "Protection",
+              "automatic": "Automatic",
+              "reduced": "Reduced",
+              "comfort": "Comfort"
+            }
+          }
+        }
       }
     }
   }

@@ -6,9 +6,6 @@ import logging
 from typing import Any
 
 import voluptuous as vol
-
-from ariston import Ariston, DeviceAttribute
-from ariston.const import ARISTON_API_URL, ARISTON_USER_AGENT
 from homeassistant import config_entries
 from homeassistant.const import (
     CONF_DEVICE,
@@ -17,6 +14,9 @@ from homeassistant.const import (
     CONF_USERNAME,
 )
 from homeassistant.core import callback
+
+from ariston import Ariston, DeviceAttribute
+from ariston.const import ARISTON_API_URL, ARISTON_USER_AGENT
 
 from .const import (
     API_URL_SETTING,
@@ -27,9 +27,18 @@ from .const import (
     DEFAULT_SCAN_INTERVAL_SECONDS,
     DOMAIN,
     ENERGY_SCAN_INTERVAL,
+    RATED_POWER_W,
+    WATER_HEATER_TEMPERATURE_UNIT,
 )
 
 _LOGGER = logging.getLogger(__name__)
+
+
+def _positive_int(value: Any) -> int:
+    """Validate a real positive integer without coercing strings or decimals."""
+    if type(value) is not int or value < 1:
+        raise vol.Invalid("expected a positive integer")
+    return value
 
 STEP_USER_DATA_SCHEMA = vol.Schema(
     {
@@ -76,38 +85,39 @@ class AristonConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
             self.cloud_api_user_agent = user_input[API_USER_AGENT]
             ariston = Ariston()
 
-            reponse = await ariston.async_connect(
+            response = await ariston.async_connect(
                 self.cloud_username,
                 self.cloud_password,
                 self.cloud_api_url,
                 self.cloud_api_user_agent,
             )
-            if not reponse:
+            if not response:
                 errors["base"] = "invalid_auth"
                 return self.async_show_form(
                     step_id="user", data_schema=STEP_USER_DATA_SCHEMA, errors=errors
                 )
+
+            cloud_devices = await ariston.async_discover()
+            if not cloud_devices:
+                errors["base"] = "no_device_found"
+                return self.async_show_form(
+                    step_id="user", data_schema=STEP_USER_DATA_SCHEMA, errors=errors
+                )
+
+            if len(cloud_devices) == 1:
+                return await self.async_create_or_update_entry(cloud_devices[0])
+
+            self.cloud_devices = {
+                device[DeviceAttribute.GW]: device for device in cloud_devices
+            }
+            return await self.async_step_select()
+
         except Exception:  # pylint: disable=broad-except
             _LOGGER.exception("Unexpected exception")
             errors["base"] = "unknown"
-        else:
-            cloud_devices = await ariston.async_discover()
-            if len(cloud_devices) == 0:
-                errors["base"] = "no device found"
-            if len(cloud_devices) == 1:
-                return await self.async_create_or_update_entry(cloud_devices[0])
-            if len(cloud_devices) > 1:
-                for device in cloud_devices:
-                    name = device[DeviceAttribute.NAME]
-                    model = device[DeviceAttribute.SN]
-                    list_name = f"{name} - {model}"
-                    self.cloud_devices[list_name] = device
-
-                return await self.async_step_select()
-
-        return self.async_show_form(
-            step_id="user", data_schema=STEP_USER_DATA_SCHEMA, errors=errors
-        )
+            return self.async_show_form(
+                step_id="user", data_schema=STEP_USER_DATA_SCHEMA, errors=errors
+            )
 
     async def async_create_or_update_entry(self, cloud_device):
         """Create or update config entry."""
@@ -140,19 +150,26 @@ class AristonConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
         )
 
     async def async_step_select(self, user_input=None):
-        """Multiple device found, select one of them."""
-        errors = {}
+        """Handle device selection when multiple devices are found."""
         if user_input is not None:
             return await self.async_create_or_update_entry(
                 self.cloud_devices[user_input["select_device"]]
             )
 
+        device_options = {
+            gateway: (
+                f"{device.get(DeviceAttribute.NAME, 'Unknown')} - "
+                f"{device.get(DeviceAttribute.SN, 'Unknown')} ({gateway})"
+            )
+            for gateway, device in self.cloud_devices.items()
+        }
         select_schema = vol.Schema(
-            {vol.Required("select_device"): vol.In(list(self.cloud_devices))}
+            {vol.Required("select_device"): vol.In(device_options)}
         )
 
         return self.async_show_form(
-            step_id="select", data_schema=select_schema, errors=errors
+            step_id="select",
+            data_schema=select_schema,
         )
 
     @staticmethod
@@ -168,9 +185,94 @@ class AristonOptionsFlow(config_entries.OptionsFlow):
     async def async_step_init(self, user_input=None):
         """Manage the options."""
         if user_input is not None:
-            return self.async_create_entry(title="", data=user_input)
+            if RATED_POWER_W in user_input:
+                try:
+                    _positive_int(user_input[RATED_POWER_W])
+                except vol.Invalid:
+                    return self.async_show_form(
+                        step_id="init",
+                        data_schema=self._get_options_schema(),
+                        errors={RATED_POWER_W: "invalid_rated_power"},
+                    )
 
+            # Update config entry data if credentials were changed
+            if any(
+                user_input.get(key) != self.config_entry.data.get(key)
+                for key in [
+                    CONF_USERNAME,
+                    CONF_PASSWORD,
+                    API_URL_SETTING,
+                    API_USER_AGENT,
+                ]
+            ):
+                # Test new credentials before updating
+                try:
+                    ariston = Ariston()
+                    response = await ariston.async_connect(
+                        user_input[CONF_USERNAME],
+                        user_input[CONF_PASSWORD],
+                        user_input.get(API_URL_SETTING, ARISTON_API_URL),
+                        user_input.get(API_USER_AGENT, ARISTON_USER_AGENT),
+                    )
+
+                    if not response:
+                        return self.async_show_form(
+                            step_id="init",
+                            data_schema=self._get_options_schema(),
+                            errors={"base": "invalid_auth"},
+                        )
+
+                    # Update config entry data with new credentials
+                    new_data = {**self.config_entry.data}
+                    new_data.update(
+                        {
+                            CONF_USERNAME: user_input[CONF_USERNAME],
+                            CONF_PASSWORD: user_input[CONF_PASSWORD],
+                            API_URL_SETTING: user_input.get(
+                                API_URL_SETTING, ARISTON_API_URL
+                            ),
+                            API_USER_AGENT: user_input.get(
+                                API_USER_AGENT, ARISTON_USER_AGENT
+                            ),
+                        }
+                    )
+
+                    self.hass.config_entries.async_update_entry(
+                        self.config_entry, data=new_data
+                    )
+
+                except Exception:
+                    _LOGGER.exception("Unexpected exception while updating options")
+                    return self.async_show_form(
+                        step_id="init",
+                        data_schema=self._get_options_schema(),
+                        errors={"base": "unknown"},
+                    )
+
+            # Return options (scan intervals)
+            new_options = {
+                CONF_SCAN_INTERVAL: user_input[CONF_SCAN_INTERVAL],
+                ENERGY_SCAN_INTERVAL: user_input[ENERGY_SCAN_INTERVAL],
+                BUS_ERRORS_SCAN_INTERVAL: user_input[BUS_ERRORS_SCAN_INTERVAL],
+                WATER_HEATER_TEMPERATURE_UNIT: user_input[
+                    WATER_HEATER_TEMPERATURE_UNIT
+                ],
+            }
+            if RATED_POWER_W in user_input:
+                new_options[RATED_POWER_W] = user_input[RATED_POWER_W]
+            return self.async_create_entry(title="", data=new_options)
+
+        return self.async_show_form(
+            step_id="init",
+            data_schema=self._get_options_schema(),
+        )
+
+    def _get_options_schema(self):
+        """Get options schema."""
+        # Get current values
+        data = self.config_entry.data
         options = self.config_entry.options
+
         scan_interval = options.get(CONF_SCAN_INTERVAL, DEFAULT_SCAN_INTERVAL_SECONDS)
         energy_scan_interval = options.get(
             ENERGY_SCAN_INTERVAL, DEFAULT_ENERGY_SCAN_INTERVAL_MINUTES
@@ -178,24 +280,44 @@ class AristonOptionsFlow(config_entries.OptionsFlow):
         bus_errors_scan_interval = options.get(
             BUS_ERRORS_SCAN_INTERVAL, DEFAULT_BUS_ERRORS_SCAN_INTERVAL_SECONDS
         )
-
-        return self.async_show_form(
-            step_id="init",
-            data_schema=vol.Schema(
-                {
-                    vol.Optional(
-                        CONF_SCAN_INTERVAL,
-                        default=scan_interval,
-                    ): int,
-                    vol.Optional(
-                        ENERGY_SCAN_INTERVAL,
-                        default=energy_scan_interval,
-                    ): int,
-                    vol.Optional(
-                        BUS_ERRORS_SCAN_INTERVAL,
-                        default=bus_errors_scan_interval,
-                    ): int,
-                }
-            ),
-            last_step=True,
+        water_heater_temperature_unit = options.get(
+            WATER_HEATER_TEMPERATURE_UNIT, "auto"
         )
+
+        # Build schema with current values
+        schema = {
+                vol.Required(CONF_USERNAME, default=data.get(CONF_USERNAME, "")): str,
+                vol.Required(CONF_PASSWORD, default=data.get(CONF_PASSWORD, "")): str,
+                vol.Optional(
+                    API_URL_SETTING, default=data.get(API_URL_SETTING, ARISTON_API_URL)
+                ): str,
+                vol.Optional(
+                    API_USER_AGENT, default=data.get(API_USER_AGENT, ARISTON_USER_AGENT)
+                ): str,
+                vol.Optional(
+                    CONF_SCAN_INTERVAL,
+                    default=scan_interval,
+                ): int,
+                vol.Optional(
+                    ENERGY_SCAN_INTERVAL,
+                    default=energy_scan_interval,
+                ): int,
+                vol.Optional(
+                    BUS_ERRORS_SCAN_INTERVAL,
+                    default=bus_errors_scan_interval,
+                ): int,
+                vol.Optional(
+                    WATER_HEATER_TEMPERATURE_UNIT,
+                    default=water_heater_temperature_unit,
+                ): vol.In(("auto", "celsius", "fahrenheit")),
+            }
+        rated_power_marker = (
+            vol.Optional(
+                RATED_POWER_W,
+                description={"suggested_value": options[RATED_POWER_W]},
+            )
+            if RATED_POWER_W in options
+            else vol.Optional(RATED_POWER_W)
+        )
+        schema[rated_power_marker] = vol.All(int, vol.Range(min=1))
+        return vol.Schema(schema)

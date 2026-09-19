@@ -7,13 +7,21 @@
     "error": {
       "cannot_connect": "Не удалось подключиться.",
       "invalid_auth": "Неверная аутентификация.",
+      "no_device_found": "Устройства не найдены.",
       "unknown": "Непредвиденная ошибка."
     },
     "step": {
       "user": {
         "data": {
           "password": "Пароль",
-          "username": "Имя пользователя"
+          "username": "Имя пользователя",
+          "api_url_setting": "URL API Ariston",
+          "api_user_agent": "Пользовательский агент API Ariston"
+        }
+      },
+      "select": {
+        "data": {
+          "select_device": "Устройство"
         }
       }
     }
@@ -22,11 +30,31 @@
     "step": {
       "init": {
         "data": {
-          "extra_energy_features": "Дополнительные объекты, связанные с энергией.",
+          "username": "Имя пользователя",
+          "password": "Пароль",
+          "api_url_setting": "URL API Ariston",
+          "api_user_agent": "Пользовательский агент API Ariston",
           "scan_interval": "Интервал сканирования зоны (секунды).",
-          "energy_scan_interval": "Интервал сканирования энергии (минуты)."
+          "energy_scan_interval": "Интервал сканирования энергии (минуты).",
+          "bus_errors_scan_interval": "Интервал сканирования ошибок шины (секунды)."
         },
         "title": "Настроить Аристон"
+      }
+    }
+  },
+  "entity": {
+    "climate": {
+      "ariston_thermostat": {
+        "state_attributes": {
+          "preset_mode": {
+            "state": {
+              "protection": "Protection",
+              "automatic": "Automatic",
+              "reduced": "Reduced",
+              "comfort": "Comfort"
+            }
+          }
+        }
       }
     }
   }

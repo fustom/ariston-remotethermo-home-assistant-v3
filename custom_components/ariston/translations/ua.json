@@ -7,13 +7,21 @@
     "error": {
       "cannot_connect": "Не вдалося підключитися",
       "invalid_auth": "Недійсна автентифікація",
+      "no_device_found": "Пристроїв не знайдено",
       "unknown": "Неочікувана помилка"
     },
     "step": {
       "user": {
         "data": {
           "password": "Пароль",
-          "username": "Ім'я користувача"
+          "username": "Ім'я користувача",
+          "api_url_setting": "URL API Ariston",
+          "api_user_agent": "Агент користувача API Ariston"
+        }
+      },
+      "select": {
+        "data": {
+          "select_device": "Пристрій"
         }
       }
     }
@@ -22,11 +30,31 @@
     "step": {
       "init": {
         "data": {
-          "extra_energy_features": "Об'єкти, пов’язані з додатковою енергетикою",
+          "username": "Ім'я користувача",
+          "password": "Пароль",
+          "api_url_setting": "URL API Ariston",
+          "api_user_agent": "Агент користувача API Ariston",
           "scan_interval": "Інтервал сканування зон (секунд)",
-          "energy_scan_interval": "Інтервал сканування енергії (хвилини)"
+          "energy_scan_interval": "Інтервал сканування енергії (хвилини)",
+          "bus_errors_scan_interval": "Інтервал сканування помилок шини (секунд)"
         },
         "title": "Налаштувати Ariston"
+      }
+    }
+  },
+  "entity": {
+    "climate": {
+      "ariston_thermostat": {
+        "state_attributes": {
+          "preset_mode": {
+            "state": {
+              "protection": "Protection",
+              "automatic": "Automatic",
+              "reduced": "Reduced",
+              "comfort": "Comfort"
+            }
+          }
+        }
       }
     }
   }

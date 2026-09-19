@@ -5,9 +5,6 @@ from __future__ import annotations
 import logging
 
 import voluptuous as vol
-
-from ariston import Ariston, DeviceAttribute, SystemType
-from ariston.const import ARISTON_API_URL, ARISTON_USER_AGENT
 from homeassistant.config_entries import ConfigEntry
 from homeassistant.const import (
     ATTR_DEVICE_ID,
@@ -19,8 +16,13 @@ from homeassistant.const import (
 )
 from homeassistant.core import HomeAssistant
 from homeassistant.exceptions import ConfigEntryAuthFailed, ConfigEntryNotReady
-from homeassistant.helpers import config_validation as cv, device_registry as dr
+from homeassistant.helpers import config_validation as cv
+from homeassistant.helpers import device_registry as dr
+from homeassistant.helpers.update_coordinator import UpdateFailed
 from homeassistant.util.unit_system import METRIC_SYSTEM
+
+from ariston import Ariston, DeviceAttribute, SystemType
+from ariston.const import ARISTON_API_URL, ARISTON_USER_AGENT
 
 from .const import (
     API_URL_SETTING,
@@ -34,6 +36,9 @@ from .const import (
     DOMAIN,
     ENERGY_COORDINATOR,
     ENERGY_SCAN_INTERVAL,
+    RATED_POWER_W,
+    WATER_HEATER_TEMPERATURE_UNIT,
+    async_load_calorific_overrides,
 )
 from .coordinator import DeviceDataUpdateCoordinator
 
@@ -62,6 +67,20 @@ SET_ITEM_BY_ID_SCHEMA = vol.Schema(
         vol.Required(ATTR_VALUE): vol.Coerce(float),
     }
 )
+
+
+async def _async_first_refresh_optional(
+    coordinator: DeviceDataUpdateCoordinator, label: str
+) -> None:
+    """Refresh optional data once without blocking primary device setup."""
+    try:
+        await coordinator.async_config_entry_first_refresh()
+    except ConfigEntryNotReady as err:
+        if not isinstance(err.__cause__, UpdateFailed):
+            raise
+        _LOGGER.warning(
+            "Initial %s refresh failed; scheduled polling will retry: %s", label, err
+        )
 
 
 async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
@@ -98,12 +117,22 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
             CONF_SCAN_INTERVAL, DEFAULT_SCAN_INTERVAL_SECONDS
         )
         coordinator = DeviceDataUpdateCoordinator(
-            hass, device, scan_interval_seconds, COORDINATOR, device.async_update_state
+            hass,
+            entry,
+            device,
+            scan_interval_seconds,
+            COORDINATOR,
+            device.async_update_state,
         )
+        coordinator.water_heater_temperature_unit = entry.options.get(
+            WATER_HEATER_TEMPERATURE_UNIT, "auto"
+        )
+        coordinator.rated_power_w = entry.options.get(RATED_POWER_W)
 
-        hass.data.setdefault(DOMAIN, {}).setdefault(
-            entry.unique_id, {COORDINATOR: {}, ENERGY_COORDINATOR: {}}
-        )
+        # Load persisted gas calorific overrides from disk
+        await async_load_calorific_overrides(hass)
+
+        hass.data.setdefault(DOMAIN, {}).setdefault(entry.unique_id, {})
         hass.data[DOMAIN][entry.unique_id][COORDINATOR] = coordinator
 
         await coordinator.async_config_entry_first_refresh()
@@ -113,6 +142,7 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
         )
         bus_errors_coordinator = DeviceDataUpdateCoordinator(
             hass,
+            entry,
             device,
             bus_errors_scan_interval_seconds,
             BUS_ERRORS_COORDINATOR,
@@ -121,7 +151,7 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
         hass.data[DOMAIN][entry.unique_id][BUS_ERRORS_COORDINATOR] = (
             bus_errors_coordinator
         )
-        await bus_errors_coordinator.async_config_entry_first_refresh()
+        await _async_first_refresh_optional(bus_errors_coordinator, "bus errors")
 
         if device.has_metering:
             energy_interval_minutes = entry.options.get(
@@ -129,13 +159,14 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
             )
             energy_coordinator = DeviceDataUpdateCoordinator(
                 hass,
+                entry,
                 device,
                 energy_interval_minutes * 60,
                 ENERGY_COORDINATOR,
                 device.async_update_energy,
             )
             hass.data[DOMAIN][entry.unique_id][ENERGY_COORDINATOR] = energy_coordinator
-            await energy_coordinator.async_config_entry_first_refresh()
+            await _async_first_refresh_optional(energy_coordinator, "energy")
 
         await hass.config_entries.async_forward_entry_setups(entry, PLATFORMS)
 
