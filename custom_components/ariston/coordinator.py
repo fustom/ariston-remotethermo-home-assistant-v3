@@ -73,6 +73,7 @@ class DeviceDataUpdateCoordinator(DataUpdateCoordinator):
         self._async_update_state = async_update_state
         self.pending_writes: dict[str, PendingWrite] = {}
         self._write_generations: dict[str, int] = {}
+        self.water_heater_temperature_unit = "auto"
 
     def begin_pending_write(self, key: str) -> int:
         """Reserve the newest request for a property before its first await."""

@@ -8,6 +8,7 @@ from types import SimpleNamespace
 import homeassistant  # noqa: F401  # Install Home Assistant's schema compatibility
 import pytest
 from ariston import ConnectionException
+from ariston.const import SystemType
 from homeassistant.const import ATTR_TEMPERATURE
 from homeassistant.helpers.update_coordinator import UpdateFailed
 
@@ -240,6 +241,7 @@ def _water_heater():
     device = SimpleNamespace(
         name="Boiler",
         gateway="gw",
+        system_type=SystemType.GALEVO,
         water_heater_temperature_step=1.0,
         water_heater_target_temperature=40.0,
         water_heater_current_mode_text="manual",

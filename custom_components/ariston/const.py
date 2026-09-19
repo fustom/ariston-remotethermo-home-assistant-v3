@@ -65,6 +65,7 @@ BUS_ERRORS_COORDINATOR: Final[str] = "bus_errors_coordinator"
 BUS_ERRORS_SCAN_INTERVAL: Final[str] = "bus_errors_scan_interval"
 API_URL_SETTING: Final[str] = "api_url_setting"
 API_USER_AGENT: Final[str] = "api_user_agent"
+WATER_HEATER_TEMPERATURE_UNIT: Final[str] = "water_heater_temperature_unit"
 
 DEFAULT_SCAN_INTERVAL_SECONDS: Final[int] = 180
 DEFAULT_ENERGY_SCAN_INTERVAL_MINUTES: Final[int] = 60

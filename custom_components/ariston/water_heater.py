@@ -9,8 +9,9 @@ from homeassistant.components.water_heater import (
     WaterHeaterEntityFeature,
 )
 from homeassistant.config_entries import ConfigEntry
-from homeassistant.const import ATTR_TEMPERATURE
+from homeassistant.const import ATTR_TEMPERATURE, UnitOfTemperature
 from homeassistant.core import HomeAssistant
+from homeassistant.util.unit_conversion import TemperatureConverter
 
 from ariston.const import SystemType
 
@@ -49,6 +50,33 @@ class AristonWaterHeater(AristonEntity, WaterHeaterEntity):
         """Initialize the water heater."""
         super().__init__(coordinator, description)
 
+    def _to_display_temperature(self, value):
+        """Convert a native Velis value to the selected display unit."""
+        if value is None or self.device.system_type is not SystemType.VELIS:
+            return value
+        return TemperatureConverter.convert(
+            value,
+            self.device.water_heater_temperature_unit,
+            self.temperature_unit,
+        )
+
+    def _to_device_temperature(self, value: float) -> float:
+        """Convert, clamp, and round a Velis command to native units."""
+        if self.device.system_type is not SystemType.VELIS:
+            return value
+        converted = TemperatureConverter.convert(
+            value,
+            self.temperature_unit,
+            self.device.water_heater_temperature_unit,
+        )
+        minimum = self.device.water_heater_minimum_temperature
+        maximum = self.device.water_heater_maximum_temperature
+        if minimum is not None:
+            converted = max(converted, minimum)
+        if maximum is not None:
+            converted = min(converted, maximum)
+        return round(converted, self.device.water_heater_temperature_decimals)
+
     @property
     def name(self) -> str:
         """Return the name of the device."""
@@ -67,22 +95,30 @@ class AristonWaterHeater(AristonEntity, WaterHeaterEntity):
     @property
     def current_temperature(self):
         """Return the temperature."""
-        return self.device.water_heater_current_temperature
+        return self._to_display_temperature(
+            self.device.water_heater_current_temperature
+        )
 
     @property
     def min_temp(self):
         """Return the minimum temperature."""
-        return self.device.water_heater_minimum_temperature
+        return self._to_display_temperature(
+            self.device.water_heater_minimum_temperature
+        )
 
     @property
     def target_temperature(self):
         """Return the temperature we try to reach."""
-        return self.device.water_heater_target_temperature
+        return self._to_display_temperature(
+            self.device.water_heater_target_temperature
+        )
 
     @property
     def max_temp(self):
         """Return the maximum temperature."""
-        return self.device.water_heater_maximum_temperature
+        return self._to_display_temperature(
+            self.device.water_heater_maximum_temperature
+        )
 
     @property
     def precision(self) -> float:
@@ -92,6 +128,12 @@ class AristonWaterHeater(AristonEntity, WaterHeaterEntity):
     @property
     def temperature_unit(self):
         """Return the unit of measurement."""
+        if self.device.system_type is SystemType.VELIS:
+            override = self.coordinator.water_heater_temperature_unit
+            if override == "celsius":
+                return UnitOfTemperature.CELSIUS
+            if override == "fahrenheit":
+                return UnitOfTemperature.FAHRENHEIT
         return self.device.water_heater_temperature_unit
 
     @property
@@ -123,7 +165,7 @@ class AristonWaterHeater(AristonEntity, WaterHeaterEntity):
         if ATTR_TEMPERATURE not in kwargs:
             raise ValueError(f"Missing parameter {ATTR_TEMPERATURE}")
 
-        temperature = kwargs[ATTR_TEMPERATURE]
+        temperature = self._to_device_temperature(kwargs[ATTR_TEMPERATURE])
         _LOGGER.debug(
             "Setting temperature to %d for %s",
             temperature,

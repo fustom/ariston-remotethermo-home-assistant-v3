@@ -27,6 +27,7 @@ from .const import (
     DEFAULT_SCAN_INTERVAL_SECONDS,
     DOMAIN,
     ENERGY_SCAN_INTERVAL,
+    WATER_HEATER_TEMPERATURE_UNIT,
 )
 
 _LOGGER = logging.getLogger(__name__)
@@ -237,6 +238,9 @@ class AristonOptionsFlow(config_entries.OptionsFlow):
                     CONF_SCAN_INTERVAL: user_input[CONF_SCAN_INTERVAL],
                     ENERGY_SCAN_INTERVAL: user_input[ENERGY_SCAN_INTERVAL],
                     BUS_ERRORS_SCAN_INTERVAL: user_input[BUS_ERRORS_SCAN_INTERVAL],
+                    WATER_HEATER_TEMPERATURE_UNIT: user_input[
+                        WATER_HEATER_TEMPERATURE_UNIT
+                    ],
                 },
             )
 
@@ -257,6 +261,9 @@ class AristonOptionsFlow(config_entries.OptionsFlow):
         )
         bus_errors_scan_interval = options.get(
             BUS_ERRORS_SCAN_INTERVAL, DEFAULT_BUS_ERRORS_SCAN_INTERVAL_SECONDS
+        )
+        water_heater_temperature_unit = options.get(
+            WATER_HEATER_TEMPERATURE_UNIT, "auto"
         )
 
         # Build schema with current values
@@ -282,5 +289,9 @@ class AristonOptionsFlow(config_entries.OptionsFlow):
                     BUS_ERRORS_SCAN_INTERVAL,
                     default=bus_errors_scan_interval,
                 ): int,
+                vol.Optional(
+                    WATER_HEATER_TEMPERATURE_UNIT,
+                    default=water_heater_temperature_unit,
+                ): vol.In(("auto", "celsius", "fahrenheit")),
             }
         )

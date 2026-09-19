@@ -36,6 +36,7 @@ from .const import (
     DOMAIN,
     ENERGY_COORDINATOR,
     ENERGY_SCAN_INTERVAL,
+    WATER_HEATER_TEMPERATURE_UNIT,
     async_load_calorific_overrides,
 )
 from .coordinator import DeviceDataUpdateCoordinator
@@ -121,6 +122,9 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
             scan_interval_seconds,
             COORDINATOR,
             device.async_update_state,
+        )
+        coordinator.water_heater_temperature_unit = entry.options.get(
+            WATER_HEATER_TEMPERATURE_UNIT, "auto"
         )
 
         # Load persisted gas calorific overrides from disk

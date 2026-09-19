@@ -36,7 +36,11 @@
           "api_user_agent": "Ariston API user agent",
           "scan_interval": "Zone Scan Interval (seconds)",
           "energy_scan_interval": "Energy Scan Interval (minutes)",
-          "bus_errors_scan_interval": "Bus Errors Scan Interval (seconds)"
+          "bus_errors_scan_interval": "Bus Errors Scan Interval (seconds)",
+          "water_heater_temperature_unit": "Water heater temperature unit"
+        },
+        "data_description": {
+          "water_heater_temperature_unit": "Override the unit reported by compatible Velis water heaters; auto keeps the device unit."
         },
         "title": "Configure Ariston"
       }
