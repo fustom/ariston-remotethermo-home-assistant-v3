@@ -3,8 +3,8 @@
 from __future__ import annotations
 
 import logging
+import math
 
-from ariston.const import PlantMode, ZoneMode, BsbZoneMode
 from homeassistant.components.climate import (
     ClimateEntity,
     ClimateEntityFeature,
@@ -15,11 +15,39 @@ from homeassistant.config_entries import ConfigEntry
 from homeassistant.const import ATTR_TEMPERATURE
 from homeassistant.core import HomeAssistant
 
+from ariston.const import (
+    BsbZoneMode,
+    BsbZoneProperties,
+    PlantMode,
+    PropertyType,
+    SystemType,
+    ZoneMode,
+)
+
 from .const import ARISTON_CLIMATE_TYPES, AristonClimateEntityDescription
 from .coordinator import DeviceDataUpdateCoordinator
 from .entity import AristonEntity, get_coordinator_for_description
 
 _LOGGER = logging.getLogger(__name__)
+
+BSB_ZONE_MODE_TEXTS = {
+    BsbZoneMode.OFF: "protection",
+    BsbZoneMode.TIME_PROGRAM: "automatic",
+    BsbZoneMode.MANUAL_NIGHT: "reduced",
+    BsbZoneMode.MANUAL: "comfort",
+}
+BSB_ZONE_MODES = {text: mode for mode, text in BSB_ZONE_MODE_TEXTS.items()}
+
+
+def _coerce_bsb_zone_mode(raw_mode) -> BsbZoneMode:
+    """Normalize BSB enum, integer, and numeric-string mode values."""
+    if isinstance(raw_mode, BsbZoneMode):
+        return raw_mode
+    if isinstance(raw_mode, bool) or (
+        isinstance(raw_mode, float) and not raw_mode.is_integer()
+    ):
+        raise ValueError
+    return BsbZoneMode(int(raw_mode))
 
 
 async def async_setup_entry(
@@ -81,6 +109,7 @@ class AristonThermostat(AristonEntity, ClimateEntity):
     """Ariston Thermostat Device."""
 
     _attr_has_thermostat: bool = False  # Use attribute instead of property
+    _attr_translation_key = "ariston_thermostat"
     
     def __init__(
         self,
@@ -91,6 +120,67 @@ class AristonThermostat(AristonEntity, ClimateEntity):
         """Initialize the thermostat."""
         super().__init__(coordinator, description, zone)
         self._attr_has_thermostat = False  # Initialize attribute
+
+    def _get_bsb_zone_mode(self) -> BsbZoneMode:
+        """Read a BSB zone mode without treating numeric zero as missing."""
+        try:
+            raw = self.device.get_zone(self.zone).get(BsbZoneProperties.MODE)
+            if isinstance(raw, dict):
+                raw = raw.get(PropertyType.VALUE)
+            return BsbZoneMode.UNDEFINED if raw is None else _coerce_bsb_zone_mode(raw)
+        except (AttributeError, TypeError, ValueError):
+            return BsbZoneMode.UNDEFINED
+
+    def _get_bsb_temperature(self, property_name: str) -> float | None:
+        """Normalize scalar and property-dictionary BSB temperatures."""
+        try:
+            value = self.device.get_zone(self.zone).get(property_name)
+            if isinstance(value, dict):
+                value = value.get(PropertyType.VALUE)
+            if value is None or isinstance(value, bool):
+                return None
+            value = float(value)
+            return value if math.isfinite(value) else None
+        except (AttributeError, TypeError, ValueError):
+            return None
+
+    def _get_bsb_desired_temperature(self) -> float | None:
+        """Return the schedule-aware desired BSB room temperature."""
+        return self._get_bsb_temperature(BsbZoneProperties.DESIRED_ROOM_TEMP)
+
+    def _is_bsb_currently_reduced(self) -> bool:
+        """Return whether the active BSB target is the reduced setpoint."""
+        mode = self._get_bsb_zone_mode()
+        if mode is BsbZoneMode.MANUAL_NIGHT:
+            return True
+        if mode is not BsbZoneMode.TIME_PROGRAM:
+            return False
+        desired = self._get_bsb_desired_temperature()
+        reduced = self._get_bsb_temperature(BsbZoneProperties.CH_RED_TEMP)
+        return desired is not None and reduced is not None and math.isclose(
+            desired, reduced, rel_tol=0.0, abs_tol=0.05
+        )
+
+    def _get_bsb_reduced_metadata(self) -> tuple[float, float, float] | None:
+        """Return safe reduced bounds, or fall back when cloud metadata is malformed."""
+        try:
+            reduced = self.device.get_zone(self.zone).get(
+                BsbZoneProperties.CH_RED_TEMP
+            )
+            if not isinstance(reduced, dict):
+                return None
+            minimum = float(self.device.get_reduced_temp_min(self.zone))
+            maximum = float(self.device.get_reduced_temp_max(self.zone))
+            step = float(self.device.get_reduced_temp_step(self.zone))
+            if (
+                not all(math.isfinite(value) for value in (minimum, maximum, step))
+                or minimum > maximum
+                or step <= 0
+            ):
+                return None
+            return minimum, maximum, step
+        except (AttributeError, TypeError, ValueError):
+            return None
 
     async def async_added_to_hass(self):
         """Run when entity about to be added."""
@@ -182,6 +272,12 @@ class AristonThermostat(AristonEntity, ClimateEntity):
         """Return minimum temperature."""
         if not self._attr_has_thermostat:
             return None
+        if (
+            self.device.system_type is SystemType.BSB
+            and self._is_bsb_currently_reduced()
+            and (metadata := self._get_bsb_reduced_metadata()) is not None
+        ):
+            return metadata[0]
         return self.device.get_comfort_temp_min(self.zone)
 
     @property
@@ -189,6 +285,12 @@ class AristonThermostat(AristonEntity, ClimateEntity):
         """Return the maximum temperature."""
         if not self._attr_has_thermostat:
             return None
+        if (
+            self.device.system_type is SystemType.BSB
+            and self._is_bsb_currently_reduced()
+            and (metadata := self._get_bsb_reduced_metadata()) is not None
+        ):
+            return metadata[1]
         return self.device.get_comfort_temp_max(self.zone)
 
     @property
@@ -196,6 +298,12 @@ class AristonThermostat(AristonEntity, ClimateEntity):
         """Return the target temperature step support by the device."""
         if not self._attr_has_thermostat:
             return None
+        if (
+            self.device.system_type is SystemType.BSB
+            and self._is_bsb_currently_reduced()
+            and (metadata := self._get_bsb_reduced_metadata()) is not None
+        ):
+            return metadata[2]
         return self.device.get_target_temp_step(self.zone)
 
     @property
@@ -210,12 +318,24 @@ class AristonThermostat(AristonEntity, ClimateEntity):
         """Return the target temperature for the device."""
         if not self._attr_has_thermostat:
             return None  # This will disable temperature adjustment
+        if self.device.system_type is SystemType.BSB:
+            desired = self._get_bsb_desired_temperature()
+            if desired is not None:
+                return desired
         return self.device.get_target_temp_value(self.zone)
 
     @property
     def supported_features(self) -> int:
         """Return the supported features for this device integration."""
-        features = ClimateEntityFeature.PRESET_MODE if self.device.plant_mode_supported else 0
+        features = (
+            ClimateEntityFeature.PRESET_MODE
+            if self.device.plant_mode_supported
+            or (
+                self.device.system_type is SystemType.BSB
+                and bool(self.preset_modes)
+            )
+            else 0
+        )
         
         # Only add temperature control if zone has thermostat
         if self._attr_has_thermostat:
@@ -291,11 +411,23 @@ class AristonThermostat(AristonEntity, ClimateEntity):
     @property
     def preset_mode(self) -> str:
         """Return the current preset mode, e.g., home, away, temp."""
+        if self.device.system_type is SystemType.BSB:
+            return BSB_ZONE_MODE_TEXTS.get(self._get_bsb_zone_mode())
         return self.device.plant_mode_text
 
     @property
     def preset_modes(self) -> list[str]:
         """Return a list of available preset modes."""
+        if self.device.system_type is SystemType.BSB:
+            presets = []
+            for raw_mode in self.device.get_zone_mode_options(self.zone) or ():
+                try:
+                    preset = BSB_ZONE_MODE_TEXTS.get(_coerce_bsb_zone_mode(raw_mode))
+                except (TypeError, ValueError):
+                    continue
+                if preset is not None and preset not in presets:
+                    presets.append(preset)
+            return presets
         return self.device.plant_mode_opt_texts
 
     async def async_set_hvac_mode(self, hvac_mode):
@@ -380,6 +512,11 @@ class AristonThermostat(AristonEntity, ClimateEntity):
             self.name,
         )
 
+        if self.device.system_type is SystemType.BSB:
+            await self.device.async_set_zone_mode(BSB_ZONE_MODES[preset_mode], self.zone)
+            self.async_write_ha_state()
+            return
+
         # Don't assume index maps to enum value directly
         preset_index = self.device.plant_mode_opt_texts.index(preset_mode)
         plant_mode = PlantMode(self.device.plant_mode_options[preset_index])
@@ -425,5 +562,11 @@ class AristonThermostat(AristonEntity, ClimateEntity):
             self.name,
         )
 
-        await self.device.async_set_comfort_temp(temperature, self.zone)
+        if (
+            self.device.system_type is SystemType.BSB
+            and self._is_bsb_currently_reduced()
+        ):
+            await self.device.async_set_reduced_temp(temperature, self.zone)
+        else:
+            await self.device.async_set_comfort_temp(temperature, self.zone)
         self.async_write_ha_state()
