@@ -6,7 +6,6 @@ import logging
 from typing import Any
 
 import voluptuous as vol
-import voluptuous_serialize
 
 from ariston import Ariston, DeviceAttribute
 from ariston.const import ARISTON_API_URL, ARISTON_USER_AGENT
