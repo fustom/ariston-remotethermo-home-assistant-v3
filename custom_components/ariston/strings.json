@@ -27,6 +27,9 @@
     }
   },
   "options": {
+    "error": {
+      "invalid_rated_power": "Rated power must be a positive whole number"
+    },
     "step": {
       "init": {
         "title": "Configure Ariston",
@@ -38,10 +41,12 @@
           "scan_interval": "Zone Scan Interval (seconds)",
           "energy_scan_interval": "Energy Scan Interval (minutes)",
           "bus_errors_scan_interval": "Bus Errors Scan Interval (seconds)",
-          "water_heater_temperature_unit": "Water heater temperature unit"
+          "water_heater_temperature_unit": "Water heater temperature unit",
+          "rated_power_w": "Rated power (W)"
         },
         "data_description": {
-          "water_heater_temperature_unit": "Override the unit reported by compatible Velis water heaters; auto keeps the device unit."
+          "water_heater_temperature_unit": "Override the unit reported by compatible Velis water heaters; auto keeps the device unit.",
+          "rated_power_w": "Optional rated power from the device label, used only to estimate instantaneous power while heating."
         }
       }
     }

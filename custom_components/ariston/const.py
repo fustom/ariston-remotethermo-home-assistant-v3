@@ -40,7 +40,13 @@ from homeassistant.components.sensor import (
     SensorStateClass,
 )
 from homeassistant.components.switch import SwitchEntityDescription
-from homeassistant.const import UnitOfEnergy, UnitOfTemperature, UnitOfTime, UnitOfVolume
+from homeassistant.const import (
+    UnitOfEnergy,
+    UnitOfPower,
+    UnitOfTemperature,
+    UnitOfTime,
+    UnitOfVolume,
+)
 from homeassistant.helpers.entity import EntityCategory, EntityDescription
 from homeassistant.helpers.storage import Store
 from homeassistant.util import dt as dt_util
@@ -66,6 +72,7 @@ BUS_ERRORS_SCAN_INTERVAL: Final[str] = "bus_errors_scan_interval"
 API_URL_SETTING: Final[str] = "api_url_setting"
 API_USER_AGENT: Final[str] = "api_user_agent"
 WATER_HEATER_TEMPERATURE_UNIT: Final[str] = "water_heater_temperature_unit"
+RATED_POWER_W: Final[str] = "rated_power_w"
 
 DEFAULT_SCAN_INTERVAL_SECONDS: Final[int] = 180
 DEFAULT_ENERGY_SCAN_INTERVAL_MINUTES: Final[int] = 60
@@ -279,6 +286,15 @@ def gas_kwh_to_m3(entity: Any, value: float | None) -> float | None:
     if value is None:
         return None
     return round(value / get_gas_calorific_value(entity), 3)
+
+
+def get_estimated_power(entity: Any) -> int | None:
+    """Estimate instantaneous power from configured rating and heating state."""
+    heating = getattr(entity.device, "is_heating", None)
+    rated_power_w = entity.coordinator.rated_power_w
+    if heating is None or rated_power_w is None:
+        return None
+    return rated_power_w if heating else 0
 
 
 # ==================== ENTITY DESCRIPTION BASE CLASSES ====================
@@ -554,6 +570,27 @@ ARISTON_SENSOR_TYPES: list[AristonSensorEntityDescription] = [
         native_unit_of_measurement="",
         system_types=[SystemType.VELIS],
         whe_types=[WheType.Lux, WheType.Evo, WheType.Evo2, WheType.Lydos, WheType.LydosHybrid, WheType.Andris2, WheType.Lux2],
+    ),
+    AristonSensorEntityDescription(
+        key="estimated_power",
+        name=f"{NAME} estimated instantaneous power",
+        icon="mdi:flash",
+        device_class=SensorDeviceClass.POWER,
+        state_class=SensorStateClass.MEASUREMENT,
+        native_unit_of_measurement=UnitOfPower.WATT,
+        get_native_value=get_estimated_power,
+        system_types=[SystemType.VELIS],
+        whe_types=[
+            WheType.Evo,
+            WheType.Evo2,
+            WheType.Lydos,
+            WheType.Lux,
+            WheType.Lux2,
+            WheType.Andris2,
+        ],
+        get_is_supported=lambda coordinator: coordinator.rated_power_w is not None,
+        get_is_available=lambda entity: getattr(entity.device, "is_heating", None)
+        is not None,
     ),
 
     # --- Gas Config Sensor ---

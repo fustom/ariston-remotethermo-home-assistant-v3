@@ -36,6 +36,7 @@ from .const import (
     DOMAIN,
     ENERGY_COORDINATOR,
     ENERGY_SCAN_INTERVAL,
+    RATED_POWER_W,
     WATER_HEATER_TEMPERATURE_UNIT,
     async_load_calorific_overrides,
 )
@@ -126,6 +127,7 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
         coordinator.water_heater_temperature_unit = entry.options.get(
             WATER_HEATER_TEMPERATURE_UNIT, "auto"
         )
+        coordinator.rated_power_w = entry.options.get(RATED_POWER_W)
 
         # Load persisted gas calorific overrides from disk
         await async_load_calorific_overrides(hass)

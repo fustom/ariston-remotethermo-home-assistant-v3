@@ -27,10 +27,18 @@ from .const import (
     DEFAULT_SCAN_INTERVAL_SECONDS,
     DOMAIN,
     ENERGY_SCAN_INTERVAL,
+    RATED_POWER_W,
     WATER_HEATER_TEMPERATURE_UNIT,
 )
 
 _LOGGER = logging.getLogger(__name__)
+
+
+def _positive_int(value: Any) -> int:
+    """Validate a real positive integer without coercing strings or decimals."""
+    if type(value) is not int or value < 1:
+        raise vol.Invalid("expected a positive integer")
+    return value
 
 STEP_USER_DATA_SCHEMA = vol.Schema(
     {
@@ -177,6 +185,16 @@ class AristonOptionsFlow(config_entries.OptionsFlow):
     async def async_step_init(self, user_input=None):
         """Manage the options."""
         if user_input is not None:
+            if RATED_POWER_W in user_input:
+                try:
+                    _positive_int(user_input[RATED_POWER_W])
+                except vol.Invalid:
+                    return self.async_show_form(
+                        step_id="init",
+                        data_schema=self._get_options_schema(),
+                        errors={RATED_POWER_W: "invalid_rated_power"},
+                    )
+
             # Update config entry data if credentials were changed
             if any(
                 user_input.get(key) != self.config_entry.data.get(key)
@@ -232,17 +250,17 @@ class AristonOptionsFlow(config_entries.OptionsFlow):
                     )
 
             # Return options (scan intervals)
-            return self.async_create_entry(
-                title="",
-                data={
-                    CONF_SCAN_INTERVAL: user_input[CONF_SCAN_INTERVAL],
-                    ENERGY_SCAN_INTERVAL: user_input[ENERGY_SCAN_INTERVAL],
-                    BUS_ERRORS_SCAN_INTERVAL: user_input[BUS_ERRORS_SCAN_INTERVAL],
-                    WATER_HEATER_TEMPERATURE_UNIT: user_input[
-                        WATER_HEATER_TEMPERATURE_UNIT
-                    ],
-                },
-            )
+            new_options = {
+                CONF_SCAN_INTERVAL: user_input[CONF_SCAN_INTERVAL],
+                ENERGY_SCAN_INTERVAL: user_input[ENERGY_SCAN_INTERVAL],
+                BUS_ERRORS_SCAN_INTERVAL: user_input[BUS_ERRORS_SCAN_INTERVAL],
+                WATER_HEATER_TEMPERATURE_UNIT: user_input[
+                    WATER_HEATER_TEMPERATURE_UNIT
+                ],
+            }
+            if RATED_POWER_W in user_input:
+                new_options[RATED_POWER_W] = user_input[RATED_POWER_W]
+            return self.async_create_entry(title="", data=new_options)
 
         return self.async_show_form(
             step_id="init",
@@ -267,8 +285,7 @@ class AristonOptionsFlow(config_entries.OptionsFlow):
         )
 
         # Build schema with current values
-        return vol.Schema(
-            {
+        schema = {
                 vol.Required(CONF_USERNAME, default=data.get(CONF_USERNAME, "")): str,
                 vol.Required(CONF_PASSWORD, default=data.get(CONF_PASSWORD, "")): str,
                 vol.Optional(
@@ -294,4 +311,13 @@ class AristonOptionsFlow(config_entries.OptionsFlow):
                     default=water_heater_temperature_unit,
                 ): vol.In(("auto", "celsius", "fahrenheit")),
             }
+        rated_power_marker = (
+            vol.Optional(
+                RATED_POWER_W,
+                description={"suggested_value": options[RATED_POWER_W]},
+            )
+            if RATED_POWER_W in options
+            else vol.Optional(RATED_POWER_W)
         )
+        schema[rated_power_marker] = vol.All(int, vol.Range(min=1))
+        return vol.Schema(schema)
