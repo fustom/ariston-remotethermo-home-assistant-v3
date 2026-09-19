@@ -20,7 +20,7 @@ from .const import (
     AristonBinarySensorEntityDescription,
 )
 from .coordinator import DeviceDataUpdateCoordinator
-from .entity import AristonEntity
+from .entity import AristonEntity, get_coordinator_for_description
 
 _LOGGER = logging.getLogger(__name__)
 
@@ -41,23 +41,20 @@ async def async_setup_entry(
     """Set up the Ariston binary sensors from config entry."""
     ariston_binary_sensors: list[AristonBinarySensor] = []
     for description in ARISTON_BINARY_SENSOR_TYPES:
-        coordinator: DeviceDataUpdateCoordinator = hass.data[DOMAIN][entry.unique_id][
-            description.coordinator
-        ]
-        if (
-            coordinator
-            and coordinator.device
-            and coordinator.device.are_device_features_available(
-                description.device_features,
-                description.system_types,
-                description.whe_types,
-            )
-        ):
-            ariston_binary_sensors.append(AristonBinarySensor(coordinator, description))
+        coordinator = get_coordinator_for_description(hass, entry, description)
+        if coordinator is None:
+            continue
+        ariston_binary_sensors.append(AristonBinarySensor(coordinator, description))
 
     async_add_entities(ariston_binary_sensors)
 
-    if coordinator.device.system_type == SystemType.GALEVO:
+    primary_coordinator = (
+        hass.data.get(DOMAIN, {}).get(entry.unique_id, {}).get(COORDINATOR)
+    )
+    if (
+        primary_coordinator is not None
+        and primary_coordinator.device.system_type == SystemType.GALEVO
+    ):
 
         async def async_create_vacation_service(service_call):
             """Create a vacation on the target device."""

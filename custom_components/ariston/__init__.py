@@ -18,6 +18,7 @@ from homeassistant.core import HomeAssistant
 from homeassistant.exceptions import ConfigEntryAuthFailed, ConfigEntryNotReady
 from homeassistant.helpers import config_validation as cv
 from homeassistant.helpers import device_registry as dr
+from homeassistant.helpers.update_coordinator import UpdateFailed
 from homeassistant.util.unit_system import METRIC_SYSTEM
 
 from ariston import Ariston, DeviceAttribute, SystemType
@@ -66,6 +67,20 @@ SET_ITEM_BY_ID_SCHEMA = vol.Schema(
 )
 
 
+async def _async_first_refresh_optional(
+    coordinator: DeviceDataUpdateCoordinator, label: str
+) -> None:
+    """Refresh optional data once without blocking primary device setup."""
+    try:
+        await coordinator.async_config_entry_first_refresh()
+    except ConfigEntryNotReady as err:
+        if not isinstance(err.__cause__, UpdateFailed):
+            raise
+        _LOGGER.warning(
+            "Initial %s refresh failed; scheduled polling will retry: %s", label, err
+        )
+
+
 async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
     """Set up Ariston from a config entry."""
     ariston = Ariston()
@@ -111,9 +126,7 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
         # Load persisted gas calorific overrides from disk
         await async_load_calorific_overrides(hass)
 
-        hass.data.setdefault(DOMAIN, {}).setdefault(
-            entry.unique_id, {COORDINATOR: {}, ENERGY_COORDINATOR: {}}
-        )
+        hass.data.setdefault(DOMAIN, {}).setdefault(entry.unique_id, {})
         hass.data[DOMAIN][entry.unique_id][COORDINATOR] = coordinator
 
         await coordinator.async_config_entry_first_refresh()
@@ -132,7 +145,7 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
         hass.data[DOMAIN][entry.unique_id][BUS_ERRORS_COORDINATOR] = (
             bus_errors_coordinator
         )
-        await bus_errors_coordinator.async_config_entry_first_refresh()
+        await _async_first_refresh_optional(bus_errors_coordinator, "bus errors")
 
         if device.has_metering:
             energy_interval_minutes = entry.options.get(
@@ -147,7 +160,7 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
                 device.async_update_energy,
             )
             hass.data[DOMAIN][entry.unique_id][ENERGY_COORDINATOR] = energy_coordinator
-            await energy_coordinator.async_config_entry_first_refresh()
+            await _async_first_refresh_optional(energy_coordinator, "energy")
 
         await hass.config_entries.async_forward_entry_setups(entry, PLATFORMS)
 

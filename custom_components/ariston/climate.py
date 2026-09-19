@@ -15,9 +15,9 @@ from homeassistant.config_entries import ConfigEntry
 from homeassistant.const import ATTR_TEMPERATURE
 from homeassistant.core import HomeAssistant
 
-from .const import ARISTON_CLIMATE_TYPES, DOMAIN, AristonClimateEntityDescription
+from .const import ARISTON_CLIMATE_TYPES, AristonClimateEntityDescription
 from .coordinator import DeviceDataUpdateCoordinator
-from .entity import AristonEntity
+from .entity import AristonEntity, get_coordinator_for_description
 
 _LOGGER = logging.getLogger(__name__)
 
@@ -29,59 +29,50 @@ async def async_setup_entry(
     ariston_climates: list[AristonThermostat] = []
 
     for description in ARISTON_CLIMATE_TYPES:
-        coordinator: DeviceDataUpdateCoordinator = hass.data[DOMAIN][entry.unique_id][
-            description.coordinator
-        ]
-        if (
-            coordinator
-            and coordinator.device
-            and coordinator.device.are_device_features_available(
-                description.device_features,
-                description.system_types,
-                description.whe_types,
-            )
-        ):
-            for zone_number in coordinator.device.zone_numbers:
-                # Skip hidden zones
-                try:
-                    # Check if zone is hidden
-                    if hasattr(coordinator.device, 'is_zone_hidden'):
-                        if coordinator.device.is_zone_hidden(zone_number):
-                            _LOGGER.debug(
-                                "Skipping hidden zone %d for device %s",
-                                zone_number,
-                                coordinator.device.name
-                            )
-                            continue
-                    # Alternative: Check zone attributes from device features
-                    elif hasattr(coordinator.device, 'features'):
-                        features = coordinator.device.features
-                        if features and 'zones' in features:
-                            zones = features.get('zones', [])
-                            if zone_number - 1 < len(zones):
-                                zone_info = zones[zone_number - 1]
-                                if zone_info.get('isHidden', False):
-                                    _LOGGER.debug(
-                                        "Skipping hidden zone %d (from features)",
-                                        zone_number
-                                    )
-                                    continue
-                except Exception as e:
-                    _LOGGER.debug(
-                        "Error checking if zone %d is hidden: %s",
-                        zone_number,
-                        e
-                    )
-                    # If we can't determine, create the entity anyway
-                    pass
-                
-                ariston_climates.append(
-                    AristonThermostat(
-                        zone_number,
-                        coordinator,
-                        description,
-                    )
+        coordinator = get_coordinator_for_description(hass, entry, description)
+        if coordinator is None:
+            continue
+        for zone_number in coordinator.device.zone_numbers:
+            # Skip hidden zones
+            try:
+                # Check if zone is hidden
+                if hasattr(coordinator.device, 'is_zone_hidden'):
+                    if coordinator.device.is_zone_hidden(zone_number):
+                        _LOGGER.debug(
+                            "Skipping hidden zone %d for device %s",
+                            zone_number,
+                            coordinator.device.name
+                        )
+                        continue
+                # Alternative: Check zone attributes from device features
+                elif hasattr(coordinator.device, 'features'):
+                    features = coordinator.device.features
+                    if features and 'zones' in features:
+                        zones = features.get('zones', [])
+                        if zone_number - 1 < len(zones):
+                            zone_info = zones[zone_number - 1]
+                            if zone_info.get('isHidden', False):
+                                _LOGGER.debug(
+                                    "Skipping hidden zone %d (from features)",
+                                    zone_number
+                                )
+                                continue
+            except Exception as e:
+                _LOGGER.debug(
+                    "Error checking if zone %d is hidden: %s",
+                    zone_number,
+                    e
                 )
+                # If we can't determine, create the entity anyway
+                pass
+
+            ariston_climates.append(
+                AristonThermostat(
+                    zone_number,
+                    coordinator,
+                    description,
+                )
+            )
 
     async_add_entities(ariston_climates)
 

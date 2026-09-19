@@ -291,6 +291,8 @@ class AristonBaseEntityDescription(EntityDescription):
     system_types: list[SystemType] | None = None
     whe_types: list[WheType] | None = None
     zone: bool = False
+    get_is_supported: Callable[[Any], bool] | None = None
+    get_is_available: Callable[[Any], bool] | None = None
 
 @dataclass(kw_only=True, frozen=True)
 class AristonClimateEntityDescription(ClimateEntityDescription, AristonBaseEntityDescription):
