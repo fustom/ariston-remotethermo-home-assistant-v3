@@ -4,7 +4,6 @@ from __future__ import annotations
 
 import logging
 
-from ariston.const import SystemType
 from homeassistant.components.water_heater import (
     WaterHeaterEntity,
     WaterHeaterEntityFeature,
@@ -12,6 +11,8 @@ from homeassistant.components.water_heater import (
 from homeassistant.config_entries import ConfigEntry
 from homeassistant.const import ATTR_TEMPERATURE
 from homeassistant.core import HomeAssistant
+
+from ariston.const import SystemType
 
 from .const import (
     ARISTON_WATER_HEATER_TYPES,
@@ -129,12 +130,33 @@ class AristonWaterHeater(AristonEntity, WaterHeaterEntity):
             self.name,
         )
 
+        generation = self.coordinator.begin_pending_write(
+            "water_heater_temperature"
+        )
         await self.device.async_set_water_heater_temperature(temperature)
+        self.coordinator.track_pending_write(
+            "water_heater_temperature",
+            temperature,
+            lambda: self.device.water_heater_target_temperature,
+            lambda: self.device.async_set_water_heater_temperature(temperature),
+            tolerance=max(self.device.water_heater_temperature_step / 2, 0.05),
+            generation=generation,
+        )
         self.async_write_ha_state()
 
     async def async_set_operation_mode(self, operation_mode):
         """Set operation mode."""
+        generation = self.coordinator.begin_pending_write(
+            "water_heater_operation_mode"
+        )
         await self.device.async_set_water_heater_operation_mode(operation_mode)
+        self.coordinator.track_pending_write(
+            "water_heater_operation_mode",
+            operation_mode,
+            lambda: self.device.water_heater_current_mode_text,
+            lambda: self.device.async_set_water_heater_operation_mode(operation_mode),
+            generation=generation,
+        )
         self.async_write_ha_state()
 
     async def async_turn_off(self, **kwargs) -> None:
