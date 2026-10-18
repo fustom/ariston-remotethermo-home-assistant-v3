@@ -19,6 +19,7 @@ from ariston.const import (
     MedDeviceSettings,
     MenuItemNames,
     NuosSplitProperties,
+    PlantMode,
     SeDeviceSettings,
     SlpDeviceSettings,
     SystemType,
@@ -900,7 +901,26 @@ ARISTON_NUMBER_TYPES: list[AristonNumberEntityDescription] = [
     ),
 ]
 
+
+async def _async_select_plant_mode(entity, option: str) -> None:
+    """Set the plant mode from one of its option texts."""
+    device = entity.device
+    index = device.plant_mode_opt_texts.index(option)
+    await device.async_set_plant_mode(PlantMode(device.plant_mode_options[index]))
+    # Climate entities show the plant mode too, so update them now.
+    entity.coordinator.async_update_listeners()
+
+
 ARISTON_SELECT_TYPES: list[AristonSelectEntityDescription] = [
+    AristonSelectEntityDescription(
+        key=DeviceProperties.PLANT_MODE,
+        name=f"{NAME} plant mode",
+        icon="mdi:sun-snowflake-variant",
+        get_current_option=lambda entity: entity.device.plant_mode_text,
+        get_options=lambda entity: entity.device.plant_mode_opt_texts,
+        select_option=_async_select_plant_mode,
+        system_types=[SystemType.GALEVO],
+    ),
     AristonSelectEntityDescription(
         key=ConsumptionProperties.CURRENCY,
         name=f"{NAME} currency",
