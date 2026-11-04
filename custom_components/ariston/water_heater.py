@@ -75,7 +75,7 @@ class AristonWaterHeater(AristonEntity, WaterHeaterEntity):
         return "mdi:water-pump"
 
     @property
-    def current_temperature(self):
+    def native_current_temperature(self) -> float:
         """Return the temperature."""
         return self.device.water_heater_current_temperature
 
@@ -85,7 +85,7 @@ class AristonWaterHeater(AristonEntity, WaterHeaterEntity):
         return self.device.water_heater_minimum_temperature
 
     @property
-    def target_temperature(self):
+    def native_target_temperature(self) -> float:
         """Return the temperature we try to reach."""
         return self.device.water_heater_target_temperature
 
@@ -100,7 +100,7 @@ class AristonWaterHeater(AristonEntity, WaterHeaterEntity):
         return 1 / 10**self.device.water_heater_temperature_decimals
 
     @property
-    def temperature_unit(self):
+    def native_temperature_unit(self) -> str:
         """Return the unit of measurement."""
         return self.device.water_heater_temperature_unit
 
