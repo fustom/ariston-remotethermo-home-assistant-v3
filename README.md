@@ -1,3 +1,25 @@
+# 🚀 Co-Maintainers Wanted!
+
+Hello everyone! 
+
+Thank you to everyone who uses, stars, and contributes to this project. 
+
+Due to work commitments and a busy schedule, I am no longer able to dedicate the time this project deserves. To keep the repository active and moving forward, I am looking for **co-maintainers** or a **new primary maintainer** to help lead the project.
+
+### How You Can Help:
+* **Triage Issues:** Review, label, and respond to incoming issue reports.
+* **Review Pull Requests:** Help test, review, and merge community contributions.
+* **Maintenance & Enhancements:** Keep dependencies updated and work on planned roadmap features.
+
+### Interested?
+If you've enjoyed using this project and would like to step up as a maintainer, please:
+1. Write an email to me.
+2. Briefly introduce yourself and share any prior experience or ideas you have for the project.
+
+Even if you can only contribute a few hours a month, your help would be hugely appreciated!
+
+Thanks for being part of the community! 🙌
+
 [![CodeQL](https://github.com/fustom/ariston-remotethermo-home-assistant-v3/actions/workflows/codeql.yml/badge.svg?branch=main)](https://github.com/fustom/ariston-remotethermo-home-assistant-v3/actions/workflows/codeql.yml)
 [![hacs_badge](https://img.shields.io/badge/HACS-Default-orange.svg)](https://github.com/hacs/integration)
 [![HACS Action](https://github.com/fustom/ariston-remotethermo-home-assistant-v3/actions/workflows/hacs.yml/badge.svg)](https://github.com/fustom/ariston-remotethermo-home-assistant-v3/actions/workflows/hacs.yml)
