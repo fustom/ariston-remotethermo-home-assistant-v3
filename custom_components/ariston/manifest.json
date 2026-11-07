@@ -1,8 +1,8 @@
 {
   "domain": "ariston",
   "name": "Ariston",
-  "codeowners": ["@fustom"],
   "categories": ["climate.thermostats_heating", "climate.water_heaters"],
+  "codeowners": ["@fustom"],
   "config_flow": true,
   "dependencies": [],
   "documentation": "https://github.com/fustom/ariston-remotethermo-home-assistant-v3",
