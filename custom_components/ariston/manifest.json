@@ -1,6 +1,7 @@
 {
   "domain": "ariston",
   "name": "Ariston",
+  "categories": ["climate.thermostats_heating", "climate.water_heaters"],
   "codeowners": ["@fustom"],
   "config_flow": true,
   "dependencies": [],
