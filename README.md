@@ -22,7 +22,6 @@ But it does not use Ariston website. It uses Ariston API what I reversed enginee
 - More sensors, switches, binary sersors, selectors, services.
 - Exception handling.
 - More logs.
-- Unit tests.
 - Fun.
 
 ## Integration was tested on and works with:
@@ -32,6 +31,16 @@ But it does not use Ariston website. It uses Ariston API what I reversed enginee
 - Ariston Lydos Hybrid
 
 Feel free to test something else and create new issue / pull request if something goes wrong.
+
+## Tests
+
+The test suite uses Home Assistant's pytest fixtures and reports line coverage for
+the integration. Python 3.14.2 or newer is required by the current test dependencies.
+
+```sh
+python -m pip install -r requirements_test.txt
+pytest
+```
 
 ## Installation
 [![Open your Home Assistant instance and open a repository inside the Home Assistant Community Store.](https://my.home-assistant.io/badges/hacs_repository.svg)](https://my.home-assistant.io/redirect/hacs_repository/?owner=fustom&repository=ariston-remotethermo-home-assistant-v3&category=integration) or copy ariston folder to your configuration/custom_components path.
