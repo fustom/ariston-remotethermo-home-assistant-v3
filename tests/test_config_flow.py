@@ -228,8 +228,8 @@ async def test_options_flow_shows_stored_values(
     result = await hass.config_entries.options.async_init(entry.entry_id)
     values = result["data_schema"]({})
 
-    assert (
+    assert expected == (
         values["scan_interval"],
         values[ENERGY_SCAN_INTERVAL],
         values[BUS_ERRORS_SCAN_INTERVAL],
-    ) == expected
+    )

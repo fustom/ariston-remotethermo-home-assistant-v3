@@ -184,18 +184,20 @@ async def test_setup_raises_auth_error_when_cloud_rejects_credentials(
     client = MagicMock()
     client.async_connect = AsyncMock(return_value=False)
     _mock_client(monkeypatch, client)
+    entry = _entry()
 
     with pytest.raises(ConfigEntryAuthFailed):
-        await async_setup_entry(hass, _entry())
+        await async_setup_entry(hass, entry)
 
 
 async def test_setup_wraps_unexpected_cloud_error_as_not_ready(hass, monkeypatch):
     client = MagicMock()
     client.async_connect = AsyncMock(side_effect=RuntimeError("cloud unavailable"))
     _mock_client(monkeypatch, client)
+    entry = _entry()
 
     with pytest.raises(ConfigEntryNotReady):
-        await async_setup_entry(hass, _entry())
+        await async_setup_entry(hass, entry)
 
 
 async def test_setup_returns_false_when_device_is_not_found(hass, monkeypatch):
