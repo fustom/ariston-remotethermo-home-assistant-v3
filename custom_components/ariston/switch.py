@@ -10,7 +10,11 @@ from homeassistant.core import HomeAssistant
 
 from .const import ARISTON_SWITCH_TYPES, DOMAIN, AristonSwitchEntityDescription
 from .coordinator import DeviceDataUpdateCoordinator
-from .entity import AristonEntity
+from .entity import (
+    AristonEntity,
+    async_refresh_after_set,
+    is_entity_description_available,
+)
 
 _LOGGER = logging.getLogger(__name__)
 
@@ -21,18 +25,10 @@ async def async_setup_entry(
     """Set up the Ariston switches from config entry."""
     ariston_switches: list[AristonSwitch] = []
     for description in ARISTON_SWITCH_TYPES:
-        coordinator: DeviceDataUpdateCoordinator = hass.data[DOMAIN][entry.unique_id][
-            description.coordinator
-        ]
-        if (
-            coordinator
-            and coordinator.device
-            and coordinator.device.are_device_features_available(
-                description.device_features,
-                description.system_types,
-                description.whe_types,
-            )
-        ):
+        coordinator: DeviceDataUpdateCoordinator | None = hass.data[DOMAIN][
+            entry.unique_id
+        ].get(description.coordinator)
+        if is_entity_description_available(coordinator, description):
             ariston_switches.append(
                 AristonSwitch(
                     coordinator,
@@ -62,9 +58,9 @@ class AristonSwitch(AristonEntity, SwitchEntity):
     async def async_turn_on(self, **kwargs) -> None:
         """Turn the switch on."""
         await self.entity_description.set_value(self, True)
-        self.async_write_ha_state()
+        await async_refresh_after_set(self)
 
     async def async_turn_off(self, **kwargs) -> None:
         """Turn the device off."""
         await self.entity_description.set_value(self, False)
-        self.async_write_ha_state()
+        await async_refresh_after_set(self)

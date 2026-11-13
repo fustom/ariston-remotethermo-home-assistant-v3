@@ -17,7 +17,11 @@ from homeassistant.core import HomeAssistant
 
 from .const import ARISTON_CLIMATE_TYPES, DOMAIN, AristonClimateEntityDescription
 from .coordinator import DeviceDataUpdateCoordinator
-from .entity import AristonEntity
+from .entity import (
+    AristonEntity,
+    async_refresh_after_set,
+    is_entity_description_available,
+)
 
 _LOGGER = logging.getLogger(__name__)
 
@@ -29,18 +33,10 @@ async def async_setup_entry(
     ariston_climates: list[AristonThermostat] = []
 
     for description in ARISTON_CLIMATE_TYPES:
-        coordinator: DeviceDataUpdateCoordinator = hass.data[DOMAIN][entry.unique_id][
-            description.coordinator
-        ]
-        if (
-            coordinator
-            and coordinator.device
-            and coordinator.device.are_device_features_available(
-                description.device_features,
-                description.system_types,
-                description.whe_types,
-            )
-        ):
+        coordinator: DeviceDataUpdateCoordinator | None = hass.data[DOMAIN][
+            entry.unique_id
+        ].get(description.coordinator)
+        if is_entity_description_available(coordinator, description):
             for zone_number in coordinator.device.zone_numbers:
                 ariston_climates.append(
                     AristonThermostat(
@@ -258,7 +254,7 @@ class AristonThermostat(AristonEntity, ClimateEntity):
         elif hvac_mode == HVACMode.HEAT:
             await self.device.async_set_zone_mode(BsbZoneMode.MANUAL, self.zone)
 
-        self.async_write_ha_state()
+        await async_refresh_after_set(self)
 
     async def async_set_preset_mode(self, preset_mode):
         """Set new target preset mode."""
@@ -290,9 +286,7 @@ class AristonThermostat(AristonEntity, ClimateEntity):
             if self.device.is_zone_mode_options_contains_off(self.zone):
                 await self.device.async_set_zone_mode(BsbZoneMode.OFF, self.zone)
 
-        # Refresh coordinator to get updated device state
-        await self.coordinator.async_request_refresh()
-        self.async_write_ha_state()
+        await async_refresh_after_set(self)
 
     async def async_set_temperature(self, **kwargs):
         """Set new target temperature."""
@@ -307,4 +301,4 @@ class AristonThermostat(AristonEntity, ClimateEntity):
         )
 
         await self.device.async_set_comfort_temp(temperature, self.zone)
-        self.async_write_ha_state()
+        await async_refresh_after_set(self)
