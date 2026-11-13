@@ -1,0 +1,4 @@
+ariston==0.19.11
+homeassistant==2026.11.1
+pytest-cov==7.1.0
+pytest-homeassistant==2026.11.1
