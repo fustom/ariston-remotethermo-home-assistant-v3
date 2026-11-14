@@ -7,6 +7,9 @@ from typing import Any, Final
 
 from ariston.const import (
     ARISTON_BUS_ERRORS,
+    BsbDeviceProperties,
+    BsbZoneMode,
+    BsbZoneProperties,
     ConsumptionProperties,
     ConsumptionType,
     CustomDeviceFeatures,
@@ -292,6 +295,50 @@ ARISTON_SENSOR_TYPES: list[AristonSensorEntityDescription] = [
         get_native_value=lambda entity: entity.device.outside_temp_value,
         get_native_unit_of_measurement=lambda entity: entity.device.outside_temp_unit,
         system_types=[SystemType.GALEVO, SystemType.BSB],
+    ),
+    # --- BSB sensors ---
+    AristonSensorEntityDescription(
+        key=BsbDeviceProperties.DHW_TEMP,
+        name=f"{NAME} DHW temperature",
+        device_class=SensorDeviceClass.TEMPERATURE,
+        state_class=SensorStateClass.MEASUREMENT,
+        native_unit_of_measurement=UnitOfTemperature.CELSIUS,
+        icon="mdi:water-thermometer",
+        get_native_value=lambda entity: entity.device.data.get(BsbDeviceProperties.DHW_TEMP, None),
+        system_types=[SystemType.BSB],
+    ),
+    AristonSensorEntityDescription(
+        key=BsbZoneProperties.DESIRED_ROOM_TEMP,
+        name=f"{NAME} desired room temperature",
+        device_class=SensorDeviceClass.TEMPERATURE,
+        state_class=SensorStateClass.MEASUREMENT,
+        native_unit_of_measurement=UnitOfTemperature.CELSIUS,
+        icon="mdi:home-thermometer",
+        get_native_value=lambda entity: entity.device.get_zone(
+            entity.device.zone_numbers[0]
+        ).get(BsbZoneProperties.DESIRED_ROOM_TEMP, None),
+        system_types=[SystemType.BSB],
+    ),
+    AristonSensorEntityDescription(
+        key=BsbZoneProperties.CH_PROT_TEMP,
+        name=f"{NAME} frost protection temperature",
+        device_class=SensorDeviceClass.TEMPERATURE,
+        state_class=SensorStateClass.MEASUREMENT,
+        native_unit_of_measurement=UnitOfTemperature.CELSIUS,
+        icon="mdi:thermometer-alert",
+        entity_category=EntityCategory.DIAGNOSTIC,
+        get_native_value=lambda entity: entity.device.get_zone(
+            entity.device.zone_numbers[0]
+        ).get(BsbZoneProperties.CH_PROT_TEMP, None),
+        system_types=[SystemType.BSB],
+    ),
+    AristonSensorEntityDescription(
+        key="firmware_version",
+        name=f"{NAME} firmware version",
+        icon="mdi:chip",
+        entity_category=EntityCategory.DIAGNOSTIC,
+        get_native_value=lambda entity: entity.device.firmware_version,
+        system_types=[SystemType.BSB],
     ),
     AristonSensorEntityDescription(
         key=EvoLydosDeviceProperties.AV_SHW,
@@ -652,6 +699,39 @@ ARISTON_BINARY_SENSOR_TYPES: list[AristonBinarySensorEntityDescription] = [
             WheType.Andris2,
         ],
     ),
+    # --- BSB (pompa di calore / heat pump) ---
+    AristonBinarySensorEntityDescription(
+        key=BsbDeviceProperties.HP_ON,
+        name=f"{NAME} heat pump on",
+        icon="mdi:heat-pump",
+        get_is_on=lambda entity: entity.device.data.get(BsbDeviceProperties.HP_ON, False),
+        system_types=[SystemType.BSB],
+    ),
+    AristonBinarySensorEntityDescription(
+        key=BsbDeviceProperties.DHW_ENABLED,
+        name=f"{NAME} DHW enabled",
+        icon="mdi:water-boiler",
+        get_is_on=lambda entity: entity.device.data.get(BsbDeviceProperties.DHW_ENABLED, False),
+        system_types=[SystemType.BSB],
+    ),
+    AristonBinarySensorEntityDescription(
+        key=BsbZoneProperties.HEATING_ON,
+        name=f"{NAME} zone heating on",
+        icon="mdi:radiator",
+        get_is_on=lambda entity: entity.device.get_zone(
+            entity.device.zone_numbers[0]
+        ).get(BsbZoneProperties.HEATING_ON, False),
+        system_types=[SystemType.BSB],
+    ),
+    AristonBinarySensorEntityDescription(
+        key=BsbZoneProperties.HEAT_OR_COOL_REQ,
+        name=f"{NAME} heat or cool request",
+        icon="mdi:thermostat",
+        get_is_on=lambda entity: entity.device.get_zone(
+            entity.device.zone_numbers[0]
+        ).get(BsbZoneProperties.HEAT_OR_COOL_REQ, False),
+        system_types=[SystemType.BSB],
+    ),
 ]
 
 ARISTON_SWITCH_TYPES: list[AristonSwitchEntityDescription] = [
@@ -935,6 +1015,59 @@ ARISTON_NUMBER_TYPES: list[AristonNumberEntityDescription] = [
         value: entity.device.async_set_cooling_temperature_value(int(value)),
         whe_types=[WheType.LydosHybrid],
     ),
+    # --- BSB number (valori impostabili) ---
+    AristonNumberEntityDescription(
+        key=BsbDeviceProperties.DHW_COMF_TEMP,
+        name=f"{NAME} DHW comfort temperature",
+        icon="mdi:water-thermometer",
+        entity_category=EntityCategory.CONFIG,
+        zone=False,
+        get_native_min_value=lambda entity: entity.device.water_heater_minimum_temperature,
+        get_native_max_value=lambda entity: entity.device.water_heater_maximum_temperature,
+        get_native_step=lambda entity: entity.device.water_heater_temperature_step,
+        get_native_value=lambda entity: entity.device.water_heater_target_temperature,
+        set_native_value=lambda entity, value: entity.device.async_set_water_heater_temperature(value),
+        system_types=[SystemType.BSB],
+    ),
+    AristonNumberEntityDescription(
+        key=BsbDeviceProperties.DHW_REDU_TEMP,
+        name=f"{NAME} DHW reduced temperature",
+        icon="mdi:water-thermometer-outline",
+        entity_category=EntityCategory.CONFIG,
+        zone=False,
+        get_native_min_value=lambda entity: entity.device.water_heater_reduced_minimum_temperature,
+        get_native_max_value=lambda entity: entity.device.water_heater_reduced_maximum_temperature,
+        get_native_step=lambda entity: entity.device.water_heater_reduced_temperature_step,
+        get_native_value=lambda entity: entity.device.water_heater_reduced_temperature,
+        set_native_value=lambda entity, value: entity.device.async_set_water_heater_reduced_temperature(value),
+        system_types=[SystemType.BSB],
+    ),
+    AristonNumberEntityDescription(
+        key=BsbZoneProperties.CH_COMF_TEMP,
+        name=f"{NAME} CH comfort temperature",
+        icon="mdi:home-thermometer",
+        entity_category=EntityCategory.CONFIG,
+        zone=True,
+        get_native_min_value=lambda entity: entity.device.get_comfort_temp_min(entity.zone),
+        get_native_max_value=lambda entity: entity.device.get_comfort_temp_max(entity.zone),
+        get_native_step=lambda entity: entity.device.get_comfort_temp_step(entity.zone),
+        get_native_value=lambda entity: entity.device.get_comfort_temp_value(entity.zone),
+        set_native_value=lambda entity, value: entity.device.async_set_comfort_temp(value, entity.zone),
+        system_types=[SystemType.BSB],
+    ),
+    AristonNumberEntityDescription(
+        key=BsbZoneProperties.CH_RED_TEMP,
+        name=f"{NAME} CH reduced temperature",
+        icon="mdi:home-thermometer-outline",
+        entity_category=EntityCategory.CONFIG,
+        zone=True,
+        get_native_min_value=lambda entity: entity.device.get_reduced_temp_min(entity.zone),
+        get_native_max_value=lambda entity: entity.device.get_reduced_temp_max(entity.zone),
+        get_native_step=lambda entity: entity.device.get_reduced_temp_step(entity.zone),
+        get_native_value=lambda entity: entity.device.get_reduced_temp_value(entity.zone),
+        set_native_value=lambda entity, value: entity.device.async_set_reduced_temp(value, entity.zone),
+        system_types=[SystemType.BSB],
+    ),
 ]
 
 ARISTON_SELECT_TYPES: list[AristonSelectEntityDescription] = [
@@ -1012,5 +1145,33 @@ ARISTON_SELECT_TYPES: list[AristonSelectEntityDescription] = [
         option: entity.device.async_set_water_heater_operation_mode(option),
         system_types=[SystemType.VELIS],
         whe_types=[WheType.Evo],
+    ),
+    # --- BSB select (modalità) ---
+    AristonSelectEntityDescription(
+        key=BsbDeviceProperties.DHW_MODE,
+        name=f"{NAME} DHW operation mode",
+        icon="mdi:water-boiler",
+        get_current_option=lambda entity: entity.device.water_heater_current_mode_text,
+        get_options=lambda entity: entity.device.water_heater_mode_operation_texts,
+        select_option=lambda entity,
+        option: entity.device.async_set_water_heater_operation_mode(option),
+        system_types=[SystemType.BSB],
+    ),
+    AristonSelectEntityDescription(
+        key=BsbZoneProperties.MODE,
+        name=f"{NAME} zone mode",
+        icon="mdi:home-clock",
+        get_current_option=lambda entity: entity.device.get_zone_mode(
+            entity.device.zone_numbers[0]
+        ).name,
+        get_options=lambda entity: [
+            m.name for m in BsbZoneMode
+            if m != BsbZoneMode.UNDEFINED
+            and m.value in (entity.device.get_zone_mode_options(entity.device.zone_numbers[0]) or [])
+        ],
+        select_option=lambda entity, option: entity.device.async_set_zone_mode(
+            BsbZoneMode[option], entity.device.zone_numbers[0]
+        ),
+        system_types=[SystemType.BSB],
     ),
 ]
