@@ -7,6 +7,7 @@ import pytest
 import voluptuous as vol
 
 from ariston import DeviceAttribute
+from ariston.ariston_api import ConnectionException
 from ariston.const import ARISTON_API_URL, ARISTON_USER_AGENT, SystemType
 from homeassistant.const import (
     ATTR_DEVICE_ID,
@@ -31,6 +32,7 @@ from custom_components.ariston import (
     async_unload_entry,
 )
 from custom_components.ariston.const import (
+    ARISTON_SENSOR_TYPES,
     BUS_ERRORS_COORDINATOR,
     BUS_ERRORS_SCAN_INTERVAL,
     COORDINATOR,
@@ -39,6 +41,7 @@ from custom_components.ariston.const import (
     ENERGY_COORDINATOR,
     ENERGY_SCAN_INTERVAL,
 )
+from custom_components.ariston.sensor import AristonSensor
 
 
 def _entry(**options):
@@ -146,6 +149,98 @@ async def test_setup_creates_coordinators_and_unload_removes_entry_data(
     )
     assert await async_unload_entry(hass, entry)
     assert entry.unique_id not in hass.data[DOMAIN]
+
+
+async def test_setup_continues_when_bus_errors_first_refresh_fails(
+    hass, monkeypatch
+):
+    device = _mock_device()
+    device.bus_errors = []
+    device.async_get_bus_errors = AsyncMock(
+        side_effect=[ConnectionException(500), None]
+    )
+    client = MagicMock()
+    client.async_connect = AsyncMock(return_value=True)
+    client.async_hello = AsyncMock(return_value=device)
+    _mock_client(monkeypatch, client)
+    forward_platforms = AsyncMock()
+    monkeypatch.setattr(
+        hass.config_entries, "async_forward_entry_setups", forward_platforms
+    )
+    entry = _entry()
+    entry.add_to_hass(hass)
+    entry._async_set_state(hass, ConfigEntryState.SETUP_IN_PROGRESS, None)
+
+    assert await async_setup_entry(hass, entry)
+
+    coordinators = hass.data[DOMAIN][entry.unique_id]
+    assert coordinators[COORDINATOR].last_update_success
+    bus_errors_coordinator = coordinators[BUS_ERRORS_COORDINATOR]
+    assert not bus_errors_coordinator.last_update_success
+    forward_platforms.assert_awaited_once()
+
+    description = next(
+        description
+        for description in ARISTON_SENSOR_TYPES
+        if description.coordinator == BUS_ERRORS_COORDINATOR
+    )
+    sensor = AristonSensor(bus_errors_coordinator, description)
+    assert not sensor.available
+
+    device.bus_errors = [{"code": "E1"}]
+    await bus_errors_coordinator.async_refresh()
+
+    assert sensor.available
+    assert sensor.native_value == 1
+
+
+async def test_primary_refresh_failure_still_blocks_setup(hass, monkeypatch):
+    device = _mock_device()
+    device.async_update_state.side_effect = RuntimeError("primary endpoint failed")
+    client = MagicMock()
+    client.async_connect = AsyncMock(return_value=True)
+    client.async_hello = AsyncMock(return_value=device)
+    _mock_client(monkeypatch, client)
+    forward_platforms = AsyncMock()
+    monkeypatch.setattr(
+        hass.config_entries, "async_forward_entry_setups", forward_platforms
+    )
+    entry = _entry()
+    entry.add_to_hass(hass)
+    entry._async_set_state(hass, ConfigEntryState.SETUP_IN_PROGRESS, None)
+
+    with pytest.raises(ConfigEntryNotReady):
+        await async_setup_entry(hass, entry)
+
+    forward_platforms.assert_not_awaited()
+
+
+async def test_bus_errors_auth_failure_starts_reauth(hass, monkeypatch):
+    device = _mock_device()
+    client = MagicMock()
+    client.async_connect = AsyncMock(return_value=True)
+    client.async_hello = AsyncMock(return_value=device)
+    _mock_client(monkeypatch, client)
+    monkeypatch.setattr(
+        hass.config_entries, "async_forward_entry_setups", AsyncMock()
+    )
+    entry = _entry()
+    entry.add_to_hass(hass)
+    entry._async_set_state(hass, ConfigEntryState.SETUP_IN_PROGRESS, None)
+
+    assert await async_setup_entry(hass, entry)
+
+    start_reauth = MagicMock()
+    monkeypatch.setattr(
+        type(entry),
+        "async_start_reauth_if_available",
+        lambda config_entry, target_hass: start_reauth(target_hass),
+    )
+    device.async_get_bus_errors.side_effect = ConfigEntryAuthFailed("expired")
+
+    await hass.data[DOMAIN][entry.unique_id][BUS_ERRORS_COORDINATOR].async_refresh()
+
+    start_reauth.assert_called_once_with(hass)
 
 
 async def test_setup_skips_energy_coordinator_when_device_has_no_metering(
