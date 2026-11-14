@@ -3,7 +3,18 @@
 from datetime import datetime, timezone
 from unittest.mock import AsyncMock, patch
 
+import pytest
+
+from ariston.const import (
+    ConsumptionProperties,
+    ConsumptionTimeInterval,
+    ConsumptionType,
+)
+from homeassistant.util import dt as dt_util
+
 from custom_components.ariston.const import (
+    ARISTON_NUMBER_TYPES,
+    ARISTON_SENSOR_TYPES,
     AristonBinarySensorEntityDescription,
     AristonNumberEntityDescription,
     AristonSelectEntityDescription,
@@ -83,6 +94,33 @@ async def test_number_exposes_dynamic_limits_and_sets_value(
     write_state.assert_called_once()
 
 
+@pytest.mark.parametrize(
+    ("cost_property", "setter_name"),
+    [
+        (ConsumptionProperties.ELEC_COST, "async_set_elect_cost"),
+        (ConsumptionProperties.GAS_COST, "async_set_gas_cost"),
+    ],
+)
+async def test_energy_cost_numbers_accept_four_decimal_places(
+    coordinator, ariston_device, cost_property, setter_name
+):
+    description = next(
+        description
+        for description in ARISTON_NUMBER_TYPES
+        if description.key == cost_property
+    )
+    setter = AsyncMock()
+    setattr(ariston_device, setter_name, setter)
+    entity = AristonNumber(coordinator, description)
+
+    assert entity.native_step == 0.0001
+
+    with patch.object(entity, "async_write_ha_state"):
+        await entity.async_set_native_value(0.1036)
+
+    setter.assert_awaited_once_with(0.1036)
+
+
 def test_number_exposes_static_limits(coordinator):
     entity = AristonNumber(
         coordinator,
@@ -101,6 +139,30 @@ def test_number_exposes_static_limits(coordinator):
     assert entity.native_min_value == 1
     assert entity.native_max_value == 10
     assert entity.native_step == 0.5
+
+
+def test_dhw_total_energy_reports_daily_sum_and_reset_time(
+    coordinator, ariston_device
+):
+    ariston_device.consumptions_sequences = [
+        {
+            "k": ConsumptionType.DOMESTIC_HOT_WATER_TOTAL_ENERGY.value,
+            "p": ConsumptionTimeInterval.LAST_DAY.value,
+            "v": [0.0, 0.72, 0.0, 1.15, 0.0],
+        }
+    ]
+    ariston_device.consumption_sequence_last_changed_utc = datetime(
+        2025, 1, 2, 11, tzinfo=timezone.utc
+    )
+    description = next(
+        description
+        for description in ARISTON_SENSOR_TYPES
+        if description.key == "Domestic hot water total energy consumption"
+    )
+    entity = AristonSensor(coordinator, description)
+
+    assert entity.native_value == 1.87
+    assert entity.last_reset == dt_util.start_of_local_day()
 
 
 async def test_select_exposes_options_and_selects_value(coordinator, ariston_device):
