@@ -4,17 +4,18 @@ from __future__ import annotations
 
 import logging
 
-from ariston.const import SystemType
+from ariston.const import SystemType, DeviceAttribute
 from homeassistant.components.water_heater import (
     WaterHeaterEntity,
     WaterHeaterEntityFeature,
 )
 from homeassistant.config_entries import ConfigEntry
-from homeassistant.const import ATTR_TEMPERATURE
+from homeassistant.const import ATTR_TEMPERATURE, CONF_DEVICE, UnitOfTemperature
 from homeassistant.core import HomeAssistant
 
 from .const import (
     ARISTON_WATER_HEATER_TYPES,
+    CONF_WATER_HEATER_TEMPERATURE_UNIT_OVERRIDE,
     DOMAIN,
     AristonWaterHeaterEntityDescription,
 )
@@ -78,6 +79,11 @@ class AristonWaterHeater(AristonEntity, WaterHeaterEntity):
     @property
     def min_temp(self):
         """Return the minimum temperature."""
+        if self.device.system_type == SystemType.VELIS:
+            return self.device.plant_settings.get(
+                "SlpMinSetpointTemperature",
+                self.device.water_heater_minimum_temperature,
+            )
         return self.device.water_heater_minimum_temperature
 
     @property
@@ -98,6 +104,21 @@ class AristonWaterHeater(AristonEntity, WaterHeaterEntity):
     @property
     def temperature_unit(self):
         """Return the unit of measurement."""
+        # Get the override setting from config entry options
+        try:
+            entries = self.hass.config_entries.async_entries(DOMAIN)
+            for entry in entries:
+                if entry.data.get(CONF_DEVICE, {}).get(DeviceAttribute.GW) == self.device.gateway:
+                    override = entry.options.get(
+                        CONF_WATER_HEATER_TEMPERATURE_UNIT_OVERRIDE, "auto"
+                    )
+                    
+                    if override == "celsius":
+                        return UnitOfTemperature.CELSIUS
+                    elif override == "fahrenheit":
+                        return UnitOfTemperature.FAHRENHEIT
+        except Exception:
+            pass
         return self.device.water_heater_temperature_unit
 
     @property
