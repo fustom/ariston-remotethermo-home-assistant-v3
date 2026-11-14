@@ -7,6 +7,7 @@ from datetime import timedelta
 import logging
 
 from ariston.base_device import AristonBaseDevice
+from homeassistant.config_entries import ConfigEntry
 from homeassistant.core import HomeAssistant
 from homeassistant.helpers.update_coordinator import DataUpdateCoordinator
 
@@ -25,11 +26,13 @@ class DeviceDataUpdateCoordinator(DataUpdateCoordinator):
         scan_interval_seconds: int,
         coordinator_name: str,
         async_update_state: Callable,
+        config_entry: ConfigEntry | None = None,
     ) -> None:
         """Initialize the data update coordinator."""
         super().__init__(
             hass,
             _LOGGER,
+            config_entry=config_entry,
             name=f"{DOMAIN}-{device.name}-{coordinator_name}",
             update_interval=timedelta(seconds=scan_interval_seconds),
             update_method=async_update_state,

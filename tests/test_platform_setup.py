@@ -1,6 +1,6 @@
 """Tests for platform entity selection and zone expansion."""
 
-from unittest.mock import AsyncMock
+from unittest.mock import AsyncMock, MagicMock
 
 from ariston.const import WheType
 from homeassistant.const import ATTR_DEVICE_ID
@@ -67,8 +67,14 @@ async def test_platforms_add_supported_entities_and_expand_zones(
     added_by_platform = {}
     for platform_name, (platform, entity_type) in platforms.items():
         added = []
+
+        def add_entities(entities):
+            for entity in entities:
+                entity.async_write_ha_state = MagicMock()
+            added.extend(entities)
+
         await platform.async_setup_entry(
-            hass, entry, lambda entities: added.extend(entities)
+            hass, entry, add_entities
         )
         assert added
         assert all(isinstance(entity, entity_type) for entity in added)

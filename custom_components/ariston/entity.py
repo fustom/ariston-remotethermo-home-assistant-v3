@@ -70,6 +70,14 @@ class AristonEntity(CoordinatorEntity, ABC):
         )
 
     @property
+    def name(self) -> str:
+        """Return the description name, falling back to the device name."""
+        description_name = self.entity_description.name
+        if isinstance(description_name, str) and description_name:
+            return description_name
+        return self.device.name or ""
+
+    @property
     def model(self) -> str:
         """Return the model of the entity."""
         if self.device.whe_model_type == 0:

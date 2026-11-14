@@ -152,6 +152,7 @@ async def test_water_heater_power_commands(coordinator, ariston_device, method, 
     ariston_device.async_set_power = AsyncMock()
     entity = AristonWaterHeater(coordinator, ARISTON_WATER_HEATER_TYPES[0])
 
-    await getattr(entity, method)()
+    with patch.object(entity, "async_write_ha_state"):
+        await getattr(entity, method)()
 
     ariston_device.async_set_power.assert_awaited_once_with(power)

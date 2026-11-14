@@ -14,6 +14,7 @@ from homeassistant.const import (
     CONF_PASSWORD,
     CONF_USERNAME,
 )
+from homeassistant.config_entries import ConfigEntryState
 from homeassistant.exceptions import ConfigEntryAuthFailed, ConfigEntryNotReady
 from homeassistant.helpers import device_registry as dr
 from homeassistant.util.unit_system import METRIC_SYSTEM
@@ -97,6 +98,7 @@ async def test_setup_creates_coordinators_and_unload_removes_entry_data(
         }
     )
     entry.add_to_hass(hass)
+    entry.state = ConfigEntryState.SETUP_IN_PROGRESS
 
     assert await async_setup_entry(hass, entry)
 
@@ -159,6 +161,7 @@ async def test_setup_skips_energy_coordinator_when_device_has_no_metering(
     )
     entry = _entry()
     entry.add_to_hass(hass)
+    entry.state = ConfigEntryState.SETUP_IN_PROGRESS
 
     assert await async_setup_entry(hass, entry)
 

@@ -11,6 +11,7 @@ from homeassistant.const import CONF_DEVICE, CONF_PASSWORD, CONF_USERNAME
 from homeassistant.data_entry_flow import FlowResultType
 from pytest_homeassistant.common import MockConfigEntry
 
+import custom_components.ariston as ariston_integration
 from custom_components.ariston import config_flow
 from custom_components.ariston.const import (
     API_URL_SETTING,
@@ -30,7 +31,11 @@ def ariston_client(monkeypatch):
     client = MagicMock()
     client.async_connect = AsyncMock(return_value=True)
     client.async_discover = AsyncMock(return_value=[])
+    client.async_hello = AsyncMock(return_value=None)
     monkeypatch.setattr(config_flow, "Ariston", MagicMock(return_value=client))
+    monkeypatch.setattr(
+        ariston_integration, "Ariston", MagicMock(return_value=client)
+    )
     return client
 
 
