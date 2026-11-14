@@ -72,6 +72,24 @@ ATTR_ERRORS: Final[str] = "errors"
 
 EXTRA_STATE_ATTRIBUTE: Final[str] = "Attribute"
 EXTRA_STATE_DEVICE_METHOD: Final[str] = "DeviceMethod"
+DEVICE_FEATURE_ZONE_HEAT_REQUEST: Final[str] = "ZoneHeatRequest"
+DEVICE_FEATURE_DHW_FLAME: Final[str] = "DhwFlame"
+
+
+def _get_ch_heat_request(entity: Any) -> bool:
+    """Return whether a central-heating zone is actively requesting heat."""
+    return bool(entity.device.get_zone_heat_request_value(entity.zone))
+
+
+def _get_dhw_flame(entity: Any) -> bool:
+    """Approximate DHW flame for boilers that only expose a global flame flag."""
+    if not bool(entity.device.is_flame_on_value):
+        return False
+
+    return not any(
+        bool(entity.device.get_zone_heat_request_value(zone))
+        for zone in entity.device.zone_numbers
+    )
 
 
 @dataclass(kw_only=True, frozen=True)
@@ -564,6 +582,25 @@ ARISTON_BINARY_SENSOR_TYPES: list[AristonBinarySensorEntityDescription] = [
         icon="mdi:fire",
         get_is_on=lambda entity: entity.device.is_flame_on_value,
         system_types=[SystemType.GALEVO, SystemType.BSB],
+    ),
+    AristonBinarySensorEntityDescription(
+        key=DEVICE_FEATURE_ZONE_HEAT_REQUEST,
+        name=f"{NAME} CH heat request",
+        icon="mdi:radiator",
+        entity_category=EntityCategory.DIAGNOSTIC,
+        get_is_on=_get_ch_heat_request,
+        system_types=[SystemType.GALEVO],
+        zone=True,
+    ),
+    AristonBinarySensorEntityDescription(
+        key=DEVICE_FEATURE_DHW_FLAME,
+        name=f"{NAME} DHW flame estimated",
+        icon="mdi:water-boiler",
+        entity_category=EntityCategory.DIAGNOSTIC,
+        entity_registry_enabled_default=False,
+        device_features=[CustomDeviceFeatures.HAS_DHW],
+        get_is_on=_get_dhw_flame,
+        system_types=[SystemType.GALEVO],
     ),
     AristonBinarySensorEntityDescription(
         key=DeviceProperties.IS_HEATING_PUMP_ON,

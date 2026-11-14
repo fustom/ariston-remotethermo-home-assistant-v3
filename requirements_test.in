@@ -1,0 +1,6 @@
+ariston==0.19.11
+homeassistant==2026.11.1
+pytest-cov==7.1.0
+pytest-homeassistant==2026.11.1
+# Home Assistant's PyRIC dependency has no wheel on PyPI; pin its official HA wheel.
+pyric @ https://wheels.home-assistant.io/musllinux/PyRIC-0.1.6.3-py2.py3-none-any.whl#sha256=0ab6ee3288a1c6d05ca2bf44c221ef0893d874c470a50464b7b82eb61f4eab2e

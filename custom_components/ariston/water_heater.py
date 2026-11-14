@@ -19,7 +19,11 @@ from .const import (
     AristonWaterHeaterEntityDescription,
 )
 from .coordinator import DeviceDataUpdateCoordinator
-from .entity import AristonEntity
+from .entity import (
+    AristonEntity,
+    async_refresh_after_set,
+    is_entity_description_available,
+)
 
 _LOGGER = logging.getLogger(__name__)
 
@@ -30,19 +34,11 @@ async def async_setup_entry(
     """Set up the Ariston water heater device from config entry."""
     ariston_water_heaters: list[AristonWaterHeater] = []
     for description in ARISTON_WATER_HEATER_TYPES:
-        coordinator: DeviceDataUpdateCoordinator = hass.data[DOMAIN][entry.unique_id][
-            description.coordinator
-        ]
+        coordinator: DeviceDataUpdateCoordinator | None = hass.data[DOMAIN][
+            entry.unique_id
+        ].get(description.coordinator)
 
-        if (
-            coordinator
-            and coordinator.device
-            and coordinator.device.are_device_features_available(
-                description.device_features,
-                description.system_types,
-                description.whe_types,
-            )
-        ):
+        if is_entity_description_available(coordinator, description):
             ariston_water_heaters.append(AristonWaterHeater(coordinator, description))
 
     async_add_entities(ariston_water_heaters)
@@ -141,17 +137,19 @@ class AristonWaterHeater(AristonEntity, WaterHeaterEntity):
         )
 
         await self.device.async_set_water_heater_temperature(temperature)
-        self.async_write_ha_state()
+        await async_refresh_after_set(self)
 
     async def async_set_operation_mode(self, operation_mode):
         """Set operation mode."""
         await self.device.async_set_water_heater_operation_mode(operation_mode)
-        self.async_write_ha_state()
+        await async_refresh_after_set(self)
 
     async def async_turn_off(self, **kwargs) -> None:
         """Turn the water heater off."""
         await self.device.async_set_power(False)
+        await async_refresh_after_set(self)
 
     async def async_turn_on(self, **kwargs) -> None:
         """Turn the water heater on."""
         await self.device.async_set_power(True)
+        await async_refresh_after_set(self)

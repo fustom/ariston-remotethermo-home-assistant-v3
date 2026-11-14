@@ -20,6 +20,28 @@ from .coordinator import DeviceDataUpdateCoordinator
 _LOGGER = logging.getLogger(__name__)
 
 
+def is_entity_description_available(
+    coordinator: DeviceDataUpdateCoordinator | None,
+    description: AristonBaseEntityDescription,
+) -> bool:
+    """Return True if the entity description is supported by the device."""
+    return bool(
+        coordinator
+        and coordinator.device
+        and coordinator.device.are_device_features_available(
+            description.device_features,
+            description.system_types,
+            description.whe_types,
+        )
+    )
+
+
+async def async_refresh_after_set(entity: CoordinatorEntity) -> None:
+    """Refresh state after a write call, then publish the latest known state."""
+    await entity.coordinator.async_request_refresh()
+    entity.async_write_ha_state()
+
+
 class AristonEntity(CoordinatorEntity, ABC):
     """Generic Ariston entity (base class)."""
 
@@ -46,6 +68,14 @@ class AristonEntity(CoordinatorEntity, ABC):
             sw_version=self.device.firmware_version,
             model=self.model,
         )
+
+    @property
+    def name(self) -> str:
+        """Return the description name, falling back to the device name."""
+        description_name = self.entity_description.name
+        if isinstance(description_name, str) and description_name:
+            return description_name
+        return self.device.name or ""
 
     @property
     def model(self) -> str:

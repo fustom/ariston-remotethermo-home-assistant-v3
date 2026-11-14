@@ -17,7 +17,11 @@ from homeassistant.core import HomeAssistant
 
 from .const import ARISTON_CLIMATE_TYPES, DOMAIN, AristonClimateEntityDescription
 from .coordinator import DeviceDataUpdateCoordinator
-from .entity import AristonEntity
+from .entity import (
+    AristonEntity,
+    async_refresh_after_set,
+    is_entity_description_available,
+)
 
 _LOGGER = logging.getLogger(__name__)
 
@@ -29,18 +33,10 @@ async def async_setup_entry(
     ariston_climates: list[AristonThermostat] = []
 
     for description in ARISTON_CLIMATE_TYPES:
-        coordinator: DeviceDataUpdateCoordinator = hass.data[DOMAIN][entry.unique_id][
-            description.coordinator
-        ]
-        if (
-            coordinator
-            and coordinator.device
-            and coordinator.device.are_device_features_available(
-                description.device_features,
-                description.system_types,
-                description.whe_types,
-            )
-        ):
+        coordinator: DeviceDataUpdateCoordinator | None = hass.data[DOMAIN][
+            entry.unique_id
+        ].get(description.coordinator)
+        if is_entity_description_available(coordinator, description):
             for zone_number in coordinator.device.zone_numbers:
                 ariston_climates.append(
                     AristonThermostat(
@@ -168,15 +164,18 @@ class AristonThermostat(AristonEntity, ClimateEntity):
     def hvac_action(self):
         """Return the current running hvac operation."""
         if_flame_on = bool(self.device.is_flame_on_value)
+        if_heating_pump_on = bool(getattr(self.device, 'is_heating_pump_on_value', False))
+
+        if_not_idle = if_flame_on or if_heating_pump_on
 
         curr_hvac_action = HVACAction.OFF
         if self.device.is_plant_in_heat_mode:
-            if if_flame_on:
+            if if_not_idle:
                 curr_hvac_action = HVACAction.HEATING
             else:
                 curr_hvac_action = HVACAction.IDLE
         if self.device.is_plant_in_cool_mode:
-            if if_flame_on:
+            if if_not_idle:
                 curr_hvac_action = HVACAction.COOLING
             else:
                 curr_hvac_action = HVACAction.IDLE
@@ -255,7 +254,7 @@ class AristonThermostat(AristonEntity, ClimateEntity):
         elif hvac_mode == HVACMode.HEAT:
             await self.device.async_set_zone_mode(BsbZoneMode.MANUAL, self.zone)
 
-        self.async_write_ha_state()
+        await async_refresh_after_set(self)
 
     async def async_set_preset_mode(self, preset_mode):
         """Set new target preset mode."""
@@ -265,10 +264,29 @@ class AristonThermostat(AristonEntity, ClimateEntity):
             self.name,
         )
 
-        await self.device.async_set_plant_mode(
-            PlantMode(self.device.plant_mode_opt_texts.index(preset_mode)),
-        )
-        self.async_write_ha_state()
+        # Don't assume index maps to enum value directly
+        preset_index = self.device.plant_mode_opt_texts.index(preset_mode)
+        plant_mode = PlantMode(self.device.plant_mode_options[preset_index])
+
+        # Get current states
+        current_plant_in_cool = self.device.is_plant_in_cool_mode
+        zone_modes = self.device.get_zone_mode_options(self.zone)
+
+        # When switching away from cooling mode, ensure zone is in appropriate state
+        if current_plant_in_cool and plant_mode != PlantMode.COOLING:
+            # Set zone to manual heat mode before changing plant mode
+            if ZoneMode.MANUAL in zone_modes:
+                await self.device.async_set_zone_mode(ZoneMode.MANUAL, self.zone)
+
+        # Set the plant mode
+        await self.device.async_set_plant_mode(plant_mode)
+
+        # Special handling for OFF mode
+        if plant_mode == PlantMode.OFF:
+            if self.device.is_zone_mode_options_contains_off(self.zone):
+                await self.device.async_set_zone_mode(BsbZoneMode.OFF, self.zone)
+
+        await async_refresh_after_set(self)
 
     async def async_set_temperature(self, **kwargs):
         """Set new target temperature."""
@@ -283,4 +301,4 @@ class AristonThermostat(AristonEntity, ClimateEntity):
         )
 
         await self.device.async_set_comfort_temp(temperature, self.zone)
-        self.async_write_ha_state()
+        await async_refresh_after_set(self)
