@@ -6,8 +6,9 @@ import pytest
 
 from ariston import DeviceAttribute
 from ariston.const import ARISTON_API_URL, ARISTON_USER_AGENT
+from homeassistant.config_entries import SOURCE_REAUTH, SOURCE_USER
 from homeassistant.const import CONF_DEVICE, CONF_PASSWORD, CONF_USERNAME
-from homeassistant.data_entry_flow import FlowResultType, SOURCE_REAUTH, SOURCE_USER
+from homeassistant.data_entry_flow import FlowResultType
 from pytest_homeassistant.common import MockConfigEntry
 
 from custom_components.ariston import config_flow
