@@ -36,7 +36,7 @@ from homeassistant.components.sensor import (
     SensorStateClass,
 )
 from homeassistant.components.switch import SwitchEntityDescription
-from homeassistant.const import UnitOfEnergy, UnitOfTemperature, UnitOfTime
+from homeassistant.const import UnitOfEnergy, UnitOfPower, UnitOfTemperature, UnitOfTime
 from homeassistant.helpers.entity import EntityCategory, EntityDescription
 
 try:
@@ -58,6 +58,8 @@ BUS_ERRORS_COORDINATOR: Final[str] = "bus_errors_coordinator"
 BUS_ERRORS_SCAN_INTERVAL: Final[str] = "bus_errors_scan_interval"
 API_URL_SETTING: Final[str] = "api_url_setting"
 API_USER_AGENT: Final[str] = "api_user_agent"
+
+RATED_POWER_W: Final[str] = "rated_power_w"
 
 DEFAULT_SCAN_INTERVAL_SECONDS: Final[int] = 180
 DEFAULT_ENERGY_SCAN_INTERVAL_MINUTES: Final[int] = 60
@@ -572,6 +574,28 @@ ARISTON_SENSOR_TYPES: list[AristonSensorEntityDescription] = [
             WheType.Lux,
             WheType.Lux2,
         ],
+    ),
+    AristonSensorEntityDescription(
+        key="Instantaneous power",
+        name=f"{NAME} instantaneous power",
+        icon="mdi:lightning-bolt",
+        device_class=SensorDeviceClass.POWER,
+        state_class=SensorStateClass.MEASUREMENT,
+        native_unit_of_measurement=UnitOfPower.WATT,
+        coordinator=COORDINATOR,
+        system_types=[SystemType.VELIS],
+        whe_types=[
+            WheType.Evo,
+            WheType.Evo2,
+            WheType.Lydos,
+            WheType.LydosHybrid,
+            WheType.Lux,
+            WheType.Lux2,
+            WheType.Andris2,
+        ],
+        get_native_value=lambda entity: (
+            entity.coordinator.rated_power_w if entity.device.is_heating else 0
+        ) if entity.coordinator.rated_power_w is not None else None,
     ),
 ]
 
