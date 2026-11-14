@@ -98,7 +98,7 @@ async def test_setup_creates_coordinators_and_unload_removes_entry_data(
         }
     )
     entry.add_to_hass(hass)
-    entry.state = ConfigEntryState.SETUP_IN_PROGRESS
+    entry._async_set_state(hass, ConfigEntryState.SETUP_IN_PROGRESS, None)
 
     assert await async_setup_entry(hass, entry)
 
@@ -161,7 +161,7 @@ async def test_setup_skips_energy_coordinator_when_device_has_no_metering(
     )
     entry = _entry()
     entry.add_to_hass(hass)
-    entry.state = ConfigEntryState.SETUP_IN_PROGRESS
+    entry._async_set_state(hass, ConfigEntryState.SETUP_IN_PROGRESS, None)
 
     assert await async_setup_entry(hass, entry)
 
