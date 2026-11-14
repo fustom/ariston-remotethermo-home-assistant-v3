@@ -59,6 +59,22 @@ class AristonEntity(CoordinatorEntity, ABC):
         self.zone = zone
 
     @property
+    def available(self) -> bool:
+        """Return True if entity is available.
+
+        In addition to the usual coordinator-based availability, an
+        entity description can supply ``get_is_available`` to hide an
+        entity on installations where the underlying data point does
+        not apply (e.g. a heat-pump-only sensor on a BSB device that
+        is actually a gas boiler).
+        """
+        if not super().available:
+            return False
+        if self.entity_description.get_is_available is not None:
+            return bool(self.entity_description.get_is_available(self))
+        return True
+
+    @property
     def device_info(self) -> DeviceInfo:
         """Return device specific attributes."""
         return DeviceInfo(

@@ -102,6 +102,7 @@ class AristonBaseEntityDescription(EntityDescription):
     system_types: list[SystemType] | None = None
     whe_types: list[WheType] | None = None
     zone: bool = False
+    get_is_available: Callable[[Any], bool] | None = None
 
 
 @dataclass(kw_only=True, frozen=True)
@@ -236,6 +237,38 @@ ARISTON_WATER_HEATER_TYPES: list[AristonWaterHeaterEntityDescription] = [
 ]
 
 ARISTON_SENSOR_TYPES: list[AristonSensorEntityDescription] = [
+    AristonSensorEntityDescription(
+        key=DeviceProperties.WEATHER,
+        name=f"{NAME} weather",
+        entity_category=EntityCategory.DIAGNOSTIC,
+        device_class=SensorDeviceClass.ENUM,
+        options=[
+            "unavailable",
+            "clear",
+            "variable",
+            "cloudy",
+            "rainy",
+            "rainstorm",
+            "snow",
+            "fog",
+            "windy",
+            "clear_by_night",
+            "variable_by_night",
+            "cloudy_by_night",
+            "rainy_by_night",
+            "rainstorm_by_night",
+            "snow_by_night",
+            "fog_by_night",
+            "windy_by_night",
+        ],
+        icon="mdi:weather-partly-cloudy",
+        get_native_value=lambda entity: (
+            entity.device.weather_value.lower()
+            if entity.device.weather_value is not None
+            else None
+        ),
+        system_types=[SystemType.GALEVO],
+    ),
     AristonSensorEntityDescription(
         key=DeviceProperties.HEATING_CIRCUIT_PRESSURE,
         name=f"{NAME} heating circuit pressure",
@@ -607,7 +640,23 @@ ARISTON_BINARY_SENSOR_TYPES: list[AristonBinarySensorEntityDescription] = [
         name=f"{NAME} is heating pump on",
         icon="mdi:heat-pump-outline",
         get_is_on=lambda entity: entity.device.is_heating_pump_on_value,
-        device_features=[DeviceFeatures.HYBRID_SYS],
+        device_features=[DeviceFeatures.HP_SYS],
+        system_types=[SystemType.GALEVO],
+    ),
+    AristonBinarySensorEntityDescription(
+        key=DeviceProperties.IS_HEATING_PUMP_ON,
+        name=f"{NAME} is heating pump on",
+        icon="mdi:heat-pump-outline",
+        get_is_on=lambda entity: entity.device.is_heating_pump_on_value,
+        get_is_available=lambda entity: entity.device.has_heat_pump,
+        system_types=[SystemType.BSB],
+    ),
+    AristonBinarySensorEntityDescription(
+        key=DeviceProperties.IS_RESISTOR_ON,
+        name=f"{NAME} is resistor on",
+        icon="mdi:radiator",
+        get_is_on=lambda entity: entity.device.is_resistor_on_value,
+        device_features=[DeviceFeatures.HP_SYS],
         system_types=[SystemType.GALEVO],
     ),
     AristonBinarySensorEntityDescription(
@@ -655,6 +704,14 @@ ARISTON_BINARY_SENSOR_TYPES: list[AristonBinarySensorEntityDescription] = [
 ]
 
 ARISTON_SWITCH_TYPES: list[AristonSwitchEntityDescription] = [
+    AristonSwitchEntityDescription(
+        key=DeviceProperties.IS_DHW_BOOST,
+        name=f"{NAME} DHW boost",
+        icon="mdi:water-boiler",
+        set_value=lambda entity, value: entity.device.async_set_dhw_boost(value),
+        get_is_on=lambda entity: entity.device.is_dhw_boost_on_value,
+        system_types=[SystemType.GALEVO],
+    ),
     AristonSwitchEntityDescription(
         key=DeviceProperties.AUTOMATIC_THERMOREGULATION,
         name=f"{NAME} automatic thermoregulation",
@@ -786,6 +843,60 @@ ARISTON_SWITCH_TYPES: list[AristonSwitchEntityDescription] = [
 ]
 
 ARISTON_NUMBER_TYPES: list[AristonNumberEntityDescription] = [
+    AristonNumberEntityDescription(
+        key=DeviceProperties.DHW_TIMEPROG_COMFORT_TEMP,
+        name=f"{NAME} DHW time prog comfort temp",
+        icon="mdi:thermometer-high",
+        entity_category=EntityCategory.CONFIG,
+        get_native_min_value=lambda entity: entity.device.dhw_time_prog_comfort_temp_min,
+        get_native_max_value=lambda entity: entity.device.dhw_time_prog_comfort_temp_max,
+        native_step=1,
+        get_native_value=lambda entity: entity.device.dhw_time_prog_comfort_temp_value,
+        set_native_value=lambda entity,
+        value: entity.device.async_set_dhw_time_prog_comfort_temp(value),
+        system_types=[SystemType.GALEVO],
+    ),
+    AristonNumberEntityDescription(
+        key=DeviceProperties.DHW_TIMEPROG_ECONOMY_TEMP,
+        name=f"{NAME} DHW time prog economy temp",
+        icon="mdi:thermometer-low",
+        entity_category=EntityCategory.CONFIG,
+        get_native_min_value=lambda entity: entity.device.dhw_time_prog_economy_temp_min,
+        get_native_max_value=lambda entity: entity.device.dhw_time_prog_economy_temp_max,
+        native_step=1,
+        get_native_value=lambda entity: entity.device.dhw_time_prog_economy_temp_value,
+        set_native_value=lambda entity,
+        value: entity.device.async_set_dhw_time_prog_economy_temp(value),
+        system_types=[SystemType.GALEVO],
+    ),
+    AristonNumberEntityDescription(
+        key=DeviceProperties.BUFFER_TIME_PROG_COMFORT_HEATING_TEMP,
+        name=f"{NAME} buffer time prog comfort heating temp",
+        icon="mdi:thermometer-high",
+        entity_category=EntityCategory.CONFIG,
+        get_native_min_value=lambda entity: entity.device.buffer_time_prog_comfort_heating_temp_min,
+        get_native_max_value=lambda entity: entity.device.buffer_time_prog_comfort_heating_temp_max,
+        native_step=1,
+        get_native_value=lambda entity: entity.device.buffer_time_prog_comfort_heating_temp_value,
+        set_native_value=lambda entity,
+        value: entity.device.async_set_buffer_time_prog_comfort_heating_temp(value),
+        device_features=[DeviceFeatures.BUFFER_TIME_PROG_AVAILABLE],
+        system_types=[SystemType.GALEVO],
+    ),
+    AristonNumberEntityDescription(
+        key=DeviceProperties.BUFFER_TIME_PROG_ECONOMY_HEATING_TEMP,
+        name=f"{NAME} buffer time prog economy heating temp",
+        icon="mdi:thermometer-low",
+        entity_category=EntityCategory.CONFIG,
+        get_native_min_value=lambda entity: entity.device.buffer_time_prog_economy_heating_temp_min,
+        get_native_max_value=lambda entity: entity.device.buffer_time_prog_economy_heating_temp_max,
+        native_step=1,
+        get_native_value=lambda entity: entity.device.buffer_time_prog_economy_heating_temp_value,
+        set_native_value=lambda entity,
+        value: entity.device.async_set_buffer_time_prog_economy_heating_temp(value),
+        device_features=[DeviceFeatures.BUFFER_TIME_PROG_AVAILABLE],
+        system_types=[SystemType.GALEVO],
+    ),
     AristonNumberEntityDescription(
         key=ConsumptionProperties.ELEC_COST,
         name=f"{NAME} elec cost",
