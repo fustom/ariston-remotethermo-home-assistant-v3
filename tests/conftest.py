@@ -27,10 +27,12 @@ def ariston_device():
 @pytest.fixture
 def coordinator(hass, ariston_device):
     """Return a coordinator backed by a fake Ariston device."""
-    return DeviceDataUpdateCoordinator(
+    coordinator = DeviceDataUpdateCoordinator(
         hass,
         ariston_device,
         300,
         "test",
         AsyncMock(),
     )
+    coordinator.async_request_refresh = AsyncMock()
+    return coordinator

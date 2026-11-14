@@ -83,6 +83,26 @@ async def test_number_exposes_dynamic_limits_and_sets_value(
     write_state.assert_called_once()
 
 
+def test_number_exposes_static_limits(coordinator):
+    entity = AristonNumber(
+        coordinator,
+        AristonNumberEntityDescription(
+            key="static",
+            name="Static number",
+            native_min_value=1,
+            native_max_value=10,
+            native_step=0.5,
+            get_native_value=lambda entity: 5,
+            set_native_value=lambda entity, value: None,
+        ),
+    )
+
+    assert entity.name == "Static number"
+    assert entity.native_min_value == 1
+    assert entity.native_max_value == 10
+    assert entity.native_step == 0.5
+
+
 async def test_select_exposes_options_and_selects_value(coordinator, ariston_device):
     ariston_device.option = "eco"
     select_option = AsyncMock()

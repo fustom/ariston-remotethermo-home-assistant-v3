@@ -57,11 +57,17 @@ Feel free to test something else and create new issue / pull request if somethin
 ## Tests
 
 The test suite uses Home Assistant's pytest fixtures and reports line coverage for
-the integration. Python 3.14.2 or newer is required by the current test dependencies.
+the integration. It runs on Python 3.14.2, matching CI.
 
 ```sh
-python -m pip install -r requirements_test.txt
-pytest
+python -m pip install --require-hashes --only-binary=:all: -r requirements_test.txt
+python -m pytest
+```
+
+To update test dependencies, edit `requirements_test.in` and regenerate the hashed lock:
+
+```sh
+uv pip compile requirements_test.in --python 3.14.2 --python-version 3.14.2 --universal --generate-hashes --upgrade --output-file requirements_test.txt
 ```
 
 ## Installation
