@@ -27,6 +27,7 @@ from .const import (
     DEFAULT_SCAN_INTERVAL_SECONDS,
     DOMAIN,
     ENERGY_SCAN_INTERVAL,
+    NAME,
 )
 
 _LOGGER = logging.getLogger(__name__)
@@ -129,7 +130,7 @@ class AristonConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
             return self.async_abort(reason="reauth_successful")
 
         return self.async_create_entry(
-            title=cloud_device[DeviceAttribute.NAME],
+            title=cloud_device[DeviceAttribute.NAME] or NAME,
             data={
                 CONF_USERNAME: self.cloud_username,
                 CONF_PASSWORD: self.cloud_password,

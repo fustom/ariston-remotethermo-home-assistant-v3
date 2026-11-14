@@ -16,6 +16,7 @@ from homeassistant.core import HomeAssistant
 from .const import (
     ARISTON_WATER_HEATER_TYPES,
     DOMAIN,
+    NAME,
     AristonWaterHeaterEntityDescription,
 )
 from .coordinator import DeviceDataUpdateCoordinator
@@ -58,7 +59,7 @@ class AristonWaterHeater(AristonEntity, WaterHeaterEntity):
     @property
     def name(self) -> str:
         """Return the name of the device."""
-        return self.device.name or ""
+        return self.device.name or NAME
 
     @property
     def unique_id(self) -> str:
