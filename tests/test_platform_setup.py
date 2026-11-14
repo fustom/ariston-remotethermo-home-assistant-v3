@@ -2,7 +2,7 @@
 
 from unittest.mock import AsyncMock, MagicMock
 
-from ariston.const import WheType
+from ariston.const import MenuItemNames, WheType
 from homeassistant.const import ATTR_DEVICE_ID
 from homeassistant.helpers import device_registry as dr
 from pytest_homeassistant.common import MockConfigEntry
@@ -100,3 +100,65 @@ async def test_platforms_add_supported_entities_and_expand_zones(
         blocking=True,
     )
     ariston_device.async_set_holiday.assert_awaited_once_with(None)
+
+
+async def test_menu_item_feature_gating_for_ch_return_and_heat_pump_entities(
+    hass, coordinator, ariston_device
+):
+    ariston_device.zone_numbers = [1]
+    ariston_device.whe_type = WheType.Unknown
+    ariston_device.custom_features = {
+        MenuItemNames.CH_RETURN_TEMP.name: False,
+        MenuItemNames.HP_WATER_FLOW_TEMP.name: True,
+        MenuItemNames.HP_OUTSIDE_AIR_TEMP.name: True,
+        MenuItemNames.HP_MODE.name: True,
+        MenuItemNames.CH_BACKUP_RESISTANCE_1.name: True,
+    }
+
+    def is_available(device_features, system_types, whe_types):
+        return (
+            (not system_types or ariston_device.system_type in system_types)
+            and (not whe_types or ariston_device.whe_type in whe_types)
+            and (
+                not device_features
+                or all(
+                    ariston_device.custom_features.get(feature, True)
+                    for feature in device_features
+                )
+            )
+        )
+
+    ariston_device.are_device_features_available = is_available
+    hass.data[DOMAIN] = {
+        "entry-1": {
+            COORDINATOR: coordinator,
+            ENERGY_COORDINATOR: coordinator,
+            BUS_ERRORS_COORDINATOR: coordinator,
+        }
+    }
+    entry = MockConfigEntry(domain=DOMAIN, unique_id="entry-1", data={})
+    entry.add_to_hass(hass)
+
+    sensors_without_return = []
+    await sensor.async_setup_entry(hass, entry, sensors_without_return.extend)
+    keys_without_return = {entity.entity_description.key for entity in sensors_without_return}
+    assert str(MenuItemNames.CH_RETURN_TEMP) not in keys_without_return
+    assert {
+        str(MenuItemNames.HP_WATER_FLOW_TEMP),
+        str(MenuItemNames.HP_OUTSIDE_AIR_TEMP),
+        str(MenuItemNames.HP_MODE),
+    }.issubset(keys_without_return)
+
+    binary_sensors = []
+    await binary_sensor.async_setup_entry(hass, entry, binary_sensors.extend)
+    assert str(MenuItemNames.CH_BACKUP_RESISTANCE_1) in {
+        entity.entity_description.key for entity in binary_sensors
+    }
+
+    ariston_device.custom_features[MenuItemNames.CH_RETURN_TEMP.name] = True
+    sensors_with_return = []
+    await sensor.async_setup_entry(hass, entry, sensors_with_return.extend)
+    assert str(MenuItemNames.CH_RETURN_TEMP) in {
+        entity.entity_description.key for entity in sensors_with_return
+    }
+

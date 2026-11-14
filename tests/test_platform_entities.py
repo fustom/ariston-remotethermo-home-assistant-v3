@@ -226,3 +226,42 @@ def test_sensor_prefers_dynamic_unit_and_handles_optional_metadata(coordinator):
     assert entity.native_unit_of_measurement == "dynamic-unit"
     assert entity.last_reset is None
     assert empty.native_unit_of_measurement is None
+
+
+def test_heat_pump_menu_entities_read_device_values(coordinator, ariston_device):
+    from ariston.const import MenuItemNames
+    from custom_components.ariston.const import ARISTON_BINARY_SENSOR_TYPES
+
+    ariston_device.hp_water_flow_temp_value = 33.0
+    ariston_device.hp_water_flow_temp_unit = "°C"
+    ariston_device.hp_outside_air_temp_value = -2.0
+    ariston_device.hp_outside_air_temp_unit = "°C"
+    ariston_device.hp_mode_value = "Heating"
+    ariston_device.ch_backup_resistance_1_value = True
+
+    sensor_by_key = {desc.key: desc for desc in ARISTON_SENSOR_TYPES}
+    assert sensor_by_key[str(MenuItemNames.CH_RETURN_TEMP)].device_features == [
+        MenuItemNames.CH_RETURN_TEMP.name
+    ]
+
+    hp_water = AristonSensor(
+        coordinator, sensor_by_key[str(MenuItemNames.HP_WATER_FLOW_TEMP)]
+    )
+    hp_outside = AristonSensor(
+        coordinator, sensor_by_key[str(MenuItemNames.HP_OUTSIDE_AIR_TEMP)]
+    )
+    hp_mode = AristonSensor(coordinator, sensor_by_key[str(MenuItemNames.HP_MODE)])
+
+    assert hp_water.native_value == 33.0
+    assert hp_water.native_unit_of_measurement == "°C"
+    assert hp_outside.native_value == -2.0
+    assert hp_outside.native_unit_of_measurement == "°C"
+    assert hp_mode.native_value == "Heating"
+
+    backup_desc = next(
+        desc
+        for desc in ARISTON_BINARY_SENSOR_TYPES
+        if desc.key == str(MenuItemNames.CH_BACKUP_RESISTANCE_1)
+    )
+    backup_entity = AristonBinarySensor(coordinator, backup_desc)
+    assert backup_entity.is_on is True
