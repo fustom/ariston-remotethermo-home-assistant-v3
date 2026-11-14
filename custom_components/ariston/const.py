@@ -573,6 +573,28 @@ ARISTON_SENSOR_TYPES: list[AristonSensorEntityDescription] = [
             WheType.Lux2,
         ],
     ),
+    AristonSensorEntityDescription(
+        key=DeviceProperties.DHW_STORAGE_TEMPERATURE,
+        name=f"{NAME} DHW current temperature",
+        icon="mdi:thermometer-water",
+        device_class=SensorDeviceClass.TEMPERATURE,
+        state_class=SensorStateClass.MEASUREMENT,
+        get_native_value=lambda entity: entity.device.water_heater_current_temperature,
+        native_unit_of_measurement=UnitOfTemperature.CELSIUS,
+        device_features=[CustomDeviceFeatures.HAS_DHW],
+        system_types=[SystemType.GALEVO, SystemType.BSB],
+    ),
+    AristonSensorEntityDescription(
+        key=DeviceProperties.DHW_TEMP,
+        name=f"{NAME} DHW target temperature",
+        icon="mdi:thermometer-chevron-up",
+        device_class=SensorDeviceClass.TEMPERATURE,
+        state_class=SensorStateClass.MEASUREMENT,
+        get_native_value=lambda entity: entity.device.water_heater_target_temperature,
+        native_unit_of_measurement=UnitOfTemperature.CELSIUS,
+        device_features=[CustomDeviceFeatures.HAS_DHW],
+        system_types=[SystemType.GALEVO, SystemType.BSB],
+    ),
 ]
 
 ARISTON_BINARY_SENSOR_TYPES: list[AristonBinarySensorEntityDescription] = [
