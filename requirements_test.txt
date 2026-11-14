@@ -2557,9 +2557,9 @@ pyrfc3339==2.1.1 \
     --hash=sha256:4973172cb8b29c14caca7f76e6a52890d9e59ec2722dd5eb29b7fdd9fda2232f \
     --hash=sha256:b144d63819bd4c1ebf9cb57e12f4cba567fcf23d6e8f2f829ba9c7810ea4b951
     # via acme
-pyric==0.1.6.3 \
-    --hash=sha256:b539b01cafebd2406c00097f94525ea0f8ecd1dd92f7731f43eac0ef16c2ccc9
-    # via bluetooth-auto-recovery
+pyric @ https://wheels.home-assistant.io/musllinux/PyRIC-0.1.6.3-py2.py3-none-any.whl \
+    --hash=sha256:0ab6ee3288a1c6d05ca2bf44c221ef0893d874c470a50464b7b82eb61f4eab2e
+    # via requirements_test.in
 pyserial==3.5 \
     --hash=sha256:3c77e014170dfffbd816e6ffc205e9842efb10be9f58ec16d3e8675b4925cddb \
     --hash=sha256:c4451db6ba391ca6ca299fb3ec7bae67a5c55dde170964c7a14ceefec02f2cf0

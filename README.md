@@ -60,7 +60,7 @@ The test suite uses Home Assistant's pytest fixtures and reports line coverage f
 the integration. It runs on Python 3.14.2, matching CI.
 
 ```sh
-python -m pip install --require-hashes -r requirements_test.txt
+python -m pip install --require-hashes --only-binary=:all: -r requirements_test.txt
 python -m pytest
 ```
 
