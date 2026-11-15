@@ -725,6 +725,21 @@ ARISTON_SENSOR_TYPES: list[AristonSensorEntityDescription] = [
             WheType.Lux2,
         ],
     ),
+    AristonSensorEntityDescription(
+        key="holiday_end",
+        name=f"{NAME} holiday end",
+        icon="mdi:calendar-end",
+        device_class=SensorDeviceClass.DATE,
+        get_native_value=lambda entity: (
+            dt.datetime.strptime(
+                entity.device.holiday_end_date, "%Y-%m-%dT%H:%M:%S"
+            ).date()
+            if entity.device.holiday_end_date
+            else None
+        ),
+        system_types=[SystemType.VELIS],
+        whe_types=[WheType.NuosSplit],
+    ),
 ]
 
 ARISTON_BINARY_SENSOR_TYPES: list[AristonBinarySensorEntityDescription] = [
@@ -783,6 +798,20 @@ ARISTON_BINARY_SENSOR_TYPES: list[AristonBinarySensorEntityDescription] = [
         ],
         get_is_on=lambda entity: entity.device.holiday_mode_value,
         system_types=[SystemType.GALEVO],
+    ),
+    AristonBinarySensorEntityDescription(
+        key=NuosSplitProperties.HOLIDAY_UNTIL,
+        name=f"{NAME} holiday mode",
+        icon="mdi:airplane",
+        extra_states=[
+            {
+                EXTRA_STATE_ATTRIBUTE: ATTR_HOLIDAY,
+                EXTRA_STATE_DEVICE_METHOD: lambda entity: entity.device.holiday_end_date,
+            }
+        ],
+        get_is_on=lambda entity: entity.device.holiday_active,
+        system_types=[SystemType.VELIS],
+        whe_types=[WheType.NuosSplit],
     ),
     AristonBinarySensorEntityDescription(
         key=EvoLydosDeviceProperties.HEAT_REQ,
