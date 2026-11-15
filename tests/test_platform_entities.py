@@ -11,13 +11,17 @@ from ariston.const import (
     ConsumptionType,
     CustomDeviceFeatures,
     DeviceProperties,
-    MenuItemNames,
 )
 from homeassistant.util import dt as dt_util
 
 from custom_components.ariston.const import (
     ARISTON_NUMBER_TYPES,
     ARISTON_SENSOR_TYPES,
+    MENU_ITEM_CH_FLOW_TEMP_BOILER,
+    MENU_ITEM_DHW_FLOW_RATE,
+    MENU_ITEM_GAS_POWER,
+    MENU_ITEM_HP_WATER_FLOW_TEMP,
+    MENU_ITEM_PUMP_MODULATION,
     AristonBinarySensorEntityDescription,
     AristonNumberEntityDescription,
     AristonSelectEntityDescription,
@@ -204,18 +208,18 @@ def test_hybrid_menu_sensors_read_their_values_and_reported_units(
     coordinator, ariston_device
 ):
     values = {
-        MenuItemNames.HP_WATER_FLOW_TEMP.value: 28,
-        MenuItemNames.CH_FLOW_TEMP_BOILER.value: 49,
-        MenuItemNames.GAS_POWER.value: 0,
-        MenuItemNames.PUMP_MODULATION.value: 0,
-        MenuItemNames.DHW_FLOW_RATE.value: 3.2,
+        MENU_ITEM_HP_WATER_FLOW_TEMP: 28,
+        MENU_ITEM_CH_FLOW_TEMP_BOILER: 49,
+        MENU_ITEM_GAS_POWER: 0,
+        MENU_ITEM_PUMP_MODULATION: 0,
+        MENU_ITEM_DHW_FLOW_RATE: 3.2,
     }
     units = {
-        MenuItemNames.HP_WATER_FLOW_TEMP.value: "°C",
-        MenuItemNames.CH_FLOW_TEMP_BOILER.value: "°C",
-        MenuItemNames.GAS_POWER.value: "kW",
-        MenuItemNames.PUMP_MODULATION.value: "%",
-        MenuItemNames.DHW_FLOW_RATE.value: "l/min",
+        MENU_ITEM_HP_WATER_FLOW_TEMP: "°C",
+        MENU_ITEM_CH_FLOW_TEMP_BOILER: "°C",
+        MENU_ITEM_GAS_POWER: "kW",
+        MENU_ITEM_PUMP_MODULATION: "%",
+        MENU_ITEM_DHW_FLOW_RATE: "l/min",
     }
     ariston_device.get_menu_item_value = lambda menu_item_id: values[menu_item_id]
     ariston_device.get_menu_item_unit = lambda menu_item_id: units[menu_item_id]
