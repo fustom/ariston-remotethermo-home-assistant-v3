@@ -11,6 +11,7 @@ from homeassistant.components.binary_sensor import BinarySensorEntity
 from homeassistant.config_entries import ConfigEntry
 from homeassistant.const import ATTR_DEVICE_ID
 from homeassistant.core import HomeAssistant
+from homeassistant.exceptions import ServiceValidationError
 from homeassistant.helpers import config_validation as cv, device_registry as dr
 
 from .const import (
@@ -71,15 +72,34 @@ async def async_setup_entry(
             end_date = service_call.data.get(ATTR_END_DATE)
 
             device_registry = dr.async_get(hass)
-            device = device_registry.devices[device_id]
+            device = device_registry.devices.get(device_id)
+            if device is None:
+                raise ServiceValidationError(f"Device {device_id} not found")
 
-            target_entry = hass.config_entries.async_get_entry(
-                next(iter(device.config_entries))
+            target_coordinator: DeviceDataUpdateCoordinator | None = None
+            for entry_id in device.config_entries:
+                target_entry = hass.config_entries.async_get_entry(entry_id)
+                if target_entry is None or target_entry.domain != DOMAIN:
+                    continue
+                target_coordinator = (
+                    hass.data.get(DOMAIN, {})
+                    .get(target_entry.unique_id, {})
+                    .get(COORDINATOR)
+                )
+                if target_coordinator is not None:
+                    break
+
+            set_holiday = getattr(
+                getattr(target_coordinator, "device", None),
+                "async_set_holiday",
+                None,
             )
-            target_coordinator: DeviceDataUpdateCoordinator = hass.data[DOMAIN][
-                target_entry.unique_id
-            ][COORDINATOR]
-            await target_coordinator.device.async_set_holiday(end_date)
+            if set_holiday is None:
+                raise ServiceValidationError(
+                    f"Device {device.name_by_user or device.name or device_id} "
+                    "does not support holiday mode"
+                )
+            await set_holiday(end_date)
             # Pull the latest plant data so the holiday end-date sensor and any
             # other consumer of `device.data` reflect the change without
             # waiting for the next scheduled poll.
