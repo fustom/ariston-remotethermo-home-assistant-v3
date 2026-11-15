@@ -332,6 +332,74 @@ ARISTON_SENSOR_TYPES: list[AristonSensorEntityDescription] = [
         system_types=[SystemType.GALEVO],
     ),
     AristonSensorEntityDescription(
+        key=str(MenuItemNames.HP_WATER_FLOW_TEMP.value),
+        name=f"{NAME} HP water flow temp",
+        device_class=SensorDeviceClass.TEMPERATURE,
+        state_class=SensorStateClass.MEASUREMENT,
+        device_features=[str(MenuItemNames.HP_WATER_FLOW_TEMP.value)],
+        get_native_value=lambda entity: entity.device.get_menu_item_value(
+            MenuItemNames.HP_WATER_FLOW_TEMP.value
+        ),
+        get_native_unit_of_measurement=lambda entity: entity.device.get_menu_item_unit(
+            MenuItemNames.HP_WATER_FLOW_TEMP.value
+        ),
+        system_types=[SystemType.GALEVO],
+    ),
+    AristonSensorEntityDescription(
+        key=str(MenuItemNames.CH_FLOW_TEMP_BOILER.value),
+        name=f"{NAME} boiler CH flow temp",
+        device_class=SensorDeviceClass.TEMPERATURE,
+        state_class=SensorStateClass.MEASUREMENT,
+        device_features=[str(MenuItemNames.CH_FLOW_TEMP_BOILER.value)],
+        get_native_value=lambda entity: entity.device.get_menu_item_value(
+            MenuItemNames.CH_FLOW_TEMP_BOILER.value
+        ),
+        get_native_unit_of_measurement=lambda entity: entity.device.get_menu_item_unit(
+            MenuItemNames.CH_FLOW_TEMP_BOILER.value
+        ),
+        system_types=[SystemType.GALEVO],
+    ),
+    AristonSensorEntityDescription(
+        key=str(MenuItemNames.GAS_POWER.value),
+        name=f"{NAME} gas power",
+        device_class=SensorDeviceClass.POWER,
+        state_class=SensorStateClass.MEASUREMENT,
+        device_features=[str(MenuItemNames.GAS_POWER.value)],
+        get_native_value=lambda entity: entity.device.get_menu_item_value(
+            MenuItemNames.GAS_POWER.value
+        ),
+        get_native_unit_of_measurement=lambda entity: entity.device.get_menu_item_unit(
+            MenuItemNames.GAS_POWER.value
+        ),
+        system_types=[SystemType.GALEVO],
+    ),
+    AristonSensorEntityDescription(
+        key=str(MenuItemNames.PUMP_MODULATION.value),
+        name=f"{NAME} pump modulation",
+        state_class=SensorStateClass.MEASUREMENT,
+        device_features=[str(MenuItemNames.PUMP_MODULATION.value)],
+        get_native_value=lambda entity: entity.device.get_menu_item_value(
+            MenuItemNames.PUMP_MODULATION.value
+        ),
+        get_native_unit_of_measurement=lambda entity: entity.device.get_menu_item_unit(
+            MenuItemNames.PUMP_MODULATION.value
+        ),
+        system_types=[SystemType.GALEVO],
+    ),
+    AristonSensorEntityDescription(
+        key=str(MenuItemNames.DHW_FLOW_RATE.value),
+        name=f"{NAME} DHW flow rate",
+        state_class=SensorStateClass.MEASUREMENT,
+        device_features=[str(MenuItemNames.DHW_FLOW_RATE.value)],
+        get_native_value=lambda entity: entity.device.get_menu_item_value(
+            MenuItemNames.DHW_FLOW_RATE.value
+        ),
+        get_native_unit_of_measurement=lambda entity: entity.device.get_menu_item_unit(
+            MenuItemNames.DHW_FLOW_RATE.value
+        ),
+        system_types=[SystemType.GALEVO],
+    ),
+    AristonSensorEntityDescription(
         key=DeviceProperties.OUTSIDE_TEMP,
         name=f"{NAME} Outside temp",
         device_class=SensorDeviceClass.TEMPERATURE,
