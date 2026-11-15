@@ -105,14 +105,21 @@ async def test_platforms_add_supported_entities_and_expand_zones(
 async def test_menu_item_feature_gating_for_ch_return_and_heat_pump_entities(
     hass, coordinator, ariston_device
 ):
+    from custom_components.ariston.const import (
+        MENU_ITEM_CH_BACKUP_RESISTANCE_1,
+        MENU_ITEM_HP_MODE,
+        MENU_ITEM_HP_OUTSIDE_AIR_TEMP,
+        MENU_ITEM_HP_WATER_FLOW_TEMP,
+    )
+
     ariston_device.zone_numbers = [1]
     ariston_device.whe_type = WheType.Unknown
     ariston_device.custom_features = {
-        MenuItemNames.CH_RETURN_TEMP.name: False,
-        MenuItemNames.HP_WATER_FLOW_TEMP.name: True,
-        MenuItemNames.HP_OUTSIDE_AIR_TEMP.name: True,
-        MenuItemNames.HP_MODE.name: True,
-        MenuItemNames.CH_BACKUP_RESISTANCE_1.name: True,
+        str(MenuItemNames.CH_RETURN_TEMP.value): False,
+        str(MENU_ITEM_HP_WATER_FLOW_TEMP): True,
+        str(MENU_ITEM_HP_OUTSIDE_AIR_TEMP): True,
+        str(MENU_ITEM_HP_MODE): True,
+        str(MENU_ITEM_CH_BACKUP_RESISTANCE_1): True,
     }
 
     def is_available(device_features, system_types, whe_types):
@@ -144,18 +151,18 @@ async def test_menu_item_feature_gating_for_ch_return_and_heat_pump_entities(
     keys_without_return = {entity.entity_description.key for entity in sensors_without_return}
     assert str(MenuItemNames.CH_RETURN_TEMP) not in keys_without_return
     assert {
-        str(MenuItemNames.HP_WATER_FLOW_TEMP),
-        str(MenuItemNames.HP_OUTSIDE_AIR_TEMP),
-        str(MenuItemNames.HP_MODE),
+        str(MENU_ITEM_HP_WATER_FLOW_TEMP),
+        str(MENU_ITEM_HP_OUTSIDE_AIR_TEMP),
+        str(MENU_ITEM_HP_MODE),
     }.issubset(keys_without_return)
 
     binary_sensors = []
     await binary_sensor.async_setup_entry(hass, entry, binary_sensors.extend)
-    assert str(MenuItemNames.CH_BACKUP_RESISTANCE_1) in {
+    assert str(MENU_ITEM_CH_BACKUP_RESISTANCE_1) in {
         entity.entity_description.key for entity in binary_sensors
     }
 
-    ariston_device.custom_features[MenuItemNames.CH_RETURN_TEMP.name] = True
+    ariston_device.custom_features[str(MenuItemNames.CH_RETURN_TEMP.value)] = True
     sensors_with_return = []
     await sensor.async_setup_entry(hass, entry, sensors_with_return.extend)
     assert str(MenuItemNames.CH_RETURN_TEMP) in {

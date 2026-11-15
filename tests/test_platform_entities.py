@@ -9,12 +9,19 @@ from ariston.const import (
     ConsumptionProperties,
     ConsumptionTimeInterval,
     ConsumptionType,
+    CustomDeviceFeatures,
+    DeviceProperties,
 )
 from homeassistant.util import dt as dt_util
 
 from custom_components.ariston.const import (
     ARISTON_NUMBER_TYPES,
     ARISTON_SENSOR_TYPES,
+    MENU_ITEM_CH_FLOW_TEMP_BOILER,
+    MENU_ITEM_DHW_FLOW_RATE,
+    MENU_ITEM_GAS_POWER,
+    MENU_ITEM_HP_WATER_FLOW_TEMP,
+    MENU_ITEM_PUMP_MODULATION,
     AristonBinarySensorEntityDescription,
     AristonNumberEntityDescription,
     AristonSelectEntityDescription,
@@ -165,6 +172,71 @@ def test_dhw_total_energy_reports_daily_sum_and_reset_time(
     assert entity.last_reset == dt_util.start_of_local_day()
 
 
+def test_dhw_program_temperature_sensors_use_distinct_source_values(
+    coordinator, ariston_device
+):
+    ariston_device.dhw_program_comfort_temp_value = 52.5
+    ariston_device.dhw_program_comfort_temp_unit = "°C"
+    ariston_device.dhw_program_economy_temp_value = 40.0
+    ariston_device.dhw_program_economy_temp_unit = "°C"
+
+    comfort = next(
+        description
+        for description in ARISTON_SENSOR_TYPES
+        if description.key == DeviceProperties.DHW_TIMEPROG_COMFORT_TEMP
+    )
+    economy = next(
+        description
+        for description in ARISTON_SENSOR_TYPES
+        if description.key == DeviceProperties.DHW_TIMEPROG_ECONOMY_TEMP
+    )
+
+    assert comfort.device_features == [
+        CustomDeviceFeatures.HAS_DHW,
+        DeviceProperties.DHW_TIMEPROG_COMFORT_TEMP,
+    ]
+    assert economy.device_features == [
+        CustomDeviceFeatures.HAS_DHW,
+        DeviceProperties.DHW_TIMEPROG_ECONOMY_TEMP,
+    ]
+    assert AristonSensor(coordinator, comfort).native_value == 52.5
+    assert AristonSensor(coordinator, economy).native_value == 40.0
+    assert AristonSensor(coordinator, comfort).native_unit_of_measurement == "°C"
+
+
+def test_hybrid_menu_sensors_read_their_values_and_reported_units(
+    coordinator, ariston_device
+):
+    values = {
+        MENU_ITEM_HP_WATER_FLOW_TEMP: 28,
+        MENU_ITEM_CH_FLOW_TEMP_BOILER: 49,
+        MENU_ITEM_GAS_POWER: 0,
+        MENU_ITEM_PUMP_MODULATION: 0,
+        MENU_ITEM_DHW_FLOW_RATE: 3.2,
+    }
+    units = {
+        MENU_ITEM_HP_WATER_FLOW_TEMP: "°C",
+        MENU_ITEM_CH_FLOW_TEMP_BOILER: "°C",
+        MENU_ITEM_GAS_POWER: "kW",
+        MENU_ITEM_PUMP_MODULATION: "%",
+        MENU_ITEM_DHW_FLOW_RATE: "l/min",
+    }
+    ariston_device.get_menu_item_value = lambda menu_item_id: values[menu_item_id]
+    ariston_device.get_menu_item_unit = lambda menu_item_id: units[menu_item_id]
+
+    for menu_item in values:
+        description = next(
+            description
+            for description in ARISTON_SENSOR_TYPES
+            if description.key == str(menu_item)
+        )
+        sensor = AristonSensor(coordinator, description)
+
+        assert description.device_features == [str(menu_item)]
+        assert sensor.native_value == values[menu_item]
+        assert sensor.native_unit_of_measurement == units[menu_item]
+
+
 async def test_select_exposes_options_and_selects_value(coordinator, ariston_device):
     ariston_device.option = "eco"
     select_option = AsyncMock()
@@ -230,30 +302,36 @@ def test_sensor_prefers_dynamic_unit_and_handles_optional_metadata(coordinator):
 
 def test_heat_pump_menu_entities_read_device_values(coordinator, ariston_device):
     from ariston.const import MenuItemNames
-    from custom_components.ariston.const import ARISTON_BINARY_SENSOR_TYPES
+    from custom_components.ariston.const import (
+        ARISTON_BINARY_SENSOR_TYPES,
+        MENU_ITEM_CH_BACKUP_RESISTANCE_1,
+        MENU_ITEM_HP_MODE,
+        MENU_ITEM_HP_OUTSIDE_AIR_TEMP,
+    )
 
-    ariston_device.hp_water_flow_temp_value = 33.0
-    ariston_device.hp_water_flow_temp_unit = "°C"
-    ariston_device.hp_outside_air_temp_value = -2.0
-    ariston_device.hp_outside_air_temp_unit = "°C"
+    ariston_device.get_menu_item_value = (
+        lambda menu_item_id: -2.0
+        if menu_item_id == MENU_ITEM_HP_OUTSIDE_AIR_TEMP
+        else None
+    )
+    ariston_device.get_menu_item_unit = (
+        lambda menu_item_id: "°C"
+        if menu_item_id == MENU_ITEM_HP_OUTSIDE_AIR_TEMP
+        else None
+    )
     ariston_device.hp_mode_value = "Heating"
     ariston_device.ch_backup_resistance_1_value = True
 
     sensor_by_key = {desc.key: desc for desc in ARISTON_SENSOR_TYPES}
     assert sensor_by_key[str(MenuItemNames.CH_RETURN_TEMP)].device_features == [
-        MenuItemNames.CH_RETURN_TEMP.name
+        str(MenuItemNames.CH_RETURN_TEMP.value)
     ]
 
-    hp_water = AristonSensor(
-        coordinator, sensor_by_key[str(MenuItemNames.HP_WATER_FLOW_TEMP)]
-    )
     hp_outside = AristonSensor(
-        coordinator, sensor_by_key[str(MenuItemNames.HP_OUTSIDE_AIR_TEMP)]
+        coordinator, sensor_by_key[str(MENU_ITEM_HP_OUTSIDE_AIR_TEMP)]
     )
-    hp_mode = AristonSensor(coordinator, sensor_by_key[str(MenuItemNames.HP_MODE)])
+    hp_mode = AristonSensor(coordinator, sensor_by_key[str(MENU_ITEM_HP_MODE)])
 
-    assert hp_water.native_value == 33.0
-    assert hp_water.native_unit_of_measurement == "°C"
     assert hp_outside.native_value == -2.0
     assert hp_outside.native_unit_of_measurement == "°C"
     assert hp_mode.native_value == "Heating"
@@ -261,7 +339,8 @@ def test_heat_pump_menu_entities_read_device_values(coordinator, ariston_device)
     backup_desc = next(
         desc
         for desc in ARISTON_BINARY_SENSOR_TYPES
-        if desc.key == str(MenuItemNames.CH_BACKUP_RESISTANCE_1)
+        if desc.key == str(MENU_ITEM_CH_BACKUP_RESISTANCE_1)
     )
+    assert backup_desc.device_features == [str(MENU_ITEM_CH_BACKUP_RESISTANCE_1)]
     backup_entity = AristonBinarySensor(coordinator, backup_desc)
     assert backup_entity.is_on is True
