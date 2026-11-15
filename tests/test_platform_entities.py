@@ -9,6 +9,8 @@ from ariston.const import (
     ConsumptionProperties,
     ConsumptionTimeInterval,
     ConsumptionType,
+    CustomDeviceFeatures,
+    DeviceProperties,
 )
 from homeassistant.util import dt as dt_util
 
@@ -163,6 +165,38 @@ def test_dhw_total_energy_reports_daily_sum_and_reset_time(
 
     assert entity.native_value == 1.87
     assert entity.last_reset == dt_util.start_of_local_day()
+
+
+def test_dhw_program_temperature_sensors_use_distinct_source_values(
+    coordinator, ariston_device
+):
+    ariston_device.dhw_program_comfort_temp_value = 52.5
+    ariston_device.dhw_program_comfort_temp_unit = "°C"
+    ariston_device.dhw_program_economy_temp_value = 40.0
+    ariston_device.dhw_program_economy_temp_unit = "°C"
+
+    comfort = next(
+        description
+        for description in ARISTON_SENSOR_TYPES
+        if description.key == DeviceProperties.DHW_TIMEPROG_COMFORT_TEMP
+    )
+    economy = next(
+        description
+        for description in ARISTON_SENSOR_TYPES
+        if description.key == DeviceProperties.DHW_TIMEPROG_ECONOMY_TEMP
+    )
+
+    assert comfort.device_features == [
+        CustomDeviceFeatures.HAS_DHW,
+        DeviceProperties.DHW_TIMEPROG_COMFORT_TEMP,
+    ]
+    assert economy.device_features == [
+        CustomDeviceFeatures.HAS_DHW,
+        DeviceProperties.DHW_TIMEPROG_ECONOMY_TEMP,
+    ]
+    assert AristonSensor(coordinator, comfort).native_value == 52.5
+    assert AristonSensor(coordinator, economy).native_value == 40.0
+    assert AristonSensor(coordinator, comfort).native_unit_of_measurement == "°C"
 
 
 async def test_select_exposes_options_and_selects_value(coordinator, ariston_device):
