@@ -17,6 +17,11 @@ from homeassistant.util import dt as dt_util
 from custom_components.ariston.const import (
     ARISTON_NUMBER_TYPES,
     ARISTON_SENSOR_TYPES,
+    MENU_ITEM_CH_FLOW_TEMP_BOILER,
+    MENU_ITEM_DHW_FLOW_RATE,
+    MENU_ITEM_GAS_POWER,
+    MENU_ITEM_HP_WATER_FLOW_TEMP,
+    MENU_ITEM_PUMP_MODULATION,
     AristonBinarySensorEntityDescription,
     AristonNumberEntityDescription,
     AristonSelectEntityDescription,
@@ -197,6 +202,39 @@ def test_dhw_program_temperature_sensors_use_distinct_source_values(
     assert AristonSensor(coordinator, comfort).native_value == 52.5
     assert AristonSensor(coordinator, economy).native_value == 40.0
     assert AristonSensor(coordinator, comfort).native_unit_of_measurement == "°C"
+
+
+def test_hybrid_menu_sensors_read_their_values_and_reported_units(
+    coordinator, ariston_device
+):
+    values = {
+        MENU_ITEM_HP_WATER_FLOW_TEMP: 28,
+        MENU_ITEM_CH_FLOW_TEMP_BOILER: 49,
+        MENU_ITEM_GAS_POWER: 0,
+        MENU_ITEM_PUMP_MODULATION: 0,
+        MENU_ITEM_DHW_FLOW_RATE: 3.2,
+    }
+    units = {
+        MENU_ITEM_HP_WATER_FLOW_TEMP: "°C",
+        MENU_ITEM_CH_FLOW_TEMP_BOILER: "°C",
+        MENU_ITEM_GAS_POWER: "kW",
+        MENU_ITEM_PUMP_MODULATION: "%",
+        MENU_ITEM_DHW_FLOW_RATE: "l/min",
+    }
+    ariston_device.get_menu_item_value = lambda menu_item_id: values[menu_item_id]
+    ariston_device.get_menu_item_unit = lambda menu_item_id: units[menu_item_id]
+
+    for menu_item in values:
+        description = next(
+            description
+            for description in ARISTON_SENSOR_TYPES
+            if description.key == str(menu_item)
+        )
+        sensor = AristonSensor(coordinator, description)
+
+        assert description.device_features == [str(menu_item)]
+        assert sensor.native_value == values[menu_item]
+        assert sensor.native_unit_of_measurement == units[menu_item]
 
 
 async def test_select_exposes_options_and_selects_value(coordinator, ariston_device):
