@@ -6,7 +6,7 @@ import logging
 
 import voluptuous as vol
 
-from ariston.const import DeviceProperties, SystemType
+from ariston.const import DeviceProperties, NuosSplitProperties
 from homeassistant.components.binary_sensor import BinarySensorEntity
 from homeassistant.config_entries import ConfigEntry
 from homeassistant.const import ATTR_DEVICE_ID
@@ -61,7 +61,9 @@ async def async_setup_entry(
 
     async_add_entities(ariston_binary_sensors)
 
-    if main_coordinator and main_coordinator.device.system_type == SystemType.GALEVO:
+    # Register create_vacation whenever the device exposes a holiday setter
+    # (Galevo natively, Velis Slp/Nuos via the library's async_set_holiday).
+    if main_coordinator and hasattr(main_coordinator.device, "async_set_holiday"):
 
         async def async_create_vacation_service(service_call):
             """Create a vacation on the target device."""
@@ -71,19 +73,20 @@ async def async_setup_entry(
             device_registry = dr.async_get(hass)
             device = device_registry.devices[device_id]
 
-            entry = hass.config_entries.async_get_entry(
+            target_entry = hass.config_entries.async_get_entry(
                 next(iter(device.config_entries))
             )
-            coordinator: DeviceDataUpdateCoordinator = hass.data[DOMAIN][
-                entry.unique_id
+            target_coordinator: DeviceDataUpdateCoordinator = hass.data[DOMAIN][
+                target_entry.unique_id
             ][COORDINATOR]
-            await coordinator.device.async_set_holiday(end_date)
-            await coordinator.async_request_refresh()
+            await target_coordinator.device.async_set_holiday(end_date)
+            # Pull the latest plant data so the holiday end-date sensor and any
+            # other consumer of `device.data` reflect the change without
+            # waiting for the next scheduled poll.
+            await target_coordinator.async_request_refresh()
             for ariston_binary_sensor in ariston_binary_sensors:
-                if (
-                    ariston_binary_sensor.entity_description.key
-                    is DeviceProperties.HOLIDAY
-                ):
+                key = ariston_binary_sensor.entity_description.key
+                if key in (DeviceProperties.HOLIDAY, NuosSplitProperties.HOLIDAY_UNTIL):
                     ariston_binary_sensor.async_write_ha_state()
 
         hass.services.async_register(
