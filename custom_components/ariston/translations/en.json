@@ -27,7 +27,11 @@
           "extra_energy_features": "Extra energy related entities",
           "scan_interval": "Zone Scan Interval (seconds)",
           "energy_scan_interval": "Energy Scan Interval (minutes)",
-          "bus_errors_scan_interval": "Bus Errors Scan Interval (seconds)"
+          "bus_errors_scan_interval": "Bus Errors Scan Interval (seconds)",
+          "rated_power_w": "Device rated power (W)"
+        },
+        "data_description": {
+          "rated_power_w": "Rated electrical power in Watts (from device label). Used to estimate instantaneous power consumption based on heating state. Leave empty to disable the instantaneous power sensor."
         },
         "title": "Configure Ariston"
       }

@@ -27,6 +27,7 @@ from .const import (
     DEFAULT_SCAN_INTERVAL_SECONDS,
     DOMAIN,
     ENERGY_SCAN_INTERVAL,
+    RATED_POWER_W,
 )
 
 _LOGGER = logging.getLogger(__name__)
@@ -178,24 +179,34 @@ class AristonOptionsFlow(config_entries.OptionsFlow):
         bus_errors_scan_interval = options.get(
             BUS_ERRORS_SCAN_INTERVAL, DEFAULT_BUS_ERRORS_SCAN_INTERVAL_SECONDS
         )
+        rated_power_w = options.get(RATED_POWER_W)
+
+        schema_dict = {
+            vol.Optional(
+                CONF_SCAN_INTERVAL,
+                default=scan_interval,
+            ): int,
+            vol.Optional(
+                ENERGY_SCAN_INTERVAL,
+                default=energy_scan_interval,
+            ): int,
+            vol.Optional(
+                BUS_ERRORS_SCAN_INTERVAL,
+                default=bus_errors_scan_interval,
+            ): int,
+        }
+
+        if rated_power_w is not None:
+            schema_dict[vol.Optional(RATED_POWER_W, default=rated_power_w)] = vol.All(
+                int, vol.Range(min=1)
+            )
+        else:
+            schema_dict[vol.Optional(RATED_POWER_W)] = vol.Any(
+                None, vol.All(int, vol.Range(min=1))
+            )
 
         return self.async_show_form(
             step_id="init",
-            data_schema=vol.Schema(
-                {
-                    vol.Optional(
-                        CONF_SCAN_INTERVAL,
-                        default=scan_interval,
-                    ): int,
-                    vol.Optional(
-                        ENERGY_SCAN_INTERVAL,
-                        default=energy_scan_interval,
-                    ): int,
-                    vol.Optional(
-                        BUS_ERRORS_SCAN_INTERVAL,
-                        default=bus_errors_scan_interval,
-                    ): int,
-                }
-            ),
+            data_schema=vol.Schema(schema_dict),
             last_step=True,
         )
