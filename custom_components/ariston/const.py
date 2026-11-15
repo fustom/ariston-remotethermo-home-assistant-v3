@@ -257,6 +257,34 @@ ARISTON_WATER_HEATER_TYPES: list[AristonWaterHeaterEntityDescription] = [
 
 ARISTON_SENSOR_TYPES: list[AristonSensorEntityDescription] = [
     AristonSensorEntityDescription(
+        key=DeviceProperties.DHW_TIMEPROG_COMFORT_TEMP,
+        name=f"{NAME} DHW program comfort temperature",
+        device_class=SensorDeviceClass.TEMPERATURE,
+        state_class=SensorStateClass.MEASUREMENT,
+        entity_category=EntityCategory.DIAGNOSTIC,
+        get_native_value=lambda entity: entity.device.dhw_program_comfort_temp_value,
+        get_native_unit_of_measurement=lambda entity: entity.device.dhw_program_comfort_temp_unit,
+        device_features=[
+            CustomDeviceFeatures.HAS_DHW,
+            DeviceProperties.DHW_TIMEPROG_COMFORT_TEMP,
+        ],
+        system_types=[SystemType.GALEVO],
+    ),
+    AristonSensorEntityDescription(
+        key=DeviceProperties.DHW_TIMEPROG_ECONOMY_TEMP,
+        name=f"{NAME} DHW program economy temperature",
+        device_class=SensorDeviceClass.TEMPERATURE,
+        state_class=SensorStateClass.MEASUREMENT,
+        entity_category=EntityCategory.DIAGNOSTIC,
+        get_native_value=lambda entity: entity.device.dhw_program_economy_temp_value,
+        get_native_unit_of_measurement=lambda entity: entity.device.dhw_program_economy_temp_unit,
+        device_features=[
+            CustomDeviceFeatures.HAS_DHW,
+            DeviceProperties.DHW_TIMEPROG_ECONOMY_TEMP,
+        ],
+        system_types=[SystemType.GALEVO],
+    ),
+    AristonSensorEntityDescription(
         key=DeviceProperties.HEATING_CIRCUIT_PRESSURE,
         name=f"{NAME} heating circuit pressure",
         device_class=SensorDeviceClass.PRESSURE,
