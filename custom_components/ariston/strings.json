@@ -28,7 +28,11 @@
           "extra_energy_features": "Extra energy related entities",
           "scan_interval": "Zone Scan Interval (seconds)",
           "energy_scan_interval": "Energy Scan Interval (minutes)",
-          "bus_errors_scan_interval": "Bus Errors Scan Interval (seconds)"
+          "bus_errors_scan_interval": "Bus Errors Scan Interval (seconds)",
+          "water_heater_temperature_unit_override": "Water Heater Temperature Unit Override"
+        },
+        "description": {
+          "water_heater_temperature_unit_override": "Override the temperature unit for water heater. Set to 'fahrenheit' if temperatures display incorrectly (e.g., 253°F instead of 123°F). 'auto' uses the device default."
         }
       }
     }
