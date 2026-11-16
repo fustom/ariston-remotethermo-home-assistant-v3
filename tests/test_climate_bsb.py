@@ -9,7 +9,7 @@ from homeassistant.components.climate import ClimateEntityFeature
 from homeassistant.const import ATTR_TEMPERATURE
 
 from custom_components.ariston.climate import AristonThermostat, _normalize_temp
-from custom_components.aroiston.const import ARISTON_CLIMATE_TYPES
+from custom_components.ariston.const import ARISTON_CLIMATE_TYPES
 
 ZONE = 1
 COMFORT = {"value": 21.0, "min": 15.0, "max": 25.0, "step": 0.5}
@@ -67,8 +67,8 @@ def make_entity(coordinator, bsb_device):
         ({}, None),
         ({"value": None}, None),
         ("abc", None),
-        ([18], None)
-        (True, None)
+        ([18], None),
+        (True, None),
         (float("nan"), None),
         (float("inf"), None),
     ],
@@ -146,7 +146,7 @@ def test_bounds_follow_active_setpoint(make_entity, desired, limits):
 
 
 @pytest.mark.parametrize(
-    ("desired", "setter", "other")
+    ("desired", "setter", "other"),
     [
         (18.0, "async_set_reduced_temp", "async_set_comfort_temp"),
         ({"value": 18.0}, "async_set_reduced_temp", "async_set_comfort_temp"),
