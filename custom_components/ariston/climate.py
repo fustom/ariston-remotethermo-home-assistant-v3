@@ -2,7 +2,10 @@
 
 from __future__ import annotations
 
+from collections.abc import Mapping
 import logging
+import math
+from typing import Any
 
 from ariston.const import PlantMode, ZoneMode, BsbZoneMode
 from homeassistant.components.climate import (
@@ -27,6 +30,29 @@ BSB_ZONE_MODE_TEXTS: dict[int, str] = {
     2: "reduced",
     3: "comfort",
 }
+
+BSB_DESIRED_ROOM_TEMP = "desiredRoomTemp"
+
+# Tolerance ussed when comparing the desired temp against the reduced setpoint.
+BSB_TEMP_COMPARE_TOLERANCE = 0.05
+
+def _normalize_temp(raw: Any) -> float | None:
+    """Normalize a temperature value to float.
+    
+    Accepts either a scalar (int / float / numeric str) or a mapping 
+    containing a "value" key (e.g. {"value": 18.5, "min": 10, ...}).
+    Returns None if the value is missing or not numeric."""
+    if isinstance(raw, Mapping):
+        raw = raw.get("value", None)
+    if raw is None or isinstance(raw, bool):
+        return None
+    try:
+        value = float(raw)
+    except (TypeError, ValueError):
+        return None
+    if math.isnan(value) or math.isinf(value):
+        return None
+    return value
 
 
 async def async_setup_entry(
@@ -88,6 +114,13 @@ class AristonThermostat(AristonEntity, ClimateEntity):
         except (AttributeError, ValueError):
             return BsbZoneMode.UNDEFINED
 
+    def _get_bsb_desired_temp(self) -> float | None:
+        """Return the normalized desiredRoomTemp for BSB devices, else None."""
+        if self.device.plant_mode_supported:
+            return None
+        zone_data = self.device.get_zone(self.zone) or {}
+        return _normalize_temp(zone_data.get(BSB_DESIRED_ROOM_TEMP))
+
     def _is_bsb_currently_reduced(self) -> bool:
         """Check if BSB device is currently targeting the reduced setpoint.
 
@@ -95,14 +128,16 @@ class AristonThermostat(AristonEntity, ClimateEntity):
         active setpoint is the reduced one. Works for all modes including
         Automatic (schedule-driven).
         """
-        if self.device.plant_mode_supported:
-            return False
-        zone_data = self.device.get_zone(self.zone)
-        desired = zone_data.get("desiredRoomTemp", None)
+        desired = self._get_bsb_desired_temp()
         if desired is None:
             return False
-        reduced = zone_data.get("chRedTemp", {}).get("value", None)
-        return desired == reduced
+        reduced = _normalize_temp(self.device.get_zone_ch_red_temp(self.zone))
+        if reduced is None:
+            return False
+        comfort = _normalize_temp(self.device.get_zone_ch_comf_temp(self.zone))
+        if comfort is not None and math.isclose(desired, comfort, abs_tol=BSB_TEMP_COMPARE_TOLERANCE):
+            return False
+        return math.isclose(desired, reduced, abs_tol=BSB_TEMP_COMPARE_TOLERANCE)
 
     @property
     def name(self) -> str:
@@ -161,15 +196,14 @@ class AristonThermostat(AristonEntity, ClimateEntity):
     def target_temperature(self) -> float:
         """Return the target temperature for the device.
 
-        For BSB devices, use desiredRoomTemp as the source of truth.
-        This reflects the actual active setpoint in all modes, including
-        the schedule-driven setpoint in Automatic mode.
+        For BSB devices, use the normalized desiredRoomTemp as the source of
+        truth. This reflects the active setpoint in all modes, including the
+        schedule-driven setpoint in Automatic mode. Falls back the 
+        library's target temp if desiredRoomTemp is missing or invalid.
         """
-        if not self.device.plant_mode_supported:
-            zone_data = self.device.get_zone(self.zone)
-            desired = zone_data.get("desiredRoomTemp", None)
-            if desired is not None:
-                return desired
+        desired = self._get_bsb_desired_temp()
+        if desired is not None:
+            return desired
         return self.device.get_target_temp_value(self.zone)
 
     @property
@@ -182,7 +216,7 @@ class AristonThermostat(AristonEntity, ClimateEntity):
             features |= ClimateEntityFeature.TURN_ON
         if self.device.plant_mode_supported:
             features |= ClimateEntityFeature.PRESET_MODE
-        elif not self.device.plant_mode_supported and hasattr(self.device, 'get_zone_mode'):
+        elif hasattr(self.device, 'get_zone_mode'):
             # BSB device — enable preset mode for zone mode selection
             features |= ClimateEntityFeature.PRESET_MODE
         return features
@@ -339,8 +373,10 @@ class AristonThermostat(AristonEntity, ClimateEntity):
             # BSB device — map preset text back to BsbZoneMode
             options = self.device.get_zone_mode_options(self.zone) or []
             texts = [BSB_ZONE_MODE_TEXTS.get(opt, str(opt)) for opt in options]
-            idx = texts.index(preset_mode)
-            zone_mode = BsbZoneMode(options[idx])
+            if preset_mode not in texts:
+                _LOGGER.error("Unsupported preset mode %s for %s.", preset_mode, self.name)
+                return
+            zone_mode = BsbZoneMode(options[texts.index(preset_mode)])
             await self.device.async_set_zone_mode(zone_mode, self.zone)
             self.async_write_ha_state()
             return
