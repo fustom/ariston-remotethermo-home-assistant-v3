@@ -269,7 +269,7 @@ class AristonThermostat(AristonEntity, ClimateEntity):
         return curr_hvac_action
 
     @property
-    def preset_mode(self) -> str:
+    def preset_mode(self) -> str | None:
         """Return the current preset mode, e.g., home, away, temp."""
         if self.device.plant_mode_supported:
             return self.device.plant_mode_text
