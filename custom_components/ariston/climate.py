@@ -275,8 +275,6 @@ class AristonThermostat(AristonEntity, ClimateEntity):
             return self.device.plant_mode_text
         # BSB device — map zone mode value to text
         mode = self._get_bsb_zone_mode()
-        if mode is BsbZoneMode.UNDEFINED:
-            return None
         return BSB_ZONE_MODE_TEXTS.get(mode.value, str(mode.value))
 
     @property
