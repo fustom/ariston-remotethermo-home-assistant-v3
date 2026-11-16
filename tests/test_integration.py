@@ -1,5 +1,6 @@
 """Tests for config-entry setup, services, and unload handling."""
 
+from copy import deepcopy
 from types import SimpleNamespace
 from unittest.mock import AsyncMock, MagicMock
 
@@ -7,8 +8,15 @@ import pytest
 import voluptuous as vol
 
 from ariston import DeviceAttribute
-from ariston.ariston_api import ConnectionException
-from ariston.const import ARISTON_API_URL, ARISTON_USER_AGENT, SystemType
+from ariston.ariston_api import AristonAPI, ConnectionException
+from ariston.const import (
+    ARISTON_API_URL,
+    ARISTON_USER_AGENT,
+    DeviceFeatures,
+    SystemType,
+    ThermostatProperties,
+    ZoneAttribute,
+)
 from homeassistant.const import (
     ATTR_DEVICE_ID,
     CONF_DEVICE,
@@ -28,6 +36,7 @@ from custom_components.ariston import (
     DOMAIN,
     SERVICE_SET_ITEM_BY_ID,
     SET_ITEM_BY_ID_SCHEMA,
+    _get_items_with_all_heating_flow_zones,
     async_setup_entry,
     async_unload_entry,
 )
@@ -72,6 +81,7 @@ def _mock_device(*, has_metering=False, system_type=SystemType.BSB):
         gateway="gateway-1",
         has_metering=has_metering,
         system_type=system_type,
+        api=SimpleNamespace(get_items=AristonAPI.get_items),
         async_get_features=AsyncMock(),
         async_update_state=AsyncMock(),
         async_get_bus_errors=AsyncMock(),
@@ -79,6 +89,69 @@ def _mock_device(*, has_metering=False, system_type=SystemType.BSB):
         async_set_item_by_id=AsyncMock(),
         async_set_holiday=AsyncMock(),
     )
+
+
+@pytest.mark.parametrize("zones", [[], [1], [2], [1, 2], [3], [1, 3], [1, 2, 3]])
+def test_flow_control_requests_add_only_missing_flow_properties(zones):
+    features = {DeviceFeatures.ZONES: [{ZoneAttribute.NUM: zone} for zone in zones]}
+    original_features = deepcopy(features)
+    original_items = AristonAPI.get_items(features)
+
+    items = _get_items_with_all_heating_flow_zones(
+        features, get_items=AristonAPI.get_items
+    )
+
+    assert items[: len(original_items)] == original_items
+    expected_extra = {
+        (property_key.value, zone)
+        for property_key in (
+            ThermostatProperties.HEATING_FLOW_TEMP,
+            ThermostatProperties.HEATING_FLOW_OFFSET,
+        )
+        for zone in (1, 2)
+        if zone < max(zones, default=0) and zone not in zones
+    }
+    assert {
+        (item["id"], item["zn"]) for item in items[len(original_items) :]
+    } == expected_extra
+    assert len({(item["id"], item["zn"]) for item in items}) == len(items)
+    assert features == original_features
+
+
+async def test_flow_control_request_extension_is_per_api_instance(hass, monkeypatch):
+    device = _mock_device(system_type=SystemType.GALEVO)
+    device.api = AristonAPI("user@example.com", "secret")
+    device.api._async_post = AsyncMock(return_value={"items": []})
+    features = {DeviceFeatures.ZONES: [{ZoneAttribute.NUM: 3}]}
+
+    async def async_update_state():
+        return await device.api.async_get_properties(
+            "gateway-1", features, "en-US", "si"
+        )
+
+    device.async_update_state.side_effect = async_update_state
+    original_get_items = device.api.get_items
+    other_device = _mock_device(system_type=SystemType.GALEVO)
+    client = MagicMock()
+    client.async_connect = AsyncMock(return_value=True)
+    client.async_hello = AsyncMock(return_value=device)
+    _mock_client(monkeypatch, client)
+    monkeypatch.setattr(
+        hass.config_entries, "async_forward_entry_setups", AsyncMock()
+    )
+    entry = _entry()
+    entry.add_to_hass(hass)
+    entry._async_set_state(hass, ConfigEntryState.SETUP_IN_PROGRESS, None)
+
+    assert await async_setup_entry(hass, entry)
+
+    expected_items = _get_items_with_all_heating_flow_zones(
+        features, get_items=original_get_items
+    )
+    assert device.api._async_post.await_args.args[1]["items"] == expected_items
+    assert features == {DeviceFeatures.ZONES: [{ZoneAttribute.NUM: 3}]}
+    assert other_device.api.get_items is original_get_items
+    assert AristonAPI.get_items is original_get_items
 
 
 async def test_setup_creates_coordinators_and_unload_removes_entry_data(

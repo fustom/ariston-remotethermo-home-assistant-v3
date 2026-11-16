@@ -3,12 +3,19 @@
 from __future__ import annotations
 
 import logging
+from math import isfinite
 
+from ariston.const import ThermostatProperties
 from homeassistant.components.number import NumberEntity
 from homeassistant.config_entries import ConfigEntry
 from homeassistant.core import HomeAssistant
 
-from .const import ARISTON_NUMBER_TYPES, DOMAIN, AristonNumberEntityDescription
+from .const import (
+    ARISTON_NUMBER_TYPES,
+    DOMAIN,
+    AristonNumberEntityDescription,
+    get_flow_fallback_zones,
+)
 from .coordinator import DeviceDataUpdateCoordinator
 from .entity import (
     AristonEntity,
@@ -39,10 +46,48 @@ async def async_setup_entry(
                             zone_number,
                         )
                     )
+                if description.key in (
+                    ThermostatProperties.HEATING_FLOW_TEMP,
+                    ThermostatProperties.HEATING_FLOW_OFFSET,
+                ):
+                    for zone_number in get_flow_fallback_zones(
+                        coordinator.device.zone_numbers
+                    ):
+                        entity = AristonNumber(coordinator, description, zone_number)
+                        if _is_valid_flow_zone(entity):
+                            ariston_numbers.append(entity)
             else:
                 ariston_numbers.append(AristonNumber(coordinator, description))
 
     async_add_entities(ariston_numbers)
+
+
+def _is_valid_flow_zone(entity: AristonNumber) -> bool:
+    """Require complete, valid API data before adding a fallback flow control."""
+    try:
+        values = (
+            entity.native_min_value,
+            entity.native_max_value,
+            entity.native_step,
+            entity.native_value,
+        )
+    except Exception:
+        _LOGGER.exception(
+            "Unable to read %s for zone %s", entity.entity_description.key, entity.zone
+        )
+        return False
+
+    try:
+        minimum, maximum, step, value = (float(item) for item in values)
+    except (TypeError, ValueError, OverflowError):
+        return False
+
+    return (
+        all(isfinite(item) for item in (minimum, maximum, step, value))
+        and minimum <= maximum
+        and step > 0
+        and minimum <= value <= maximum
+    )
 
 
 class AristonNumber(AristonEntity, NumberEntity):

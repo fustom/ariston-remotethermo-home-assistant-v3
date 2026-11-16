@@ -2,12 +2,21 @@
 
 from __future__ import annotations
 
+from collections.abc import Callable
+from functools import partial
 import logging
+from typing import Any
 
 import voluptuous as vol
 
 from ariston import Ariston, DeviceAttribute, SystemType
-from ariston.const import ARISTON_API_URL, ARISTON_USER_AGENT
+from ariston.const import (
+    ARISTON_API_URL,
+    ARISTON_USER_AGENT,
+    DeviceFeatures,
+    ThermostatProperties,
+    ZoneAttribute,
+)
 from homeassistant.config_entries import ConfigEntry
 from homeassistant.const import (
     ATTR_DEVICE_ID,
@@ -34,6 +43,7 @@ from .const import (
     DOMAIN,
     ENERGY_COORDINATOR,
     ENERGY_SCAN_INTERVAL,
+    get_flow_fallback_zones,
 )
 from .coordinator import DeviceDataUpdateCoordinator
 
@@ -62,6 +72,29 @@ SET_ITEM_BY_ID_SCHEMA = vol.Schema(
         vol.Required(ATTR_VALUE): vol.Coerce(float),
     }
 )
+
+
+def _get_items_with_all_heating_flow_zones(
+    features: dict[str, Any],
+    *,
+    get_items: Callable[[dict[str, Any]], list[dict[str, Any]]],
+) -> list[dict[str, Any]]:
+    """Include the reference integration's fallback flow control requests."""
+    items = get_items(features)
+    existing_items = {(item.get("id"), item.get("zn")) for item in items}
+    fallback_zones = get_flow_fallback_zones(
+        [zone[ZoneAttribute.NUM] for zone in features.get(DeviceFeatures.ZONES, [])]
+    )
+    for property_id in (
+        ThermostatProperties.HEATING_FLOW_TEMP,
+        ThermostatProperties.HEATING_FLOW_OFFSET,
+    ):
+        for zone_number in fallback_zones:
+            item = (property_id.value, zone_number)
+            if item not in existing_items:
+                items.append({"id": property_id.value, "zn": zone_number})
+                existing_items.add(item)
+    return items
 
 
 async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
@@ -93,6 +126,14 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
             return False
 
         await device.async_get_features()
+
+        if device.system_type == SystemType.GALEVO:
+            # Scope the reference ZIP's request extension to this API instance.
+            # Keep feature zones intact; the number platform validates fallback zones.
+            device.api.get_items = partial(
+                _get_items_with_all_heating_flow_zones,
+                get_items=device.api.get_items,
+            )
 
         scan_interval_seconds = entry.options.get(
             CONF_SCAN_INTERVAL, DEFAULT_SCAN_INTERVAL_SECONDS
