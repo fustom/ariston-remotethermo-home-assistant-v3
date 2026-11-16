@@ -210,10 +210,7 @@ class AristonThermostat(AristonEntity, ClimateEntity):
             features |= ClimateEntityFeature.TURN_OFF
         if hasattr(ClimateEntityFeature, "TURN_ON"):
             features |= ClimateEntityFeature.TURN_ON
-        if self.device.plant_mode_supported:
-            features |= ClimateEntityFeature.PRESET_MODE
-        elif hasattr(self.device, 'get_zone_mode'):
-            # BSB device — enable preset mode for zone mode selection
+        if self.device.plant_mode_supported or hasattr(self.device, 'get_zone_mode'):
             features |= ClimateEntityFeature.PRESET_MODE
         return features
 
