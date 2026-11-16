@@ -183,8 +183,8 @@ def test_preset_mode_maps_zone_mode(make_entity, bsb_device, mode, expected):
     assert make_entity().preset_mode == expected
 
 
-def test_preset_mode_none_when_mode_missing(make_entity):
-    assert make_entity().preset_mode is None
+def test_preset_mode_undefined_when_mode_missing(make_entity):
+    assert make_entity().preset_mode == str(BsbZoneMode.UNDEFINED.value)
 
 
 def test_preset_modes_lists_allowed_options(make_entity):
