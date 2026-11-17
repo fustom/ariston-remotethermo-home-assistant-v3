@@ -107,6 +107,66 @@ def test_period_total_handles_fall_back_day():
     assert _total(v, now) == pytest.approx(1.0)
 
 
+def test_total_does_not_drop_in_last_hour_of_fall_back_day():
+    """The 25th bucket of a fall-back day is kept after it leaves v[].
+
+    2026-10-25 in Rome has 25 hours. At 22:30 CET the cloud's 24 buckets
+    start exactly at local midnight (v[0]). At 23:30 CET the window has
+    rolled: the midnight bucket is gone from v[], but it still belongs to
+    today and last_reset has not moved, so the total must not decrease.
+    """
+    v_2230 = [0.7] + [0.1] * 23  # v[0] = 00:00-01:00 CEST
+    v_2330 = v_2230[1:] + [0.05]  # rolled by one hour
+    at_2230 = dt.datetime(2026, 10, 25, 22, 30, tzinfo=ROME)
+    at_2330 = dt.datetime(2026, 10, 25, 23, 30, tzinfo=ROME)
+    device = _device(_day_sequence(v_2230))
+
+    before = period_total(device, DHW, DAY, now=at_2230)
+    device.consumptions_sequences = _day_sequence(v_2330)
+    after = period_total(device, DHW, DAY, now=at_2330)
+
+    assert before == pytest.approx(3.0)
+    assert after == pytest.approx(3.05)
+    assert period_last_reset(DAY, now=at_2230) == period_last_reset(DAY, now=at_2330)
+
+
+def test_fall_back_last_hour_without_history_sums_the_24_available_buckets():
+    """After a restart only the cloud's 24 buckets are known."""
+    v = [0.1] * 23 + [0.05]
+    now = dt.datetime(2026, 10, 25, 23, 30, tzinfo=ROME)
+    assert _total(v, now) == pytest.approx(2.35)
+
+
+def test_old_bucket_is_not_counted_on_a_normal_day():
+    """The 25-hour history must not leak yesterday into a 24-hour day."""
+    v_before = [0.7] + [0.1] * 23
+    v_after = v_before[1:] + [0.05]
+    device = _device(_day_sequence(v_before))
+
+    period_total(device, DHW, DAY, now=dt.datetime(2026, 5, 6, 22, 30, tzinfo=ROME))
+    device.consumptions_sequences = _day_sequence(v_after)
+    total = period_total(
+        device, DHW, DAY, now=dt.datetime(2026, 5, 6, 23, 30, tzinfo=ROME)
+    )
+
+    assert total == pytest.approx(2.35)
+
+
+def test_data_fetched_before_midnight_is_not_counted_as_today():
+    """Until the next fetch, yesterday's last bucket stays in yesterday."""
+    device = _device(_day_sequence([0.1] * 24))
+
+    before = period_total(
+        device, DHW, DAY, now=dt.datetime(2026, 5, 6, 23, 40, tzinfo=ROME)
+    )
+    after = period_total(
+        device, DHW, DAY, now=dt.datetime(2026, 5, 7, 0, 10, tzinfo=ROME)
+    )
+
+    assert before == pytest.approx(2.4)
+    assert after == pytest.approx(0.0)
+
+
 def test_value_and_last_reset_change_together_at_local_midnight():
     """HA needs the value to restart exactly when last_reset moves."""
     before = dt.datetime(2026, 5, 6, 23, 59, tzinfo=ROME)
