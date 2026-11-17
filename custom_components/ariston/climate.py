@@ -369,11 +369,13 @@ class AristonThermostat(AristonEntity, ClimateEntity):
             options = self.device.get_zone_mode_options(self.zone) or []
             texts = [BSB_ZONE_MODE_TEXTS.get(opt, str(opt)) for opt in options]
             if preset_mode not in texts:
-                _LOGGER.error("Unsupported preset mode %s for %s.", preset_mode, self.name)
+                _LOGGER.error(
+                    "Unsupported preset mode %s for %s.", preset_mode, self.name
+                )
                 return
             zone_mode = BsbZoneMode(options[texts.index(preset_mode)])
             await self.device.async_set_zone_mode(zone_mode, self.zone)
-            self.async_write_ha_state()
+            await async_refresh_after_set(self)
             return
 
         # Don't assume index maps to enum value directly
