@@ -162,7 +162,7 @@ async def test_set_temperature_targets_active_setpoint(
 
     getattr(bsb_device, setter).assert_awaited_once_with(17.0, ZONE)
     getattr(bsb_device, other).assert_not_awaited()
-    coordinator.async_set_updated_data.assert_awaited_once()
+    coordinator.async_request_refresh.assert_awaited_once()
 
 
 # --- BSB presets ----------------------------------------------------------------------------
