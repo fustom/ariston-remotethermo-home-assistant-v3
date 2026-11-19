@@ -9,9 +9,9 @@ from homeassistant.components.sensor import SensorEntity
 from homeassistant.config_entries import ConfigEntry
 from homeassistant.core import HomeAssistant
 
-from .const import ARISTON_SENSOR_TYPES, DOMAIN, AristonSensorEntityDescription
+from .const import ARISTON_SENSOR_TYPES, AristonSensorEntityDescription
 from .coordinator import DeviceDataUpdateCoordinator
-from .entity import AristonEntity, is_entity_description_available
+from .entity import AristonEntity, register_supported_entities
 
 _LOGGER = logging.getLogger(__name__)
 
@@ -20,21 +20,15 @@ async def async_setup_entry(
     hass: HomeAssistant, entry: ConfigEntry, async_add_entities
 ) -> None:
     """Set up the Ariston sensors from config entry."""
-    ariston_sensors: list[AristonSensor] = []
-
-    for description in ARISTON_SENSOR_TYPES:
-        coordinator: DeviceDataUpdateCoordinator | None = hass.data[DOMAIN][
-            entry.unique_id
-        ].get(description.coordinator)
-        if is_entity_description_available(coordinator, description):
-            ariston_sensors.append(
-                AristonSensor(
-                    coordinator,
-                    description,
-                )
-            )
-
-    async_add_entities(ariston_sensors)
+    register_supported_entities(
+        hass,
+        entry,
+        ARISTON_SENSOR_TYPES,
+        lambda coordinator, description, _zone=0: AristonSensor(
+            coordinator, description
+        ),
+        async_add_entities,
+    )
 
 
 class AristonSensor(AristonEntity, SensorEntity):

@@ -3,10 +3,15 @@
 from __future__ import annotations
 
 from abc import ABC
+from collections.abc import Callable, Sequence
 import logging
+from typing import Any
 
 from ariston.const import WheType
+from homeassistant.config_entries import ConfigEntry
+from homeassistant.core import HomeAssistant, callback
 from homeassistant.helpers.entity import DeviceInfo
+from homeassistant.helpers.entity_platform import AddEntitiesCallback
 from homeassistant.helpers.update_coordinator import CoordinatorEntity
 
 from .const import (
@@ -34,6 +39,71 @@ def is_entity_description_available(
             description.whe_types,
         )
     )
+
+
+def register_supported_entities(
+    hass: HomeAssistant,
+    entry: ConfigEntry,
+    descriptions: Sequence[AristonBaseEntityDescription],
+    create_entity: Callable[[DeviceDataUpdateCoordinator, Any, int], CoordinatorEntity],
+    async_add_entities: AddEntitiesCallback,
+    registered_entities: list[Any] | None = None,
+) -> None:
+    """Register currently supported entities and add newly discovered ones on future refreshes."""
+    entry_data = hass.data[DOMAIN][entry.unique_id]
+    added_keys: set[tuple[str, int]] = set()
+
+    def _collect_new_entities() -> list[Any]:
+        new_entities: list[Any] = []
+        for description in descriptions:
+            coordinator: DeviceDataUpdateCoordinator | None = entry_data.get(
+                description.coordinator
+            )
+            if not is_entity_description_available(coordinator, description):
+                continue
+            zones = (
+                coordinator.device.zone_numbers
+                if getattr(description, "zone", False)
+                else (0,)
+            )
+            for zone_number in zones:
+                entity_key = (description.key, zone_number)
+                if entity_key in added_keys:
+                    continue
+                added_keys.add(entity_key)
+                new_entities.append(
+                    create_entity(coordinator, description, zone_number)
+                )
+        return new_entities
+
+    initial_entities = _collect_new_entities()
+    if registered_entities is not None:
+        registered_entities.extend(initial_entities)
+    async_add_entities(initial_entities)
+
+    @callback
+    def _async_add_newly_supported_entities() -> None:
+        new_entities = _collect_new_entities()
+        if new_entities:
+            if registered_entities is not None:
+                registered_entities.extend(new_entities)
+            async_add_entities(new_entities)
+
+    seen_coordinators: set[int] = set()
+    for description in descriptions:
+        coordinator: DeviceDataUpdateCoordinator | None = entry_data.get(
+            description.coordinator
+        )
+        if (
+            coordinator is None
+            or id(coordinator) in seen_coordinators
+            or not hasattr(coordinator, "async_add_listener")
+        ):
+            continue
+        seen_coordinators.add(id(coordinator))
+        entry.async_on_unload(
+            coordinator.async_add_listener(_async_add_newly_supported_entities)
+        )
 
 
 async def async_refresh_after_set(entity: CoordinatorEntity) -> None:

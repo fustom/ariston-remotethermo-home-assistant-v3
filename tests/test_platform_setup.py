@@ -2,7 +2,17 @@
 
 from unittest.mock import AsyncMock, MagicMock
 
-from ariston.const import MenuItemNames, WheType
+from ariston.ariston_api import ConnectionException
+from ariston.const import (
+    DeviceAttribute,
+    DeviceFeatures,
+    MenuItemNames,
+    PropertyType,
+    SystemType,
+    WheType,
+    ZoneAttribute,
+)
+from ariston.galevo_device import AristonGalevoDevice
 from homeassistant.const import ATTR_DEVICE_ID
 from homeassistant.helpers import device_registry as dr
 from pytest_homeassistant.common import MockConfigEntry
@@ -23,7 +33,12 @@ from custom_components.ariston.const import (
     COORDINATOR,
     DOMAIN,
     ENERGY_COORDINATOR,
+    MENU_ITEM_CH_BACKUP_RESISTANCE_1,
+    MENU_ITEM_HP_MODE,
+    MENU_ITEM_HP_OUTSIDE_AIR_TEMP,
+    MENU_ITEM_HP_WATER_FLOW_TEMP,
 )
+from custom_components.ariston.coordinator import DeviceDataUpdateCoordinator
 from custom_components.ariston.binary_sensor import SERVICE_CREATE_VACATION
 from custom_components.ariston.number import AristonNumber
 from custom_components.ariston.select import AristonSelect
@@ -102,70 +117,161 @@ async def test_platforms_add_supported_entities_and_expand_zones(
     ariston_device.async_set_holiday.assert_awaited_once_with(None)
 
 
-async def test_menu_item_feature_gating_for_ch_return_and_heat_pump_entities(
-    hass, coordinator, ariston_device
-):
-    from custom_components.ariston.const import (
-        MENU_ITEM_CH_BACKUP_RESISTANCE_1,
-        MENU_ITEM_HP_MODE,
-        MENU_ITEM_HP_OUTSIDE_AIR_TEMP,
-        MENU_ITEM_HP_WATER_FLOW_TEMP,
+def _make_real_galevo_device(menu_side_effect):
+    api = MagicMock()
+    api.async_get_properties = AsyncMock(return_value={"items": []})
+    api.async_get_menu_items = AsyncMock(side_effect=menu_side_effect)
+    device = AristonGalevoDevice(
+        api,
+        {
+            DeviceAttribute.GW: "gateway-1",
+            DeviceAttribute.NAME: "Test heat pump",
+            DeviceAttribute.SN: "serial-1",
+            DeviceAttribute.SYS: SystemType.GALEVO.value,
+        },
     )
-
-    ariston_device.zone_numbers = [1]
-    ariston_device.whe_type = WheType.Unknown
-    ariston_device.custom_features = {
-        str(MenuItemNames.CH_RETURN_TEMP.value): False,
-        str(MENU_ITEM_HP_WATER_FLOW_TEMP): True,
-        str(MENU_ITEM_HP_OUTSIDE_AIR_TEMP): True,
-        str(MENU_ITEM_HP_MODE): True,
-        str(MENU_ITEM_CH_BACKUP_RESISTANCE_1): True,
+    device.features = {
+        DeviceFeatures.HP_SYS: True,
+        DeviceFeatures.ZONES: [{ZoneAttribute.NUM: 1}],
     }
+    return device
 
-    def is_available(device_features, system_types, whe_types):
-        return (
-            (not system_types or ariston_device.system_type in system_types)
-            and (not whe_types or ariston_device.whe_type in whe_types)
-            and (
-                not device_features
-                or all(
-                    ariston_device.custom_features.get(feature, True)
-                    for feature in device_features
-                )
-            )
-        )
 
-    ariston_device.are_device_features_available = is_available
+async def test_menu_item_feature_gating_with_real_device_hides_missing_items(hass):
+    device = _make_real_galevo_device(
+        [
+            [
+                {
+                    "id": MenuItemNames.SIGNAL_STRENGTH.value,
+                    PropertyType.VALUE: 80,
+                    PropertyType.UNIT: "%",
+                },
+                {
+                    "id": MenuItemNames.CH_RETURN_TEMP.value,
+                    PropertyType.VALUE: 3276.0,
+                    PropertyType.UNIT: "°C",
+                },
+            ]
+        ]
+    )
+    real_coordinator = DeviceDataUpdateCoordinator(
+        hass, device, 300, COORDINATOR, device.async_update_state
+    )
+    await real_coordinator.async_refresh()
+
     hass.data[DOMAIN] = {
         "entry-1": {
-            COORDINATOR: coordinator,
-            ENERGY_COORDINATOR: coordinator,
-            BUS_ERRORS_COORDINATOR: coordinator,
+            COORDINATOR: real_coordinator,
+            ENERGY_COORDINATOR: real_coordinator,
+            BUS_ERRORS_COORDINATOR: real_coordinator,
         }
     }
     entry = MockConfigEntry(domain=DOMAIN, unique_id="entry-1", data={})
     entry.add_to_hass(hass)
 
-    sensors_without_return = []
-    await sensor.async_setup_entry(hass, entry, sensors_without_return.extend)
-    keys_without_return = {entity.entity_description.key for entity in sensors_without_return}
-    assert str(MenuItemNames.CH_RETURN_TEMP) not in keys_without_return
+    added_sensors = []
+    await sensor.async_setup_entry(hass, entry, added_sensors.extend)
+    sensor_keys = {entity.entity_description.key for entity in added_sensors}
+    assert str(MenuItemNames.SIGNAL_STRENGTH) in sensor_keys
     assert {
+        str(MenuItemNames.CH_RETURN_TEMP),
         str(MENU_ITEM_HP_WATER_FLOW_TEMP),
         str(MENU_ITEM_HP_OUTSIDE_AIR_TEMP),
         str(MENU_ITEM_HP_MODE),
-    }.issubset(keys_without_return)
+    }.isdisjoint(sensor_keys)
 
-    binary_sensors = []
-    await binary_sensor.async_setup_entry(hass, entry, binary_sensors.extend)
-    assert str(MENU_ITEM_CH_BACKUP_RESISTANCE_1) in {
-        entity.entity_description.key for entity in binary_sensors
-    }
+    added_binary_sensors = []
+    await binary_sensor.async_setup_entry(hass, entry, added_binary_sensors.extend)
+    binary_keys = {entity.entity_description.key for entity in added_binary_sensors}
+    assert str(MENU_ITEM_CH_BACKUP_RESISTANCE_1) not in binary_keys
 
-    ariston_device.custom_features[str(MenuItemNames.CH_RETURN_TEMP.value)] = True
-    sensors_with_return = []
-    await sensor.async_setup_entry(hass, entry, sensors_with_return.extend)
-    assert str(MenuItemNames.CH_RETURN_TEMP) in {
-        entity.entity_description.key for entity in sensors_with_return
+    await real_coordinator.async_shutdown()
+
+
+async def test_delayed_menu_recovery_registers_entities_after_initial_http_550(hass):
+    recovered_menu = [
+        {
+            "id": MenuItemNames.SIGNAL_STRENGTH.value,
+            PropertyType.VALUE: 80,
+            PropertyType.UNIT: "%",
+        },
+        {
+            "id": MenuItemNames.CH_RETURN_TEMP.value,
+            PropertyType.VALUE: 27.5,
+            PropertyType.UNIT: "°C",
+        },
+        {
+            "id": MENU_ITEM_CH_BACKUP_RESISTANCE_1,
+            PropertyType.VALUE: 0.0,
+        },
+        {
+            "id": MENU_ITEM_HP_MODE,
+            PropertyType.VALUE: 3.0,
+            PropertyType.OPTIONS: {"3": "Heating"},
+        },
+        {
+            "id": MENU_ITEM_HP_OUTSIDE_AIR_TEMP,
+            PropertyType.VALUE: 2.0,
+            PropertyType.UNIT: "°C",
+        },
+        {
+            "id": MENU_ITEM_HP_WATER_FLOW_TEMP,
+            PropertyType.VALUE: 31.0,
+            PropertyType.UNIT: "°C",
+        },
+    ]
+    device = _make_real_galevo_device(
+        [ConnectionException(550), recovered_menu, recovered_menu]
+    )
+    real_coordinator = DeviceDataUpdateCoordinator(
+        hass, device, 300, COORDINATOR, device.async_update_state
+    )
+    await real_coordinator.async_refresh()
+
+    hass.data[DOMAIN] = {
+        "entry-1": {
+            COORDINATOR: real_coordinator,
+            ENERGY_COORDINATOR: real_coordinator,
+            BUS_ERRORS_COORDINATOR: real_coordinator,
+        }
     }
+    entry = MockConfigEntry(domain=DOMAIN, unique_id="entry-1", data={})
+    entry.add_to_hass(hass)
+
+    sensor_calls = []
+    await sensor.async_setup_entry(hass, entry, lambda entities: sensor_calls.append(list(entities)))
+    initial_sensor_keys = {e.entity_description.key for e in sensor_calls[0]}
+    assert {
+        str(MenuItemNames.CH_RETURN_TEMP),
+        str(MENU_ITEM_HP_WATER_FLOW_TEMP),
+        str(MENU_ITEM_HP_OUTSIDE_AIR_TEMP),
+        str(MENU_ITEM_HP_MODE),
+    }.isdisjoint(initial_sensor_keys)
+
+    binary_calls = []
+    await binary_sensor.async_setup_entry(hass, entry, lambda entities: binary_calls.append(list(entities)))
+    initial_binary_keys = {e.entity_description.key for e in binary_calls[0]}
+    assert str(MENU_ITEM_CH_BACKUP_RESISTANCE_1) not in initial_binary_keys
+
+    # Next poll recovers from HTTP 550 and dynamically adds the newly supported entities
+    await real_coordinator.async_refresh()
+    assert len(sensor_calls) == 2
+    recovered_sensor_keys = {e.entity_description.key for e in sensor_calls[1]}
+    assert {
+        str(MenuItemNames.CH_RETURN_TEMP),
+        str(MENU_ITEM_HP_WATER_FLOW_TEMP),
+        str(MENU_ITEM_HP_OUTSIDE_AIR_TEMP),
+        str(MENU_ITEM_HP_MODE),
+    }.issubset(recovered_sensor_keys)
+
+    assert len(binary_calls) == 2
+    recovered_binary_keys = {e.entity_description.key for e in binary_calls[1]}
+    assert str(MENU_ITEM_CH_BACKUP_RESISTANCE_1) in recovered_binary_keys
+
+    # Subsequent polls do not re-register already added entities
+    await real_coordinator.async_refresh()
+    assert len(sensor_calls) == 2
+    assert len(binary_calls) == 2
+
+    await real_coordinator.async_shutdown()
 
