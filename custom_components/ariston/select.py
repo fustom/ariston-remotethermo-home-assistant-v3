@@ -10,7 +10,11 @@ from homeassistant.core import HomeAssistant
 
 from .const import ARISTON_SELECT_TYPES, DOMAIN, AristonSelectEntityDescription
 from .coordinator import DeviceDataUpdateCoordinator
-from .entity import AristonEntity
+from .entity import (
+    AristonEntity,
+    async_refresh_after_set,
+    is_entity_description_available,
+)
 
 _LOGGER = logging.getLogger(__name__)
 
@@ -22,18 +26,10 @@ async def async_setup_entry(
     ariston_select: list[AristonSelect] = []
 
     for description in ARISTON_SELECT_TYPES:
-        coordinator: DeviceDataUpdateCoordinator = hass.data[DOMAIN][entry.unique_id][
-            description.coordinator
-        ]
-        if (
-            coordinator
-            and coordinator.device
-            and coordinator.device.are_device_features_available(
-                description.device_features,
-                description.system_types,
-                description.whe_types,
-            )
-        ):
+        coordinator: DeviceDataUpdateCoordinator | None = hass.data[DOMAIN][
+            entry.unique_id
+        ].get(description.coordinator)
+        if is_entity_description_available(coordinator, description):
             ariston_select.append(
                 AristonSelect(
                     coordinator,
@@ -68,4 +64,4 @@ class AristonSelect(AristonEntity, SelectEntity):
     async def async_select_option(self, option: str):
         """Change the selected option."""
         await self.entity_description.select_option(self, option)
-        self.async_write_ha_state()
+        await async_refresh_after_set(self)

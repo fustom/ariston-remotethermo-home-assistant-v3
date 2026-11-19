@@ -1,3 +1,25 @@
+# 🚀 Co-Maintainers Wanted!
+
+Hello everyone!
+
+Thank you to everyone who uses, stars, and contributes to this project.
+
+Due to work commitments and a busy schedule, I am no longer able to dedicate the time this project deserves. To keep the repository active and moving forward, I am looking for **co-maintainers** or a **new primary maintainer** to help lead the project.
+
+### How You Can Help:
+* **Triage Issues:** Review, label, and respond to incoming issue reports.
+* **Review Pull Requests:** Help test, review, and merge community contributions.
+* **Maintenance & Enhancements:** Keep dependencies updated and work on planned roadmap features.
+
+### Interested?
+If you've enjoyed using this project and would like to step up as a maintainer, please:
+1. Write an email to me.
+2. Briefly introduce yourself and share any prior experience or ideas you have for the project.
+
+Even if you can only contribute a few hours a month, your help would be hugely appreciated!
+
+Thanks for being part of the community! 🙌
+
 [![CodeQL](https://github.com/fustom/ariston-remotethermo-home-assistant-v3/actions/workflows/codeql.yml/badge.svg?branch=main)](https://github.com/fustom/ariston-remotethermo-home-assistant-v3/actions/workflows/codeql.yml)
 [![hacs_badge](https://img.shields.io/badge/HACS-Default-orange.svg)](https://github.com/hacs/integration)
 [![HACS Action](https://github.com/fustom/ariston-remotethermo-home-assistant-v3/actions/workflows/hacs.yml/badge.svg)](https://github.com/fustom/ariston-remotethermo-home-assistant-v3/actions/workflows/hacs.yml)
@@ -22,7 +44,6 @@ But it does not use Ariston website. It uses Ariston API what I reversed enginee
 - More sensors, switches, binary sersors, selectors, services.
 - Exception handling.
 - More logs.
-- Unit tests.
 - Fun.
 
 ## Integration was tested on and works with:
@@ -32,6 +53,22 @@ But it does not use Ariston website. It uses Ariston API what I reversed enginee
 - Ariston Lydos Hybrid
 
 Feel free to test something else and create new issue / pull request if something goes wrong.
+
+## Tests
+
+The test suite uses Home Assistant's pytest fixtures and reports line coverage for
+the integration. It runs on Python 3.14.2, matching CI.
+
+```sh
+python -m pip install --require-hashes --only-binary=:all: -r requirements_test.txt
+python -m pytest
+```
+
+To update test dependencies, edit `requirements_test.in` and regenerate the hashed lock:
+
+```sh
+uv pip compile requirements_test.in --python 3.14.2 --python-version 3.14.2 --universal --generate-hashes --upgrade --output-file requirements_test.txt
+```
 
 ## Installation
 [![Open your Home Assistant instance and open a repository inside the Home Assistant Community Store.](https://my.home-assistant.io/badges/hacs_repository.svg)](https://my.home-assistant.io/redirect/hacs_repository/?owner=fustom&repository=ariston-remotethermo-home-assistant-v3&category=integration) or copy ariston folder to your configuration/custom_components path.
