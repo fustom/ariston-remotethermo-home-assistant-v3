@@ -18,6 +18,7 @@ from .const import (
     DOMAIN,
     EXTRA_STATE_ATTRIBUTE,
     EXTRA_STATE_DEVICE_METHOD,
+    NAME,
     AristonBaseEntityDescription,
 )
 from .coordinator import DeviceDataUpdateCoordinator
@@ -134,7 +135,7 @@ class AristonEntity(CoordinatorEntity, ABC):
         return DeviceInfo(
             identifiers={(DOMAIN, self.device.serial_number or "")},
             manufacturer=DOMAIN,
-            name=self.device.name,
+            name=self.device.name or NAME,
             sw_version=self.device.firmware_version,
             model=self.model,
         )
