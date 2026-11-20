@@ -5,6 +5,7 @@ from unittest.mock import AsyncMock, MagicMock
 import pytest
 
 from ariston.const import (
+    ARISTON_API_URL,
     DeviceAttribute,
     DeviceFeatures,
     SystemType,
@@ -18,6 +19,7 @@ from homeassistant.helpers import device_registry as dr
 from pytest_homeassistant.common import MockConfigEntry
 
 from custom_components.ariston import (
+    _async_poll_fallback_flow_properties,
     binary_sensor,
     climate,
     number,
@@ -181,6 +183,11 @@ async def test_flow_controls_follow_supported_system_and_reported_zones(
         (None, {"value": {}}),
         (None, {"value": float("nan")}),
         (None, {"value": float("inf")}),
+        (None, {"min": None}),
+        (None, {"min": "invalid"}),
+        (None, {"max": float("nan")}),
+        (None, {"max": float("inf")}),
+        (None, {"step": float("-inf")}),
         (None, {"step": 0}),
         (None, {"step": -1}),
         (None, {"min": 60, "max": 40}),
@@ -272,17 +279,53 @@ async def test_fallback_flow_controls_require_valid_data_and_keep_existing_ids(
     }
 
 
-async def test_reported_flow_controls_remain_when_data_is_temporarily_missing(
+async def test_fallback_flow_controls_register_after_later_poll_and_update(
     hass, coordinator, ariston_device
 ):
-    ariston_device.zone_numbers = [3]
-    _mock_flow_zone_getters(ariston_device, [])
-    ariston_device.are_device_features_available = (
-        lambda features, system_types, whe_types: (
-            not system_types or ariston_device.system_type in system_types
-        )
-        and (not whe_types or ariston_device.whe_type in whe_types)
+    device = AristonGalevoDevice(
+        MagicMock(),
+        {
+            DeviceAttribute.GW: "gateway-1",
+            DeviceAttribute.NAME: "Test boiler",
+            DeviceAttribute.SYS: SystemType.GALEVO.value,
+        },
     )
+    device.features = {DeviceFeatures.ZONES: [{ZoneAttribute.NUM: 3}]}
+    device.are_device_features_available = lambda *_: True
+    reported_items = [
+        {
+            "id": property_id.value,
+            "zone": 3,
+            "min": minimum,
+            "max": maximum,
+            "step": 0.5,
+            "value": value,
+        }
+        for property_id, minimum, maximum, value in (
+            (ThermostatProperties.HEATING_FLOW_TEMP, 20, 80, 42),
+            (ThermostatProperties.HEATING_FLOW_OFFSET, -20, 20, 0),
+        )
+    ]
+    fallback_items = [
+        {
+            "id": property_id.value,
+            "zone": zone,
+            "min": minimum,
+            "max": maximum,
+            "step": 0.5,
+            "value": value,
+        }
+        for property_id, minimum, maximum, value in (
+            (ThermostatProperties.HEATING_FLOW_TEMP, 20, 80, 42),
+            (ThermostatProperties.HEATING_FLOW_OFFSET, -20, 20, 0),
+        )
+        for zone in (1, 2)
+    ]
+    device.data = {"items": reported_items}
+    device.api._async_request_properties = AsyncMock(
+        return_value={"items": fallback_items}
+    )
+    coordinator.device = device
     hass.data[DOMAIN] = {"entry-1": {COORDINATOR: coordinator}}
     entry = MockConfigEntry(domain=DOMAIN, unique_id="entry-1", data={})
     entry.add_to_hass(hass)
@@ -290,8 +333,47 @@ async def test_reported_flow_controls_remain_when_data_is_temporarily_missing(
 
     await number.async_setup_entry(hass, entry, added.extend)
 
-    assert {entity.unique_id for entity in added} == {
+    flow_unique_ids = {
+        entity.unique_id
+        for entity in added
+        if entity.entity_description.key
+        in (
+            ThermostatProperties.HEATING_FLOW_TEMP,
+            ThermostatProperties.HEATING_FLOW_OFFSET,
+        )
+    }
+    reported_unique_ids = {
         "gateway-1-Ariston heating flow temperature 3-3",
         "gateway-1-Ariston heating flow offset 3-3",
     }
-    assert all(entity.native_value is None for entity in added)
+    assert flow_unique_ids == reported_unique_ids
+
+    await _async_poll_fallback_flow_properties(device, ARISTON_API_URL)
+    assert {item["zone"] for item in device.data["items"]} == {1, 2, 3}
+
+    coordinator.async_set_updated_data(None)
+    coordinator.async_set_updated_data(None)
+
+    flow_entities = [
+        entity
+        for entity in added
+        if entity.entity_description.key
+        in (
+            ThermostatProperties.HEATING_FLOW_TEMP,
+            ThermostatProperties.HEATING_FLOW_OFFSET,
+        )
+    ]
+    assert {entity.zone for entity in flow_entities} == {1, 2, 3}
+    assert len(flow_entities) == 6
+    assert len({entity.unique_id for entity in flow_entities}) == 6
+
+    retained_flow_entities = [
+        entity
+        for entity in added
+        if entity.entity_description.key
+        in (
+            ThermostatProperties.HEATING_FLOW_TEMP,
+            ThermostatProperties.HEATING_FLOW_OFFSET,
+        )
+    ]
+    assert len(retained_flow_entities) == 6

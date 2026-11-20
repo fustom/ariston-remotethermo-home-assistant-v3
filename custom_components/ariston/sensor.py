@@ -4,6 +4,7 @@ from __future__ import annotations
 
 from datetime import datetime
 import logging
+from math import isfinite
 
 from homeassistant.components.sensor import SensorEntity
 from homeassistant.config_entries import ConfigEntry
@@ -60,10 +61,13 @@ class AristonSensor(AristonEntity, SensorEntity):
             except (TypeError, ValueError):
                 numeric_value = None
 
+            if numeric_value is not None and not isfinite(numeric_value):
+                return None
+
             if numeric_value == 0.0:
                 return self._last_valid_native_value
 
-            if numeric_value is not None and numeric_value != 0.0:
+            if numeric_value is not None:
                 self._last_valid_native_value = value
         return value
 

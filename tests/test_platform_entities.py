@@ -74,8 +74,9 @@ async def test_switch_reads_and_sets_its_description(coordinator, ariston_device
 async def test_number_exposes_dynamic_limits_and_sets_value(
     coordinator, ariston_device
 ):
-    ariston_device.minimum = 5
-    ariston_device.maximum = 80
+    ariston_device.minimum = "20"
+    ariston_device.maximum = "80"
+    ariston_device.step = "0.5"
     ariston_device.value = 24
     set_native_value = AsyncMock()
     entity = AristonNumber(
@@ -88,19 +89,43 @@ async def test_number_exposes_dynamic_limits_and_sets_value(
             get_native_value=lambda entity: entity.device.value,
             get_native_min_value=lambda entity: entity.device.minimum,
             get_native_max_value=lambda entity: entity.device.maximum,
+            get_native_step=lambda entity: entity.device.step,
             set_native_value=lambda entity, value: set_native_value(value),
         ),
     )
 
     assert entity.native_value == 24
-    assert entity.native_min_value == 5
-    assert entity.native_max_value == 80
-    assert entity.native_step == 1
+    assert entity.native_min_value == 20.0
+    assert entity.native_max_value == 80.0
+    assert entity.native_step == 0.5
+    assert entity.native_min_value <= 26 <= entity.native_max_value
     with patch.object(entity, "async_write_ha_state") as write_state:
         await entity.async_set_native_value(26)
 
     set_native_value.assert_awaited_once_with(26)
     write_state.assert_called_once()
+
+
+@pytest.mark.parametrize(
+    "invalid_limit",
+    [None, "invalid", float("nan"), float("inf"), float("-inf")],
+)
+def test_number_rejects_invalid_limits(coordinator, invalid_limit):
+    entity = AristonNumber(
+        coordinator,
+        AristonNumberEntityDescription(
+            key="invalid_limits",
+            native_min_value=invalid_limit,
+            native_max_value="80",
+            native_step="0.5",
+            get_native_value=lambda entity: 25,
+            set_native_value=lambda entity, value: None,
+        ),
+    )
+
+    assert entity.native_min_value is None
+    assert entity.native_max_value == 80.0
+    assert entity.native_step == 0.5
 
 
 @pytest.mark.parametrize(
@@ -311,9 +336,16 @@ async def test_flow_numbers_read_zone_values_and_set_values(
         (["0", "41.5", "0.0", 42, 0], [None, "41.5", "41.5", 42, 42]),
         ([42, "invalid", 0], [42, "invalid", 42]),
         ([42, {}, 0], [42, {}, 42]),
+        ([42, "NaN", 0], [42, None, 42]),
+        ([42, float("inf"), 0], [42, None, 42]),
+        ([42, float("-inf"), 0], [42, None, 42]),
+        ([0], [None]),
+        (["NaN"], [None]),
+        ([float("inf")], [None]),
+        ([float("-inf")], [None]),
     ],
 )
-def test_ch_return_temperature_ignores_only_exact_zero(
+def test_ch_return_temperature_ignores_zero_and_nonfinite_values(
     coordinator, ariston_device, values, expected
 ):
     description = next(

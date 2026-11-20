@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import logging
 from math import isfinite
+from typing import Any
 
 from ariston.const import ThermostatProperties
 from homeassistant.components.number import NumberEntity
@@ -31,6 +32,15 @@ async def async_setup_entry(
 ) -> None:
     """Set up the Ariston binary sensors from config entry."""
     ariston_numbers: list[AristonNumber] = []
+    registered_unique_ids: set[str] = set()
+    fallback_descriptions_by_coordinator: dict[
+        DeviceDataUpdateCoordinator, list[AristonNumberEntityDescription]
+    ] = {}
+
+    def add_number(entity: AristonNumber) -> None:
+        if entity.unique_id not in registered_unique_ids:
+            registered_unique_ids.add(entity.unique_id)
+            ariston_numbers.append(entity)
 
     for description in ARISTON_NUMBER_TYPES:
         coordinator: DeviceDataUpdateCoordinator | None = hass.data[DOMAIN][
@@ -39,27 +49,49 @@ async def async_setup_entry(
         if is_entity_description_available(coordinator, description):
             if description.zone:
                 for zone_number in coordinator.device.zone_numbers:
-                    ariston_numbers.append(
-                        AristonNumber(
-                            coordinator,
-                            description,
-                            zone_number,
-                        )
+                    add_number(
+                        AristonNumber(coordinator, description, zone_number)
                     )
                 if description.key in (
                     ThermostatProperties.HEATING_FLOW_TEMP,
                     ThermostatProperties.HEATING_FLOW_OFFSET,
                 ):
+                    fallback_descriptions_by_coordinator.setdefault(
+                        coordinator, []
+                    ).append(description)
                     for zone_number in get_flow_fallback_zones(
                         coordinator.device.zone_numbers
                     ):
                         entity = AristonNumber(coordinator, description, zone_number)
                         if _is_valid_flow_zone(entity):
-                            ariston_numbers.append(entity)
+                            add_number(entity)
             else:
-                ariston_numbers.append(AristonNumber(coordinator, description))
+                add_number(AristonNumber(coordinator, description))
 
     async_add_entities(ariston_numbers)
+
+    for coordinator, descriptions in fallback_descriptions_by_coordinator.items():
+
+        def add_new_fallback_numbers(
+            coordinator=coordinator,
+            descriptions=descriptions,
+        ) -> None:
+            new_entities = []
+            for description in descriptions:
+                for zone_number in get_flow_fallback_zones(
+                    coordinator.device.zone_numbers
+                ):
+                    entity = AristonNumber(coordinator, description, zone_number)
+                    if (
+                        entity.unique_id not in registered_unique_ids
+                        and _is_valid_flow_zone(entity)
+                    ):
+                        registered_unique_ids.add(entity.unique_id)
+                        new_entities.append(entity)
+            if new_entities:
+                async_add_entities(new_entities)
+
+        entry.async_on_unload(coordinator.async_add_listener(add_new_fallback_numbers))
 
 
 def _is_valid_flow_zone(entity: AristonNumber) -> bool:
@@ -90,6 +122,17 @@ def _is_valid_flow_zone(entity: AristonNumber) -> bool:
     )
 
 
+def _finite_float(value: Any) -> float | None:
+    """Return finite number values as floats, rejecting invalid API data."""
+    if value is None:
+        return None
+    try:
+        numeric_value = float(value)
+    except (TypeError, ValueError, OverflowError):
+        return None
+    return numeric_value if isfinite(numeric_value) else None
+
+
 class AristonNumber(AristonEntity, NumberEntity):
     """Base class for specific ariston binary sensors."""
 
@@ -118,25 +161,31 @@ class AristonNumber(AristonEntity, NumberEntity):
     def native_min_value(self):
         """Return the minimum value."""
         if self.entity_description.get_native_min_value is not None:
-            return self.entity_description.get_native_min_value(self)
+            value = self.entity_description.get_native_min_value(self)
+        else:
+            value = self.entity_description.native_min_value
 
-        return self.entity_description.native_min_value
+        return _finite_float(value)
 
     @property
     def native_max_value(self):
         """Return the maximum value."""
         if self.entity_description.get_native_max_value is not None:
-            return self.entity_description.get_native_max_value(self)
+            value = self.entity_description.get_native_max_value(self)
+        else:
+            value = self.entity_description.native_max_value
 
-        return self.entity_description.native_max_value
+        return _finite_float(value)
 
     @property
     def native_step(self):
         """Return the step value."""
         if self.entity_description.get_native_step is not None:
-            return self.entity_description.get_native_step(self)
+            value = self.entity_description.get_native_step(self)
+        else:
+            value = self.entity_description.native_step
 
-        return self.entity_description.native_step
+        return _finite_float(value)
 
     async def async_set_native_value(self, value: float):
         """Update the current value."""
