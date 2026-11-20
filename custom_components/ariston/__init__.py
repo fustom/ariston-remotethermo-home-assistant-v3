@@ -3,11 +3,21 @@
 from __future__ import annotations
 
 import logging
+from typing import Any
 
 import voluptuous as vol
 
 from ariston import Ariston, DeviceAttribute, SystemType
-from ariston.const import ARISTON_API_URL, ARISTON_USER_AGENT
+from ariston.const import (
+    ARISTON_API_URL,
+    ARISTON_DATA_ITEMS,
+    ARISTON_REMOTE,
+    ARISTON_USER_AGENT,
+    DeviceFeatures,
+    PropertyType,
+    ThermostatProperties,
+    ZoneAttribute,
+)
 from homeassistant.config_entries import ConfigEntry
 from homeassistant.const import (
     ATTR_DEVICE_ID,
@@ -34,6 +44,7 @@ from .const import (
     DOMAIN,
     ENERGY_COORDINATOR,
     ENERGY_SCAN_INTERVAL,
+    get_flow_fallback_zones,
 )
 from .coordinator import DeviceDataUpdateCoordinator
 
@@ -62,6 +73,66 @@ SET_ITEM_BY_ID_SCHEMA = vol.Schema(
         vol.Required(ATTR_VALUE): vol.Coerce(float),
     }
 )
+
+
+async def _async_poll_fallback_flow_properties(
+    device: Any,
+    api_url: str,
+) -> None:
+    """Fetch only the optional flow controls for earlier inferred zones."""
+    fallback_zones = get_flow_fallback_zones(
+        [
+            zone[ZoneAttribute.NUM]
+            for zone in device.features.get(DeviceFeatures.ZONES, [])
+        ]
+    )
+    if not fallback_zones:
+        return
+
+    items = [
+        {"id": property_id.value, "zn": zone_number}
+        for property_id in (
+            ThermostatProperties.HEATING_FLOW_TEMP,
+            ThermostatProperties.HEATING_FLOW_OFFSET,
+        )
+        for zone_number in fallback_zones
+    ]
+    features = {
+        DeviceFeatures.ZONES: [
+            {ZoneAttribute.NUM: zone_number} for zone_number in fallback_zones
+        ]
+    }
+    path = (
+        f"{api_url}{ARISTON_REMOTE}/{ARISTON_DATA_ITEMS}/"
+        f"{device.gw}/get?umsys={device.umsys}"
+    )
+    properties = await device.api._async_request_properties(
+        path, items, features, device.language_tag, False
+    )
+
+    if not isinstance(properties, dict) or not isinstance(
+        properties.get("items"), list
+    ):
+        return
+
+    data_items = device.data.get("items")
+    if not isinstance(data_items, list):
+        return
+
+    requested_items = {(item["id"], item["zn"]) for item in items}
+    existing_items = {
+        (item.get("id"), item.get(PropertyType.ZONE)): item
+        for item in data_items
+    }
+    for item in properties["items"]:
+        identity = (item.get("id"), item.get(PropertyType.ZONE))
+        if identity not in requested_items:
+            continue
+        if identity in existing_items:
+            existing_items[identity].update(item)
+        else:
+            data_items.append(item)
+            existing_items[identity] = item
 
 
 async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
@@ -94,6 +165,20 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
 
         await device.async_get_features()
 
+        async def async_update_state() -> None:
+            """Update the device normally, then best-effort poll inferred zones."""
+            await device.async_update_state()
+            if device.system_type == SystemType.GALEVO:
+                try:
+                    await _async_poll_fallback_flow_properties(
+                        device, api_url_setting
+                    )
+                except Exception:
+                    _LOGGER.warning(
+                        "Unable to update optional fallback flow properties",
+                        exc_info=True,
+                    )
+
         scan_interval_seconds = entry.options.get(
             CONF_SCAN_INTERVAL, DEFAULT_SCAN_INTERVAL_SECONDS
         )
@@ -102,7 +187,7 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
             device,
             scan_interval_seconds,
             COORDINATOR,
-            device.async_update_state,
+            async_update_state,
             config_entry=entry,
         )
 

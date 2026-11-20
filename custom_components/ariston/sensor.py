@@ -4,6 +4,7 @@ from __future__ import annotations
 
 from datetime import datetime
 import logging
+from math import isfinite
 
 from homeassistant.components.sensor import SensorEntity
 from homeassistant.config_entries import ConfigEntry
@@ -47,11 +48,28 @@ class AristonSensor(AristonEntity, SensorEntity):
     ) -> None:
         """Initialize the entity."""
         super().__init__(coordinator, description)
+        self._last_valid_native_value: float | str | None = None
 
     @property
     def native_value(self):
         """Return value of sensor."""
-        return self.entity_description.get_native_value(self)
+        value = self.entity_description.get_native_value(self)
+        if self.entity_description.ignore_zero and value is not None:
+            # Preserve the reference filter's handling of numeric API strings.
+            try:
+                numeric_value = float(value)
+            except (TypeError, ValueError):
+                numeric_value = None
+
+            if numeric_value is not None and not isfinite(numeric_value):
+                return None
+
+            if numeric_value == 0.0:
+                return self._last_valid_native_value
+
+            if numeric_value is not None:
+                self._last_valid_native_value = value
+        return value
 
     @property
     def native_unit_of_measurement(self):

@@ -64,6 +64,7 @@ API_USER_AGENT: Final[str] = "api_user_agent"
 DEFAULT_SCAN_INTERVAL_SECONDS: Final[int] = 180
 DEFAULT_ENERGY_SCAN_INTERVAL_MINUTES: Final[int] = 60
 DEFAULT_BUS_ERRORS_SCAN_INTERVAL_SECONDS: Final[int] = 600
+FLOW_FALLBACK_ZONES: Final[tuple[int, ...]] = (1, 2)
 
 # Optional menu IDs are local so integration tests can run before the matching
 # ariston package release is available in the locked test requirements.
@@ -84,6 +85,16 @@ EXTRA_STATE_ATTRIBUTE: Final[str] = "Attribute"
 EXTRA_STATE_DEVICE_METHOD: Final[str] = "DeviceMethod"
 DEVICE_FEATURE_ZONE_HEAT_REQUEST: Final[str] = "ZoneHeatRequest"
 DEVICE_FEATURE_DHW_FLAME: Final[str] = "DhwFlame"
+
+
+def get_flow_fallback_zones(zone_numbers: list[int]) -> tuple[int, ...]:
+    """Probe earlier flow zones only when the reported zone list has gaps."""
+    highest_zone = max(zone_numbers, default=0)
+    return tuple(
+        zone
+        for zone in FLOW_FALLBACK_ZONES
+        if zone < highest_zone and zone not in zone_numbers
+    )
 
 
 def _get_ch_heat_request(entity: Any) -> bool:
@@ -187,6 +198,7 @@ class AristonSensorEntityDescription(
     get_native_unit_of_measurement: Callable[[Any], str] | None = None
     get_last_reset: Callable[[Any], dt.datetime] | None = None
     get_native_value: Callable[[Any], Any]
+    ignore_zero: bool = False
 
 
 @dataclass(kw_only=True, frozen=True)
@@ -337,6 +349,7 @@ ARISTON_SENSOR_TYPES: list[AristonSensorEntityDescription] = [
         state_class=SensorStateClass.MEASUREMENT,
         get_native_value=lambda entity: entity.device.ch_return_temp_value,
         get_native_unit_of_measurement=lambda entity: entity.device.ch_return_temp_unit,
+        ignore_zero=True,
         system_types=[SystemType.GALEVO],
     ),
     AristonSensorEntityDescription(

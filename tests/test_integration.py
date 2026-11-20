@@ -1,5 +1,6 @@
 """Tests for config-entry setup, services, and unload handling."""
 
+from copy import deepcopy
 from types import SimpleNamespace
 from unittest.mock import AsyncMock, MagicMock
 
@@ -7,8 +8,15 @@ import pytest
 import voluptuous as vol
 
 from ariston import DeviceAttribute
-from ariston.ariston_api import ConnectionException
-from ariston.const import ARISTON_API_URL, ARISTON_USER_AGENT, SystemType
+from ariston.ariston_api import AristonAPI, ConnectionException
+from ariston.const import (
+    ARISTON_API_URL,
+    ARISTON_USER_AGENT,
+    DeviceFeatures,
+    SystemType,
+    ThermostatProperties,
+    ZoneAttribute,
+)
 from homeassistant.const import (
     ATTR_DEVICE_ID,
     CONF_DEVICE,
@@ -31,6 +39,7 @@ from custom_components.ariston import (
     async_setup_entry,
     async_unload_entry,
 )
+from custom_components.ariston import number
 from custom_components.ariston.const import (
     ARISTON_SENSOR_TYPES,
     BUS_ERRORS_COORDINATOR,
@@ -72,6 +81,7 @@ def _mock_device(*, has_metering=False, system_type=SystemType.BSB):
         gateway="gateway-1",
         has_metering=has_metering,
         system_type=system_type,
+        api=SimpleNamespace(get_items=AristonAPI.get_items),
         async_get_features=AsyncMock(),
         async_update_state=AsyncMock(),
         async_get_bus_errors=AsyncMock(),
@@ -79,6 +89,111 @@ def _mock_device(*, has_metering=False, system_type=SystemType.BSB):
         async_set_item_by_id=AsyncMock(),
         async_set_holiday=AsyncMock(),
     )
+
+
+async def test_fallback_flow_poll_is_separate_and_optional(
+    hass, monkeypatch
+):
+    device = _mock_device(system_type=SystemType.GALEVO)
+    features = {DeviceFeatures.ZONES: [{ZoneAttribute.NUM: 3}]}
+    device.features = deepcopy(features)
+    device.gw = "gateway-1"
+    device.umsys = "si"
+    device.language_tag = "en-US"
+    device.zone_numbers = [3]
+    device.are_device_features_available = lambda *_: True
+    for property_name, value in (("temp", 42), ("offset", 0)):
+        for field, field_value in (
+            ("min", 20),
+            ("max", 80),
+            ("step", 0.5),
+            ("value", value),
+        ):
+            setattr(
+                device,
+                f"get_heating_flow_{property_name}_{field}",
+                MagicMock(side_effect=lambda zone, field_value=field_value: (
+                    field_value if zone == 3 else None
+                )),
+            )
+
+    device.api = AristonAPI("user@example.com", "secret")
+
+    async def post(path, body, timeout_seconds=30):
+        flow_ids = {
+            ThermostatProperties.HEATING_FLOW_TEMP.value,
+            ThermostatProperties.HEATING_FLOW_OFFSET.value,
+        }
+        if body["items"] and all(
+            item["id"] in flow_ids and item["zn"] in (1, 2)
+            for item in body["items"]
+        ):
+            raise ConnectionException(500)
+        return {"items": []}
+
+    device.api._async_post = AsyncMock(side_effect=post)
+
+    async def async_update_state():
+        device.data = await device.api.async_get_properties(
+            device.gw, device.features, device.language_tag, device.umsys
+        )
+
+    device.async_update_state.side_effect = async_update_state
+    original_get_items = device.api.get_items
+    client = MagicMock()
+    client.async_connect = AsyncMock(return_value=True)
+    client.async_hello = AsyncMock(return_value=device)
+    _mock_client(monkeypatch, client)
+    monkeypatch.setattr(
+        hass.config_entries, "async_forward_entry_setups", AsyncMock()
+    )
+    entry = _entry()
+    entry.add_to_hass(hass)
+    entry._async_set_state(hass, ConfigEntryState.SETUP_IN_PROGRESS, None)
+
+    assert await async_setup_entry(hass, entry)
+
+    coordinator = hass.data[DOMAIN][entry.unique_id][COORDINATOR]
+    assert coordinator.last_update_success
+    assert device.api._async_post.await_count == 2
+    main_request = device.api._async_post.await_args_list[0].args[1]
+    fallback_request = device.api._async_post.await_args_list[1].args[1]
+    assert main_request["items"] == AristonAPI.get_items(features)
+    assert {
+        (item["id"], item["zn"]) for item in fallback_request["items"]
+    } == {
+        (property_id.value, zone)
+        for property_id in (
+            ThermostatProperties.HEATING_FLOW_TEMP,
+            ThermostatProperties.HEATING_FLOW_OFFSET,
+        )
+        for zone in (1, 2)
+    }
+    assert fallback_request["features"] == {
+        DeviceFeatures.ZONES: [
+            {ZoneAttribute.NUM: 1},
+            {ZoneAttribute.NUM: 2},
+        ]
+    }
+    assert device.features == features
+    assert device.api.get_items is original_get_items
+    assert AristonAPI.get_items is original_get_items
+
+    added = []
+    await number.async_setup_entry(hass, entry, added.extend)
+    reported_flow_controls = [
+        entity
+        for entity in added
+        if entity.entity_description.key
+        in (
+            ThermostatProperties.HEATING_FLOW_TEMP,
+            ThermostatProperties.HEATING_FLOW_OFFSET,
+        )
+    ]
+    assert {entity.unique_id for entity in reported_flow_controls} == {
+        "gateway-1-Ariston heating flow temperature 3-3",
+        "gateway-1-Ariston heating flow offset 3-3",
+    }
 
 
 async def test_setup_creates_coordinators_and_unload_removes_entry_data(
