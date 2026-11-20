@@ -71,6 +71,9 @@ MENU_ITEM_CH_FLOW_TEMP_BOILER: Final[int] = 123
 MENU_ITEM_GAS_POWER: Final[int] = 125
 MENU_ITEM_DHW_FLOW_RATE: Final[int] = 127
 MENU_ITEM_PUMP_MODULATION: Final[int] = 115
+MENU_ITEM_CH_BACKUP_RESISTANCE_1: Final[int] = 337
+MENU_ITEM_HP_MODE: Final[int] = 340
+MENU_ITEM_HP_OUTSIDE_AIR_TEMP: Final[int] = 341
 MENU_ITEM_HP_WATER_FLOW_TEMP: Final[int] = 348
 
 ATTR_TARGET_TEMP_STEP: Final[str] = "target_temp_step"
@@ -335,6 +338,7 @@ ARISTON_SENSOR_TYPES: list[AristonSensorEntityDescription] = [
         name=f"{NAME} CH return temp",
         device_class=SensorDeviceClass.TEMPERATURE,
         state_class=SensorStateClass.MEASUREMENT,
+        device_features=[str(MenuItemNames.CH_RETURN_TEMP.value)],
         get_native_value=lambda entity: entity.device.ch_return_temp_value,
         get_native_unit_of_measurement=lambda entity: entity.device.ch_return_temp_unit,
         system_types=[SystemType.GALEVO],
@@ -351,6 +355,30 @@ ARISTON_SENSOR_TYPES: list[AristonSensorEntityDescription] = [
         get_native_unit_of_measurement=lambda entity: entity.device.get_menu_item_unit(
             MENU_ITEM_HP_WATER_FLOW_TEMP
         ),
+        system_types=[SystemType.GALEVO],
+    ),
+    AristonSensorEntityDescription(
+        key=str(MENU_ITEM_HP_OUTSIDE_AIR_TEMP),
+        name=f"{NAME} HP outside air temp",
+        device_class=SensorDeviceClass.TEMPERATURE,
+        state_class=SensorStateClass.MEASUREMENT,
+        entity_category=EntityCategory.DIAGNOSTIC,
+        device_features=[str(MENU_ITEM_HP_OUTSIDE_AIR_TEMP)],
+        get_native_value=lambda entity: entity.device.get_menu_item_value(
+            MENU_ITEM_HP_OUTSIDE_AIR_TEMP
+        ),
+        get_native_unit_of_measurement=lambda entity: entity.device.get_menu_item_unit(
+            MENU_ITEM_HP_OUTSIDE_AIR_TEMP
+        ),
+        system_types=[SystemType.GALEVO],
+    ),
+    AristonSensorEntityDescription(
+        key=str(MENU_ITEM_HP_MODE),
+        name=f"{NAME} HP mode",
+        icon="mdi:heat-pump",
+        entity_category=EntityCategory.DIAGNOSTIC,
+        device_features=[str(MENU_ITEM_HP_MODE)],
+        get_native_value=lambda entity: entity.device.hp_mode_value,
         system_types=[SystemType.GALEVO],
     ),
     AristonSensorEntityDescription(
@@ -747,6 +775,15 @@ ARISTON_BINARY_SENSOR_TYPES: list[AristonBinarySensorEntityDescription] = [
         icon="mdi:heat-pump-outline",
         get_is_on=lambda entity: entity.device.is_heating_pump_on_value,
         device_features=[DeviceFeatures.HYBRID_SYS],
+        system_types=[SystemType.GALEVO],
+    ),
+    AristonBinarySensorEntityDescription(
+        key=str(MENU_ITEM_CH_BACKUP_RESISTANCE_1),
+        name=f"{NAME} CH backup resistance 1",
+        icon="mdi:heating-coil",
+        entity_category=EntityCategory.DIAGNOSTIC,
+        device_features=[str(MENU_ITEM_CH_BACKUP_RESISTANCE_1)],
+        get_is_on=lambda entity: entity.device.ch_backup_resistance_1_value,
         system_types=[SystemType.GALEVO],
     ),
     AristonBinarySensorEntityDescription(

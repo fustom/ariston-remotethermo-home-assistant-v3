@@ -1,2 +1,2 @@
-ariston==0.19.15
+ariston==0.19.16
 homeassistant>=2026.11.1
