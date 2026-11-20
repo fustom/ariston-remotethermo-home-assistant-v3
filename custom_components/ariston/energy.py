@@ -16,6 +16,8 @@ This module accesses `device.consumptions_sequences` directly and exposes:
   - `period_last_reset(time_interval)` returns a stable timestamp (in HA's time zone) at
     the start of the period so the HA Energy Dashboard treats one full
     period as a single accumulating window.
+  - `previous_day_total(device, consumption_type)` returns yesterday's
+    final total, used to close yesterday's cycle right after midnight.
 """
 
 from __future__ import annotations
@@ -42,6 +44,9 @@ def _local_now(now: Optional[dt.datetime]) -> dt.datetime:
 # Hourly buckets kept per consumption type. The cloud only returns 24, but a
 # DST fall-back day lasts 25 hours, so the local day can span 25 buckets.
 _HISTORY_HOURS = 25
+# Hours kept in memory: a full 25-hour day plus some slack, so yesterday can
+# still be closed when the first fetch after midnight arrives a bit late.
+_RETAINED_HOURS = 28
 _HISTORY_ATTR = "_ha_hourly_history"
 _HOUR = dt.timedelta(hours=1)
 
@@ -71,10 +76,64 @@ def _hourly_history(device, key, buckets: list, current_hour: dt.datetime) -> di
         last = len(buckets) - 1
         for index, value in enumerate(buckets):
             hours[current_hour - (last - index) * _HOUR] = value
-        oldest = current_hour - (_HISTORY_HOURS - 1) * _HOUR
+        oldest = current_hour - (_RETAINED_HOURS - 1) * _HOUR
         state["hours"] = {h: v for h, v in hours.items() if h >= oldest}
         state["source"] = buckets
     return state["hours"]
+
+
+def _find_buckets(device, consumption_type, time_interval) -> Optional[list]:
+    """Return `v[]` for the matching (k, p) sequence, or None."""
+    for sequence in getattr(device, "consumptions_sequences", None) or []:
+        if (
+            sequence.get("k") == consumption_type.value
+            and sequence.get("p") == time_interval.value
+        ):
+            return sequence.get("v") or None
+    return None
+
+
+def _day_window(now: Optional[dt.datetime]) -> tuple[dt.datetime, dt.datetime]:
+    """Return (current hour, local midnight), both in UTC."""
+    local = _local_now(now)
+    now_utc = dt_util.as_utc(local)
+    midnight = dt_util.as_utc(dt_util.start_of_local_day(local.date()))
+    return now_utc.replace(minute=0, second=0, microsecond=0), midnight
+
+
+def previous_day_total(
+    device,
+    consumption_type: ConsumptionType,
+    *,
+    now: Optional[dt.datetime] = None,
+) -> Optional[float]:
+    """Final total of the local day before `now`, from the hourly history.
+
+    Used to close yesterday's cycle right after midnight: the first fetch of
+    the new day can still revise yesterday's last bucket, and that revision
+    must be booked under yesterday's `last_reset`, not dropped.
+
+    Returns None when the history does not cover every hour of that day
+    (e.g. after a restart), because a partial sum would understate it.
+    """
+    buckets = _find_buckets(device, consumption_type, ConsumptionTimeInterval.LAST_DAY)
+    if not buckets or len(buckets) != 24:
+        return None
+    current_hour, midnight = _day_window(now)
+    history = _hourly_history(device, consumption_type.value, buckets, current_hour)
+    local_midnight = dt_util.as_local(midnight)
+    start = dt_util.as_utc(
+        dt_util.start_of_local_day(local_midnight.date() - dt.timedelta(days=1))
+    )
+    total = 0.0
+    hour = start
+    while hour < midnight:
+        value = history.get(hour)
+        if value is None:
+            return None
+        total += float(value)
+        hour += _HOUR
+    return round(total, 3)
 
 
 def period_total(
@@ -106,39 +165,26 @@ def period_total(
     Returns None if the device has not yet fetched any sequences or the
     expected (k, p) tuple is not present or has empty data.
     """
-    sequences = getattr(device, "consumptions_sequences", None)
-    if not sequences:
+    buckets = _find_buckets(device, consumption_type, time_interval)
+    if not buckets:
         return None
-    for sequence in sequences:
-        if (
-            sequence.get("k") == consumption_type.value
-            and sequence.get("p") == time_interval.value
-        ):
-            buckets = sequence.get("v") or []
-            if not buckets:
-                return None
-            if time_interval == ConsumptionTimeInterval.LAST_DAY and len(buckets) == 24:
-                local = _local_now(now)
-                midnight = dt_util.start_of_local_day(local.date())
-                # Subtract in UTC: aware datetimes sharing a tzinfo are
-                # subtracted by wall-clock, which is wrong across DST.
-                now_utc = dt_util.as_utc(local)
-                elapsed = now_utc - dt_util.as_utc(midnight)
-                current_hour = now_utc.replace(minute=0, second=0, microsecond=0)
-                history = _hourly_history(
-                    device, consumption_type.value, buckets, current_hour
-                )
-                # Today is the current hour plus every full hour elapsed
-                # since local midnight: up to 25 buckets on a fall-back day.
-                count = min(int(elapsed.total_seconds() // 3600) + 1, _HISTORY_HOURS)
-                buckets = [history.get(current_hour - i * _HOUR) for i in range(count)]
-            total = 0.0
-            for value in buckets:
-                if value is None:
-                    continue
-                total += float(value)
-            return round(total, 3)
-    return None
+    if time_interval == ConsumptionTimeInterval.LAST_DAY and len(buckets) == 24:
+        # Both values are in UTC: aware datetimes sharing a tzinfo are
+        # subtracted by wall-clock, which is wrong across DST.
+        now = _local_now(now)
+        current_hour, midnight = _day_window(now)
+        history = _hourly_history(device, consumption_type.value, buckets, current_hour)
+        # Today is the current hour plus every full hour elapsed since local
+        # midnight: up to 25 buckets on a fall-back day.
+        elapsed = dt_util.as_utc(now) - midnight
+        count = min(int(elapsed.total_seconds() // 3600) + 1, _HISTORY_HOURS)
+        buckets = [history.get(current_hour - i * _HOUR) for i in range(count)]
+    total = 0.0
+    for value in buckets:
+        if value is None:
+            continue
+        total += float(value)
+    return round(total, 3)
 
 
 def period_last_reset(
