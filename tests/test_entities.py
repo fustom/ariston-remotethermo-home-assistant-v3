@@ -89,6 +89,7 @@ def test_climate_hvac_action_reflects_heat_pump_activity(
 async def test_climate_temperature_requires_value_and_updates_device(
     coordinator, ariston_device
 ):
+    ariston_device.plant_mode_supported = True
     ariston_device.async_set_comfort_temp = AsyncMock()
     entity = AristonThermostat(1, coordinator, ARISTON_CLIMATE_TYPES[0])
 
@@ -332,7 +333,6 @@ async def test_climate_sets_bsb_modes(
         await entity.async_set_hvac_mode(hvac_mode)
 
     ariston_device.async_set_zone_mode.assert_awaited_once_with(expected_mode, 1)
-    assert not entity.supported_features & ClimateEntityFeature.PRESET_MODE
 
 
 @pytest.mark.parametrize(
@@ -370,6 +370,7 @@ async def test_climate_sets_preset_mode(
         PlantMode.WINTER,
         PlantMode.COOLING,
     ]
+    ariston_device.plant_mode_supported = True
     ariston_device.is_plant_in_cool_mode = current_cool
     ariston_device.get_zone_mode_options = MagicMock(return_value=zone_modes)
     ariston_device.is_zone_mode_options_contains_off = (

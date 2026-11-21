@@ -1,0 +1,19 @@
+{
+  "entity": {
+    "climate": {
+      "ariston_thermostat": {
+        "state_attributes": {
+          "preset_mode": {
+            "default": "mdi:thermostat",
+            "state": {
+              "protection": "mdi:snowflake",
+              "automatic": "mdi:calendar-clock",
+              "reduced": "mdi:moon-waning-crescent",
+              "comfort": "mdi:white-balance-sunny"
+            }
+          }
+        }
+      }
+    }
+  }
+}
