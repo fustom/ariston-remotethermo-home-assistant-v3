@@ -21,7 +21,7 @@ from homeassistant.util import dt as dt_util
 
 from .const import ARISTON_SENSOR_TYPES, AristonSensorEntityDescription
 from .coordinator import DeviceDataUpdateCoordinator
-from .energy import previous_day_total
+from .energy import export_history, previous_day_total, restore_history
 from .entity import AristonEntity, register_supported_entities
 
 _LOGGER = logging.getLogger(__name__)
@@ -85,6 +85,20 @@ class AristonSensor(AristonEntity, SensorEntity):
 DAILY_CONSUMPTION_SCHEME = 2
 
 
+def _parse_published(saved: Any) -> tuple[float, datetime, float] | None:
+    """Parse the saved [value, last_reset, baseline] of the last state."""
+    if not isinstance(saved, list) or len(saved) != 3:
+        return None
+    value, reset, offset = saved
+    try:
+        parsed = dt_util.parse_datetime(reset) if isinstance(reset, str) else None
+        if parsed is None or parsed.tzinfo is None:
+            return None
+        return (float(value), dt_util.as_utc(parsed), float(offset))
+    except (TypeError, ValueError):
+        return None
+
+
 class AristonDailyConsumptionSensor(AristonSensor, RestoreEntity):
     """Today's consumption, reset at local midnight.
 
@@ -101,6 +115,9 @@ class AristonDailyConsumptionSensor(AristonSensor, RestoreEntity):
       last bucket. Before the new `last_reset` is published, yesterday's
       final total is written under the old one so Recorder books it.
       A failed fetch leaves yesterday's cycle open for the next one.
+    - Restart: the hourly history and the last published value are kept
+      in the restore data. After a restart across midnight, the first
+      state closes yesterday and today's value follows right after.
     """
 
     def __init__(self, coordinator, description) -> None:
@@ -114,7 +131,7 @@ class AristonDailyConsumptionSensor(AristonSensor, RestoreEntity):
         self._override: tuple[float, datetime] | None = None
 
     async def async_added_to_hass(self) -> None:
-        """Restore the baseline, or start one after an upgrade."""
+        """Restore the saved state, or start a baseline after an upgrade."""
         await super().async_added_to_hass()
         extra = await self.async_get_last_extra_data()
         data = extra.as_dict() if extra is not None else {}
@@ -123,10 +140,32 @@ class AristonDailyConsumptionSensor(AristonSensor, RestoreEntity):
             if data.get("baseline") is not None and baseline_reset:
                 self._baseline = float(data["baseline"])
                 self._baseline_reset = dt_util.parse_datetime(baseline_reset)
+            restore_history(
+                self.device,
+                self.entity_description.daily_consumption_type,
+                data.get("history"),
+            )
+            self._published = _parse_published(data.get("published"))
         elif await self._has_statistics():
             self._baseline_pending = True
         self._update_baseline()
+        closing = self._closing_value()
+        closing_reset = self._published[1] if closing is not None else None
         self._remember_published()
+        if closing is not None:
+            # The state written right after this method closes yesterday;
+            # today's value follows on the next loop iteration.
+            self._override = (closing, closing_reset)
+            handle = self.hass.loop.call_soon(self._end_startup_closing)
+            self.async_on_remove(handle.cancel)
+
+    @callback
+    def _end_startup_closing(self) -> None:
+        """Publish today's value after the startup closing state."""
+        if self._override is None:
+            return  # A coordinator update already published it.
+        self._override = None
+        self.async_write_ha_state()
 
     async def _has_statistics(self) -> bool:
         """Whether Recorder holds statistics from before the upgrade.
@@ -156,20 +195,26 @@ class AristonDailyConsumptionSensor(AristonSensor, RestoreEntity):
         The baseline is kept with it: the baseline can end (at midnight)
         before the closing runs, e.g. when the first fetch has no data.
         """
-        value = self.native_value
+        value, reset = self._current()
         if value is not None:
             offset = (self._baseline or 0.0) if self._baseline_reset else 0.0
-            self._published = (value, self.last_reset, offset)
+            self._published = (value, dt_util.as_utc(reset), offset)
 
     @property
     def extra_restore_state_data(self) -> ExtraStoredData | None:
-        """Persist the scheme version and an active baseline."""
+        """Persist the scheme, an active baseline, history and last value."""
         if self._baseline_pending:
             return None  # Still on the old values: migrate on next start.
         data: dict[str, Any] = {"scheme": DAILY_CONSUMPTION_SCHEME}
         if self._baseline_reset is not None:
             data["baseline"] = self._baseline
             data["baseline_reset"] = self._baseline_reset.isoformat()
+        data["history"] = export_history(
+            self.device, self.entity_description.daily_consumption_type
+        )
+        if self._published is not None:
+            value, reset, offset = self._published
+            data["published"] = [value, reset.isoformat(), offset]
         return RestoredExtraData(data)
 
     def _day_value(self) -> float | None:
@@ -194,22 +239,28 @@ class AristonDailyConsumptionSensor(AristonSensor, RestoreEntity):
             self._baseline = None
             self._baseline_reset = None
 
+    def _current(self) -> tuple[float | None, datetime]:
+        """Today's value and last_reset (since the baseline, if any)."""
+        value = self._day_value()
+        if self._baseline_reset is None:
+            return value, self._day_reset()
+        if value is not None:
+            value = round(max(value - (self._baseline or 0.0), 0.0), 3)
+        return value, self._baseline_reset
+
     @property
     def native_value(self):
-        """Return today's consumption (since the baseline, if any)."""
+        """Return today's consumption, or the closing value being written."""
         if self._override is not None:
             return self._override[0]
-        value = self._day_value()
-        if value is None or self._baseline_reset is None:
-            return value
-        return round(max(value - (self._baseline or 0.0), 0.0), 3)
+        return self._current()[0]
 
     @property
     def last_reset(self) -> datetime | None:
-        """Return local midnight, or the baseline instant after an upgrade."""
+        """Return local midnight, the baseline instant, or the closed cycle."""
         if self._override is not None:
             return self._override[1]
-        return self._baseline_reset or self._day_reset()
+        return self._current()[1]
 
     def _closing_value(self) -> float | None:
         """Yesterday's final total, if it grew since it was last published."""
@@ -234,6 +285,8 @@ class AristonDailyConsumptionSensor(AristonSensor, RestoreEntity):
     @callback
     def _handle_coordinator_update(self) -> None:
         """Close yesterday's cycle, then publish today's value."""
+        # A startup closing state, if any, is already written by now.
+        self._override = None
         if not self.coordinator.last_update_success:
             # Unavailable: keep the last published cycle, so the next
             # successful fetch can still close yesterday.

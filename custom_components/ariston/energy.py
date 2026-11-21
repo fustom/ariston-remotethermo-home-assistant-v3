@@ -18,12 +18,14 @@ This module accesses `device.consumptions_sequences` directly and exposes:
     period as a single accumulating window.
   - `previous_day_total(device, consumption_type)` returns yesterday's
     final total, used to close yesterday's cycle right after midnight.
+  - `export_history` / `restore_history` save and restore the hourly
+    history across Home Assistant restarts.
 """
 
 from __future__ import annotations
 
 import datetime as dt
-from typing import Optional
+from typing import Any, Optional
 
 from ariston.const import ConsumptionTimeInterval, ConsumptionType
 from homeassistant.util import dt as dt_util
@@ -50,6 +52,59 @@ _HISTORY_ATTR = "_ha_hourly_history"
 _HOUR = dt.timedelta(hours=1)
 
 
+def _history_state(device, key) -> dict:
+    """Return the history kept on the device for one consumption type."""
+    store = getattr(device, _HISTORY_ATTR, None)
+    if not isinstance(store, dict):
+        store = {}
+        try:
+            setattr(device, _HISTORY_ATTR, store)
+        except AttributeError:
+            pass  # Cannot keep history on this object; use this fetch only.
+    return store.setdefault(key, {"source": None, "hours": {}})
+
+
+def export_history(device, consumption_type: ConsumptionType) -> dict[str, Any]:
+    """Return the hourly history of a consumption type, keyed by ISO hour."""
+    store = getattr(device, _HISTORY_ATTR, None)
+    state = store.get(consumption_type.value) if isinstance(store, dict) else None
+    if not state:
+        return {}
+    return {
+        hour.isoformat(): value
+        for hour, value in state["hours"].items()
+        if value is not None
+    }
+
+
+def restore_history(
+    device,
+    consumption_type: ConsumptionType,
+    saved: Any,
+    *,
+    now: Optional[dt.datetime] = None,
+) -> None:
+    """Merge saved hourly buckets into the history.
+
+    Buckets already in the history come from the cloud after the restart,
+    so they win. Buckets older than the retained window are dropped.
+    """
+    if not isinstance(saved, dict):
+        return
+    hours = _history_state(device, consumption_type.value)["hours"]
+    oldest = _utc_hour(_local_now(now)) - (_RETAINED_HOURS - 1) * _HOUR
+    for text, value in saved.items():
+        hour = dt_util.parse_datetime(text) if isinstance(text, str) else None
+        if hour is None or hour.tzinfo is None or value is None:
+            continue
+        hour = dt_util.as_utc(hour)
+        if hour >= oldest:
+            try:
+                hours.setdefault(hour, float(value))
+            except (TypeError, ValueError):
+                continue
+
+
 def _hourly_history(device, key, buckets: list, current_hour: dt.datetime) -> dict:
     """Return the hourly buckets seen so far, keyed by the UTC start of the hour.
 
@@ -59,17 +114,10 @@ def _hourly_history(device, key, buckets: list, current_hour: dt.datetime) -> di
     the device. A list we have already seen is not stamped again, so data
     that was fetched before midnight is never attributed to the new day.
 
-    The history lives in memory only: after a restart it starts again from
-    the 24 buckets the cloud returns.
+    The sensors save it in their restore data (see `export_history`), so
+    it survives a restart.
     """
-    store = getattr(device, _HISTORY_ATTR, None)
-    if not isinstance(store, dict):
-        store = {}
-        try:
-            setattr(device, _HISTORY_ATTR, store)
-        except AttributeError:
-            pass  # Cannot keep history on this object; use this fetch only.
-    state = store.setdefault(key, {"source": None, "hours": {}})
+    state = _history_state(device, key)
     if state["source"] is not buckets:
         hours = state["hours"]
         last = len(buckets) - 1

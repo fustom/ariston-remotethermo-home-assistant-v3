@@ -81,6 +81,14 @@ def _current_scheme():
     return {"scheme": DAILY_CONSUMPTION_SCHEME}
 
 
+def _saved(entity):
+    """The restore data without the history and the last published value."""
+    data = dict(entity.extra_restore_state_data.as_dict())
+    data.pop("history", None)
+    data.pop("published", None)
+    return data
+
+
 async def test_revised_last_bucket_is_booked_under_yesterday(
     hass, coordinator, ariston_device, freezer
 ):
@@ -155,7 +163,7 @@ async def test_upgrade_starts_a_baseline_cycle(
 
     assert entity.native_value == pytest.approx(0.0)
     assert entity.last_reset == upgrade
-    assert entity.extra_restore_state_data.as_dict() == {
+    assert _saved(entity) == {
         "scheme": DAILY_CONSUMPTION_SCHEME,
         "baseline": pytest.approx(1.5),
         "baseline_reset": dt_util.as_utc(upgrade).isoformat(),
@@ -179,7 +187,7 @@ async def test_upgrade_starts_a_baseline_cycle(
         (pytest.approx(2.7 - 1.5), upgrade),
         (pytest.approx(0.0), _midnight(7)),
     ]
-    assert entity.extra_restore_state_data.as_dict() == {
+    assert _saved(entity) == {
         "scheme": DAILY_CONSUMPTION_SCHEME
     }
 
@@ -269,7 +277,7 @@ async def test_new_sensor_reports_todays_total(
 
     assert entity.native_value == pytest.approx(1.5)
     assert entity.last_reset == _midnight(6)
-    assert entity.extra_restore_state_data.as_dict() == _current_scheme()
+    assert _saved(entity) == _current_scheme()
 
 
 async def test_failed_midnight_poll_keeps_yesterday_open(
@@ -404,4 +412,120 @@ async def test_baseline_cycle_closes_after_an_empty_midnight_fetch(
     assert entity.writes == [
         (pytest.approx(2.7 - 1.5), upgrade),
         (pytest.approx(0.1), _midnight(7)),
+    ]
+
+
+async def _restart(hass, coordinator, ariston_device, entity):
+    """Restart: drop the in-memory history, restore a new entity, add it."""
+    saved = dict(entity.extra_restore_state_data.as_dict())
+    del ariston_device._ha_hourly_history
+    restarted = await _sensor(hass, coordinator, saved)
+    restarted.async_write_ha_state()  # the state HA writes after adding
+    await hass.async_block_till_done()
+    return restarted
+
+
+async def test_restart_across_midnight_still_closes_yesterday(
+    hass, coordinator, ariston_device, freezer
+):
+    """History and last value come from the restore data.
+
+    The fetch at 00:05 no longer holds yesterday's 00:00 bucket, so the
+    closing needs the saved history.
+    """
+    freezer.move_to(dt.datetime(2026, 5, 6, 23, 5, tzinfo=ROME))
+    _set_buckets(ariston_device, [0.1] * 23 + [0.2])
+    entity = await _sensor(hass, coordinator, _current_scheme())
+
+    freezer.move_to(dt.datetime(2026, 5, 7, 0, 5, tzinfo=ROME))
+    _set_buckets(ariston_device, [0.1] * 22 + [0.8, 0.0])
+    restarted = await _restart(hass, coordinator, ariston_device, entity)
+
+    assert restarted.writes == [
+        (pytest.approx(3.1), _midnight(6)),
+        (pytest.approx(0.0), _midnight(7)),
+    ]
+    assert restarted._published == (pytest.approx(0.0), _midnight(7), 0.0)
+
+
+async def test_restart_during_the_day_writes_one_state(
+    hass, coordinator, ariston_device, freezer
+):
+    freezer.move_to(dt.datetime(2026, 5, 6, 14, 5, tzinfo=ROME))
+    _set_buckets(ariston_device, [0.1] * 24)
+    entity = await _sensor(hass, coordinator, _current_scheme())
+
+    freezer.move_to(dt.datetime(2026, 5, 6, 15, 5, tzinfo=ROME))
+    _set_buckets(ariston_device, [0.1] * 24)
+    restarted = await _restart(hass, coordinator, ariston_device, entity)
+
+    assert restarted.writes == [(pytest.approx(1.6), _midnight(6))]
+
+
+async def test_restart_across_midnight_closes_the_baseline_cycle(
+    hass, coordinator, ariston_device, freezer
+):
+    upgrade = dt.datetime(2026, 5, 6, 14, 20, tzinfo=ROME)
+    freezer.move_to(upgrade)
+    _set_buckets(ariston_device, [0.1] * 24)  # baseline 1.5
+    entity = await _sensor(hass, coordinator, restored=None)
+    freezer.move_to(dt.datetime(2026, 5, 6, 23, 5, tzinfo=ROME))
+    _set_buckets(ariston_device, [0.1] * 24)
+    entity._handle_coordinator_update()
+
+    freezer.move_to(dt.datetime(2026, 5, 7, 0, 5, tzinfo=ROME))
+    _set_buckets(ariston_device, [0.1] * 22 + [0.4, 0.0])
+    restarted = await _restart(hass, coordinator, ariston_device, entity)
+
+    assert restarted.writes == [
+        (pytest.approx(2.7 - 1.5), upgrade),
+        (pytest.approx(0.0), _midnight(7)),
+    ]
+    assert _saved(restarted) == _current_scheme()
+
+
+@pytest.mark.parametrize(
+    "published",
+    [None, "x", [1.0, "2026-05-06T00:00:00"], [1.0, "2026-05-06T00:00:00", 0.0],
+     ["a", "2026-05-06T00:00:00+02:00", 0.0], [1.0, 5, 0.0]],
+)
+async def test_invalid_saved_value_is_ignored(
+    hass, coordinator, ariston_device, freezer, published
+):
+    freezer.move_to(dt.datetime(2026, 5, 7, 0, 5, tzinfo=ROME))
+    _set_buckets(ariston_device, [0.1] * 23 + [0.0])
+    entity = await _sensor(
+        hass, coordinator, {**_current_scheme(), "published": published}
+    )
+    entity.async_write_ha_state()
+    await hass.async_block_till_done()
+
+    assert entity.writes == [(pytest.approx(0.0), _midnight(7))]
+
+
+async def test_update_right_after_a_startup_closing_does_not_close_twice(
+    hass, coordinator, ariston_device, freezer
+):
+    """A coordinator update can run before the deferred write of today."""
+    freezer.move_to(dt.datetime(2026, 5, 6, 23, 5, tzinfo=ROME))
+    _set_buckets(ariston_device, [0.1] * 23 + [0.2])
+    entity = await _sensor(hass, coordinator, _current_scheme())
+    saved = dict(entity.extra_restore_state_data.as_dict())
+    del ariston_device._ha_hourly_history
+
+    freezer.move_to(dt.datetime(2026, 5, 7, 0, 5, tzinfo=ROME))
+    _set_buckets(ariston_device, [0.1] * 22 + [0.8, 0.0])
+    restarted = await _sensor(hass, coordinator, saved)
+    restarted.async_write_ha_state()  # the state HA writes after adding
+    restarted._handle_coordinator_update()  # before the deferred write
+    await hass.async_block_till_done()
+
+    freezer.move_to(dt.datetime(2026, 5, 7, 1, 5, tzinfo=ROME))
+    _set_buckets(ariston_device, [0.1] * 22 + [0.0, 0.1])
+    restarted._handle_coordinator_update()
+
+    assert restarted.writes == [
+        (pytest.approx(3.1), _midnight(6)),
+        (pytest.approx(0.0), _midnight(7)),
+        (pytest.approx(0.1), _midnight(7)),  # no second closing
     ]

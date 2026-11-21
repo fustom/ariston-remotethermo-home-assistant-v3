@@ -364,3 +364,36 @@ def test_fall_back_day_can_be_closed_after_hours_of_failed_polls():
         device, DHW, now=dt.datetime(2026, 10, 26, 3, 10, tzinfo=ROME)
     )
     assert total == pytest.approx(2.5)
+
+
+def test_history_round_trip_keeps_fresh_buckets_and_drops_bad_ones():
+    from custom_components.ariston.energy import export_history, restore_history
+
+    now = dt.datetime(2026, 5, 7, 0, 5, tzinfo=ROME)
+    assert export_history(_device([]), DHW) == {}
+
+    device = _device(_day_sequence([0.1] * 23 + [0.2]))
+    period_total(device, DHW, DAY, now=dt.datetime(2026, 5, 6, 23, 5, tzinfo=ROME))
+    saved = export_history(device, DHW)
+    assert len(saved) == 24
+
+    restored = _device(_day_sequence([0.1] * 22 + [0.8, 0.0]))
+    period_total(restored, DHW, DAY, now=now)  # fresh fetch first
+    restore_history(
+        restored,
+        DHW,
+        {
+            **saved,
+            "2026-05-04T00:00:00+00:00": 9.0,  # older than the retained window
+            "2026-05-06T21:00:00": 9.0,  # naive
+            "not a date": 9.0,
+            "2026-05-06T03:00:00+00:00": None,
+            "2026-05-06T04:00:00+00:00": "x",
+        },
+        now=now,
+    )
+    restore_history(restored, DHW, "not a dict", now=now)
+
+    # 00:00 bucket from the saved history, 23:00 bucket from the fresh fetch.
+    assert previous_day_total(restored, DHW, now=now) == pytest.approx(3.1)
+    assert "2026-05-04T00:00:00+00:00" not in export_history(restored, DHW)
