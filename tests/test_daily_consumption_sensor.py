@@ -4,12 +4,15 @@
   first fetch of the new day must be booked under yesterday's last_reset.
 - Upgrade: the first values after the upgrade must not be compared with
   what the same entity reported before, so a baseline cycle is started.
+  A new sensor has no statistics to keep and reports today's total.
+- Failed fetch: an unavailable update must not close yesterday's cycle.
 
 Runs in Europe/Rome; the cloud's v[] has 24 hourly buckets, v[23] = now.
 """
 
 import datetime as dt
-from unittest.mock import AsyncMock
+from types import SimpleNamespace
+from unittest.mock import AsyncMock, patch
 import zoneinfo
 
 import pytest
@@ -49,14 +52,23 @@ def _description():
     return next(d for d in ARISTON_SENSOR_TYPES if d.daily_consumption_type == DHW)
 
 
-async def _sensor(hass, coordinator, restored=None):
-    """Return an added sensor whose state writes are collected in `writes`."""
+def _new_entity(hass, coordinator):
     entity = AristonDailyConsumptionSensor(coordinator, _description())
     entity.hass = hass
     entity.entity_id = "sensor.dhw_total"
+    return entity
+
+
+async def _sensor(hass, coordinator, restored=None, *, legacy=True):
+    """Return an added sensor whose state writes are collected in `writes`.
+
+    `legacy`: Recorder holds statistics from before the upgrade.
+    """
+    entity = _new_entity(hass, coordinator)
     entity.async_get_last_extra_data = AsyncMock(
         return_value=None if restored is None else RestoredExtraData(restored)
     )
+    entity._has_statistics = AsyncMock(return_value=legacy)
     entity.writes = []
     entity.async_write_ha_state = lambda: entity.writes.append(
         (entity.native_value, entity.last_reset)
@@ -110,7 +122,7 @@ async def test_no_closing_write_without_full_history(
     freezer.move_to(dt.datetime(2026, 5, 7, 0, 5, tzinfo=ROME))
     _set_buckets(ariston_device, [0.1] * 22 + [0.8, 0.0])
     entity = await _sensor(hass, coordinator, _current_scheme())
-    entity._published = (2.5, _midnight(6))
+    entity._published = (2.5, _midnight(6), 0.0)
 
     entity._handle_coordinator_update()
 
@@ -123,7 +135,7 @@ async def test_no_closing_write_for_an_older_cycle(
     freezer.move_to(dt.datetime(2026, 5, 6, 23, 5, tzinfo=ROME))
     _set_buckets(ariston_device, [0.1] * 24)
     entity = await _sensor(hass, coordinator, _current_scheme())
-    entity._published = (0.5, _midnight(4))
+    entity._published = (0.5, _midnight(4), 0.0)
 
     freezer.move_to(dt.datetime(2026, 5, 7, 0, 5, tzinfo=ROME))
     _set_buckets(ariston_device, [0.1] * 22 + [0.8, 0.0])
@@ -245,3 +257,151 @@ async def test_setup_uses_daily_class_only_for_daily_sensors(hass, coordinator):
     assert len(daily) == 8
     assert all(e.entity_description.daily_consumption_type for e in daily)
     assert any(type(e) is AristonSensor for e in added)
+
+
+async def test_new_sensor_reports_todays_total(
+    hass, coordinator, ariston_device, freezer
+):
+    """No restore data and no statistics: a new sensor, not an upgrade."""
+    freezer.move_to(dt.datetime(2026, 5, 6, 14, 20, tzinfo=ROME))
+    _set_buckets(ariston_device, [0.1] * 24)
+    entity = await _sensor(hass, coordinator, restored=None, legacy=False)
+
+    assert entity.native_value == pytest.approx(1.5)
+    assert entity.last_reset == _midnight(6)
+    assert entity.extra_restore_state_data.as_dict() == _current_scheme()
+
+
+async def test_failed_midnight_poll_keeps_yesterday_open(
+    hass, coordinator, ariston_device, freezer
+):
+    """The next successful fetch still books yesterday's revised bucket."""
+    freezer.move_to(dt.datetime(2026, 5, 6, 23, 5, tzinfo=ROME))
+    _set_buckets(ariston_device, [0.1] * 23 + [0.2])
+    entity = await _sensor(hass, coordinator, _current_scheme())
+
+    freezer.move_to(dt.datetime(2026, 5, 7, 0, 5, tzinfo=ROME))
+    coordinator.last_update_success = False
+    entity._handle_coordinator_update()
+    assert entity._published == (pytest.approx(2.5), _midnight(6), 0.0)
+
+    freezer.move_to(dt.datetime(2026, 5, 7, 1, 5, tzinfo=ROME))
+    coordinator.last_update_success = True
+    _set_buckets(ariston_device, [0.1] * 21 + [0.8, 0.0, 0.1])
+    entity.writes.clear()
+    entity._handle_coordinator_update()
+
+    assert entity.writes == [
+        (pytest.approx(3.1), _midnight(6)),
+        (pytest.approx(0.1), _midnight(7)),
+    ]
+
+
+async def test_missing_value_does_not_replace_the_published_cycle(
+    hass, coordinator, ariston_device, freezer
+):
+    freezer.move_to(dt.datetime(2026, 5, 6, 23, 5, tzinfo=ROME))
+    _set_buckets(ariston_device, [0.1] * 24)
+    entity = await _sensor(hass, coordinator, _current_scheme())
+
+    freezer.move_to(dt.datetime(2026, 5, 7, 0, 5, tzinfo=ROME))
+    ariston_device.consumptions_sequences = []
+    entity._handle_coordinator_update()
+
+    assert entity._published == (pytest.approx(2.4), _midnight(6), 0.0)
+
+
+async def test_revised_last_bucket_with_fractional_offset(
+    hass, coordinator, ariston_device, freezer
+):
+    """Asia/Kolkata (UTC+5:30): local midnight is not on a whole UTC hour."""
+    await hass.config.async_set_time_zone("Asia/Kolkata")
+    kolkata = zoneinfo.ZoneInfo("Asia/Kolkata")
+    freezer.move_to(dt.datetime(2026, 5, 6, 23, 10, tzinfo=kolkata))
+    _set_buckets(ariston_device, [0.1] * 23 + [0.2])
+    entity = await _sensor(hass, coordinator, _current_scheme())
+    assert entity.native_value == pytest.approx(2.5)
+
+    freezer.move_to(dt.datetime(2026, 5, 7, 0, 10, tzinfo=kolkata))
+    _set_buckets(ariston_device, [0.1] * 22 + [0.8, 0.05])
+    entity._handle_coordinator_update()
+
+    assert entity.writes == [
+        (pytest.approx(3.1), dt.datetime(2026, 5, 6, tzinfo=kolkata)),
+        (pytest.approx(0.05), dt.datetime(2026, 5, 7, tzinfo=kolkata)),
+    ]
+
+
+async def test_has_statistics_without_recorder(hass, coordinator):
+    entity = _new_entity(hass, coordinator)
+    assert "recorder" not in hass.config.components
+    assert await entity._has_statistics() is False
+
+
+@pytest.mark.parametrize(
+    ("metadata", "expected"),
+    [({"sensor.dhw_total": (1, {})}, True), ({}, False)],
+)
+async def test_has_statistics_reads_recorder_metadata(
+    hass, coordinator, metadata, expected
+):
+    entity = _new_entity(hass, coordinator)
+    hass.config.components.add("recorder")
+    calls = []
+
+    def get_metadata(hass_arg, *, statistic_ids):
+        calls.append(statistic_ids)
+        return metadata
+
+    async def run(job):
+        return job()
+
+    recorder = SimpleNamespace(async_add_executor_job=run)
+    with (
+        patch("custom_components.ariston.sensor.get_instance", return_value=recorder),
+        patch("custom_components.ariston.sensor.get_metadata", get_metadata),
+    ):
+        assert await entity._has_statistics() is expected
+    assert calls == [{"sensor.dhw_total"}]
+
+
+async def test_has_statistics_assumes_upgrade_on_recorder_error(hass, coordinator):
+    entity = _new_entity(hass, coordinator)
+    hass.config.components.add("recorder")
+    with patch(
+        "custom_components.ariston.sensor.get_instance", side_effect=KeyError("db")
+    ):
+        assert await entity._has_statistics() is True
+
+
+
+async def test_baseline_cycle_closes_after_an_empty_midnight_fetch(
+    hass, coordinator, ariston_device, freezer
+):
+    """The baseline ends at midnight even when the first fetch has no data.
+
+    The closing must still exclude it, or the usage from before the upgrade
+    is counted again.
+    """
+    upgrade = dt.datetime(2026, 5, 6, 14, 20, tzinfo=ROME)
+    freezer.move_to(upgrade)
+    _set_buckets(ariston_device, [0.1] * 24)  # baseline 1.5
+    entity = await _sensor(hass, coordinator, restored=None)
+    freezer.move_to(dt.datetime(2026, 5, 6, 23, 5, tzinfo=ROME))
+    _set_buckets(ariston_device, [0.1] * 24)
+    entity._handle_coordinator_update()  # 2.4 - 1.5
+
+    freezer.move_to(dt.datetime(2026, 5, 7, 0, 5, tzinfo=ROME))
+    ariston_device.consumptions_sequences = []
+    entity._handle_coordinator_update()
+    assert entity._baseline_reset is None
+
+    freezer.move_to(dt.datetime(2026, 5, 7, 1, 5, tzinfo=ROME))
+    _set_buckets(ariston_device, [0.1] * 21 + [0.4, 0.0, 0.1])
+    entity.writes.clear()
+    entity._handle_coordinator_update()
+
+    assert entity.writes == [
+        (pytest.approx(2.7 - 1.5), upgrade),
+        (pytest.approx(0.1), _midnight(7)),
+    ]

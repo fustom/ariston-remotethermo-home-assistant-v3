@@ -41,12 +41,11 @@ def _local_now(now: Optional[dt.datetime]) -> dt.datetime:
     return dt_util.as_local(now)
 
 
-# Hourly buckets kept per consumption type. The cloud only returns 24, but a
-# DST fall-back day lasts 25 hours, so the local day can span 25 buckets.
-_HISTORY_HOURS = 25
-# Hours kept in memory: a full 25-hour day plus some slack, so yesterday can
-# still be closed when the first fetch after midnight arrives a bit late.
-_RETAINED_HOURS = 28
+# Hours kept in memory per consumption type. The cloud only returns 24, but a
+# DST fall-back day spans 25 buckets, and yesterday must still be complete
+# when the first successful fetch after midnight comes hours late (failed
+# polls). 48 hours cover a delay of up to 23 hours.
+_RETAINED_HOURS = 48
 _HISTORY_ATTR = "_ha_hourly_history"
 _HOUR = dt.timedelta(hours=1)
 
@@ -93,12 +92,42 @@ def _find_buckets(device, consumption_type, time_interval) -> Optional[list]:
     return None
 
 
-def _day_window(now: Optional[dt.datetime]) -> tuple[dt.datetime, dt.datetime]:
-    """Return (current hour, local midnight), both in UTC."""
-    local = _local_now(now)
-    now_utc = dt_util.as_utc(local)
-    midnight = dt_util.as_utc(dt_util.start_of_local_day(local.date()))
-    return now_utc.replace(minute=0, second=0, microsecond=0), midnight
+def _utc_hour(moment: dt.datetime) -> dt.datetime:
+    """Return the start of the whole UTC hour containing `moment`."""
+    return dt_util.as_utc(moment).replace(minute=0, second=0, microsecond=0)
+
+
+def _day_bucket_range(day: dt.date) -> tuple[dt.datetime, dt.datetime]:
+    """Return the [first, end) bucket hours, in UTC, of a local day.
+
+    History keys are whole UTC hours. Where local midnight is not on a
+    whole UTC hour (e.g. Asia/Kolkata, UTC+5:30), one bucket spans it: that
+    bucket belongs to the new day. Storing and lookup both go through this
+    function, so every bucket belongs to exactly one local day. A DST day
+    spans 23 or 25 buckets.
+    """
+    start = _utc_hour(dt_util.start_of_local_day(day))
+    end = _utc_hour(dt_util.start_of_local_day(day + dt.timedelta(days=1)))
+    return start, end
+
+
+def _sum_hours(
+    history: dict, start: dt.datetime, end: dt.datetime, *, complete: bool
+) -> Optional[float]:
+    """Sum the history buckets in [start, end).
+
+    With `complete`, a missing bucket returns None instead of being skipped.
+    """
+    total = 0.0
+    hour = start
+    while hour < end:
+        value = history.get(hour)
+        if value is not None:
+            total += float(value)
+        elif complete:
+            return None
+        hour += _HOUR
+    return round(total, 3)
 
 
 def previous_day_total(
@@ -119,21 +148,12 @@ def previous_day_total(
     buckets = _find_buckets(device, consumption_type, ConsumptionTimeInterval.LAST_DAY)
     if not buckets or len(buckets) != 24:
         return None
-    current_hour, midnight = _day_window(now)
-    history = _hourly_history(device, consumption_type.value, buckets, current_hour)
-    local_midnight = dt_util.as_local(midnight)
-    start = dt_util.as_utc(
-        dt_util.start_of_local_day(local_midnight.date() - dt.timedelta(days=1))
+    local = _local_now(now)
+    history = _hourly_history(
+        device, consumption_type.value, buckets, _utc_hour(local)
     )
-    total = 0.0
-    hour = start
-    while hour < midnight:
-        value = history.get(hour)
-        if value is None:
-            return None
-        total += float(value)
-        hour += _HOUR
-    return round(total, 3)
+    start, end = _day_bucket_range(local.date() - dt.timedelta(days=1))
+    return _sum_hours(history, start, end, complete=True)
 
 
 def period_total(
@@ -155,9 +175,10 @@ def period_total(
     calendar day in Home Assistant's configured time zone, so the value
     pairs cleanly with `last_reset = local midnight` for HA's Energy
     Dashboard (the value drops to ~0 exactly when `last_reset` changes).
-    The buckets come from a 25-hour history (see `_hourly_history`), so
+    The buckets come from the hourly history (see `_hourly_history`), so
     the midnight bucket is still counted in the last hour of a DST
     fall-back day, when it has already left the cloud's 24-hour window.
+    Which buckets make up a day is decided by `_day_bucket_range`.
 
     For other intervals (week / month / year) we sum the whole `v[]`;
     refining those is left for future work.
@@ -169,16 +190,15 @@ def period_total(
     if not buckets:
         return None
     if time_interval == ConsumptionTimeInterval.LAST_DAY and len(buckets) == 24:
-        # Both values are in UTC: aware datetimes sharing a tzinfo are
-        # subtracted by wall-clock, which is wrong across DST.
-        now = _local_now(now)
-        current_hour, midnight = _day_window(now)
+        local = _local_now(now)
+        current_hour = _utc_hour(local)
         history = _hourly_history(device, consumption_type.value, buckets, current_hour)
-        # Today is the current hour plus every full hour elapsed since local
-        # midnight: up to 25 buckets on a fall-back day.
-        elapsed = dt_util.as_utc(now) - midnight
-        count = min(int(elapsed.total_seconds() // 3600) + 1, _HISTORY_HOURS)
-        buckets = [history.get(current_hour - i * _HOUR) for i in range(count)]
+        # Today's buckets up to the current one. Where midnight is not on a
+        # whole UTC hour, the current bucket can already belong to tomorrow.
+        start, end = _day_bucket_range(local.date())
+        return _sum_hours(
+            history, start, min(end, current_hour + _HOUR), complete=False
+        )
     total = 0.0
     for value in buckets:
         if value is None:

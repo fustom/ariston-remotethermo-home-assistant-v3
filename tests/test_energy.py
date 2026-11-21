@@ -13,7 +13,11 @@ import pytest
 from ariston.const import ConsumptionTimeInterval, ConsumptionType
 from homeassistant.util import dt as dt_util
 
-from custom_components.ariston.energy import period_last_reset, period_total
+from custom_components.ariston.energy import (
+    period_last_reset,
+    period_total,
+    previous_day_total,
+)
 
 ROME = zoneinfo.ZoneInfo("Europe/Rome")
 UTC = dt.timezone.utc
@@ -305,3 +309,58 @@ def test_last_reset_normalizes_naive_input_as_utc():
     reset = period_last_reset(DAY, now=now)
     assert reset == dt.datetime(2026, 5, 7, 0, 0, tzinfo=ROME)
     assert reset.tzinfo is not None
+
+
+@pytest.mark.parametrize("zone", ["Asia/Kolkata", "Asia/Kathmandu"])
+def test_fractional_offset_days_split_the_buckets_without_gaps(zone):
+    """Local midnight at :30 / :45 UTC: the bucket spanning it is the new day's.
+
+    History keys are whole UTC hours. Storing and lookup use the same
+    alignment, so yesterday can be closed and no bucket is counted twice.
+    """
+    tz = zoneinfo.ZoneInfo(zone)
+    dt_util.set_default_time_zone(tz)
+    device = _device(_day_sequence([0.1] * 23 + [0.2]))
+    # 23:10 local: v[23] is the 17:00 UTC bucket, today's last one.
+    assert period_total(
+        device, DHW, DAY, now=dt.datetime(2026, 5, 6, 23, 10, tzinfo=tz)
+    ) == pytest.approx(2.5)
+
+    # 23:50 local: the current 18:00 UTC bucket spans midnight -> tomorrow.
+    device.consumptions_sequences = _day_sequence([0.1] * 22 + [0.8, 0.05])
+    before_midnight = dt.datetime(2026, 5, 6, 23, 50, tzinfo=tz)
+    assert period_total(device, DHW, DAY, now=before_midnight) == pytest.approx(3.1)
+
+    after_midnight = dt.datetime(2026, 5, 7, 0, 10, tzinfo=tz)
+    assert previous_day_total(device, DHW, now=after_midnight) == pytest.approx(3.1)
+    assert period_total(device, DHW, DAY, now=after_midnight) == pytest.approx(0.05)
+
+
+def test_fractional_offset_fall_back_day_keeps_25_buckets():
+    """Australia/Adelaide falls back from +10:30 to +9:30 on 2026-04-05."""
+    tz = zoneinfo.ZoneInfo("Australia/Adelaide")
+    dt_util.set_default_time_zone(tz)
+    device = _device(_day_sequence([0.1] * 24))
+    period_total(device, DHW, DAY, now=dt.datetime(2026, 4, 5, 21, 10, tzinfo=tz))
+
+    device.consumptions_sequences = _day_sequence([0.1] * 24)
+    last_hour = dt.datetime(2026, 4, 5, 23, 10, tzinfo=tz)
+    assert period_total(device, DHW, DAY, now=last_hour) == pytest.approx(2.5)
+    assert previous_day_total(
+        device, DHW, now=dt.datetime(2026, 4, 6, 0, 10, tzinfo=tz)
+    ) == pytest.approx(2.5)
+
+
+def test_fall_back_day_can_be_closed_after_hours_of_failed_polls():
+    """Europe/Rome, 2026-10-25 lasts 25 hours; the next fetch is at 03:10."""
+    device = _device(_day_sequence([0.1] * 24))
+    for hour in (4, 12, 20):
+        device.consumptions_sequences = _day_sequence([0.1] * 24)
+        period_total(
+            device, DHW, DAY, now=dt.datetime(2026, 10, 25, hour, 10, tzinfo=ROME)
+        )
+    device.consumptions_sequences = _day_sequence([0.1] * 24)
+    total = previous_day_total(
+        device, DHW, now=dt.datetime(2026, 10, 26, 3, 10, tzinfo=ROME)
+    )
+    assert total == pytest.approx(2.5)
