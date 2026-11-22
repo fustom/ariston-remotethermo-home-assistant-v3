@@ -113,6 +113,24 @@ class AristonThermostat(AristonEntity, ClimateEntity):
         """Return the target temperature for the device."""
         return self.device.get_target_temp_value(self.zone)
 
+    # Backward compatibility with Home Assistant < 2026.11, which only reads
+    # the non-native property names. On 2026.11+, when an entity provides
+    # both, the native_* members take precedence without deprecation warning.
+    @property
+    def temperature_unit(self) -> str:
+        """Return the unit of measurement (HA < 2026.11)."""
+        return self.native_temperature_unit
+
+    @property
+    def current_temperature(self) -> float:
+        """Return the current temperature (HA < 2026.11)."""
+        return self.native_current_temperature
+
+    @property
+    def target_temperature(self) -> float:
+        """Return the target temperature (HA < 2026.11)."""
+        return self.native_target_temperature
+
     @property
     def supported_features(self) -> int:
         """Return the supported features for this device integration."""

@@ -132,6 +132,10 @@ def test_climate_properties_and_supported_modes(coordinator, ariston_device):
     assert entity.target_temperature_step == 0.5
     assert entity.native_current_temperature == 19.5
     assert entity.native_target_temperature == 20
+    # Aliases kept for Home Assistant < 2026.11
+    assert entity.temperature_unit == "°C"
+    assert entity.current_temperature == 19.5
+    assert entity.target_temperature == 20
     assert entity.supported_features & ClimateEntityFeature.TARGET_TEMPERATURE
     assert entity.supported_features & ClimateEntityFeature.PRESET_MODE
     assert entity.hvac_mode == HVACMode.HEAT
@@ -409,6 +413,10 @@ def test_water_heater_properties_and_supported_features(coordinator, ariston_dev
     assert entity.max_temp == 70
     assert entity.precision == 0.1
     assert entity.native_temperature_unit == "°C"
+    # Aliases kept for Home Assistant < 2026.11
+    assert entity.temperature_unit == "°C"
+    assert entity.current_temperature == 45
+    assert entity.target_temperature == 55
     assert entity.name == "Test boiler"
     assert entity.unique_id == "gateway-1-water_heater"
     assert entity.icon == "mdi:water-pump"
