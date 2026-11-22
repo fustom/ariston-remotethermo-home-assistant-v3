@@ -244,6 +244,8 @@ async def test_lydos_energy_http_500_does_not_interrupt_water_heater(
             "v": [0.5, 1.25],
         }
     ]
+    # Fewer than 24 hourly buckets: the daily sensor sums the whole series.
+    expected = "1.75"
     energy_failure = ConnectionException(500)
     api.async_get_consumptions_sequences.side_effect = (
         [energy_failure, consumption]
@@ -282,7 +284,7 @@ async def test_lydos_energy_http_500_does_not_interrupt_water_heater(
         assert not coordinators[ENERGY_COORDINATOR].last_update_success
         assert hass.states.get(energy_id) is None
     else:
-        assert hass.states.get(energy_id).state == "1.25"
+        assert hass.states.get(energy_id).state == expected
         async_fire_time_changed(hass, dt_util.utcnow() + timedelta(seconds=61))
         await hass.async_block_till_done()
         assert not coordinators[ENERGY_COORDINATOR].last_update_success
@@ -297,7 +299,7 @@ async def test_lydos_energy_http_500_does_not_interrupt_water_heater(
     await hass.async_block_till_done()
 
     assert coordinators[ENERGY_COORDINATOR].last_update_success
-    assert hass.states.get(energy_id).state == "1.25"
+    assert hass.states.get(energy_id).state == expected
     assert hass.states.get(heater_id).state == heater.state
 
 
