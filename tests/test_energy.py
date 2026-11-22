@@ -14,6 +14,7 @@ from ariston.const import ConsumptionTimeInterval, ConsumptionType
 from homeassistant.util import dt as dt_util
 
 from custom_components.ariston.energy import (
+    last_bucket_hour,
     period_last_reset,
     period_total,
     previous_day_total,
@@ -397,3 +398,48 @@ def test_history_round_trip_keeps_fresh_buckets_and_drops_bad_ones():
     # 00:00 bucket from the saved history, 23:00 bucket from the fresh fetch.
     assert previous_day_total(restored, DHW, now=now) == pytest.approx(3.1)
     assert "2026-05-04T00:00:00+00:00" not in export_history(restored, DHW)
+
+
+def test_all_null_reply_is_missing_data():
+    """A 24-slot reply of nulls neither counts as zero nor erases history."""
+    device = _device(_day_sequence([0.1] * 23 + [0.2]))
+    period_total(device, DHW, DAY, now=dt.datetime(2026, 5, 6, 23, 5, tzinfo=ROME))
+
+    device.consumptions_sequences = _day_sequence([None] * 24)
+    now = dt.datetime(2026, 5, 7, 0, 5, tzinfo=ROME)
+    assert period_total(device, DHW, DAY, now=now) is None
+    assert previous_day_total(device, DHW, now=now) is None
+
+    device.consumptions_sequences = _day_sequence([0.1] * 22 + [0.8, 0.0])
+    assert previous_day_total(device, DHW, now=now) == pytest.approx(3.1)
+
+
+def test_null_buckets_keep_known_values():
+    device = _device(_day_sequence([0.1] * 23 + [0.2]))
+    period_total(device, DHW, DAY, now=dt.datetime(2026, 5, 6, 23, 5, tzinfo=ROME))
+
+    # Only the new hour is reported; the overlapping hours come back null.
+    device.consumptions_sequences = _day_sequence([None] * 23 + [0.05])
+    now = dt.datetime(2026, 5, 7, 0, 5, tzinfo=ROME)
+    assert period_total(device, DHW, DAY, now=now) == pytest.approx(0.05)
+    assert previous_day_total(device, DHW, now=now) == pytest.approx(2.5)
+
+
+def test_all_null_reply_for_other_intervals_is_missing_data():
+    sequences = [{"k": DHW.value, "p": ConsumptionTimeInterval.LAST_WEEK.value,
+                  "v": [None] * 7}]
+    assert period_total(
+        _device(sequences), DHW, ConsumptionTimeInterval.LAST_WEEK
+    ) is None
+
+
+@pytest.mark.parametrize(
+    ("zone", "expected"),
+    [
+        ("Europe/Rome", dt.datetime(2026, 5, 6, 21, tzinfo=UTC)),
+        ("Asia/Kolkata", dt.datetime(2026, 5, 6, 17, tzinfo=UTC)),
+    ],
+)
+def test_last_bucket_hour(zone, expected):
+    dt_util.set_default_time_zone(zoneinfo.ZoneInfo(zone))
+    assert last_bucket_hour(dt.date(2026, 5, 6)) == expected

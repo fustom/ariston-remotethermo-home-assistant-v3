@@ -113,6 +113,8 @@ def _hourly_history(device, key, buckets: list, current_hour: dt.datetime) -> di
     belong to (`v[23]` = `current_hour`) and merged into the history kept on
     the device. A list we have already seen is not stamped again, so data
     that was fetched before midnight is never attributed to the new day.
+    A null bucket never replaces a known value: the cloud sometimes
+    returns nulls for hours it already reported.
 
     The sensors save it in their restore data (see `export_history`), so
     it survives a restart.
@@ -122,7 +124,8 @@ def _hourly_history(device, key, buckets: list, current_hour: dt.datetime) -> di
         hours = state["hours"]
         last = len(buckets) - 1
         for index, value in enumerate(buckets):
-            hours[current_hour - (last - index) * _HOUR] = value
+            if value is not None:
+                hours[current_hour - (last - index) * _HOUR] = value
         oldest = current_hour - (_RETAINED_HOURS - 1) * _HOUR
         state["hours"] = {h: v for h, v in hours.items() if h >= oldest}
         state["source"] = buckets
@@ -130,13 +133,19 @@ def _hourly_history(device, key, buckets: list, current_hour: dt.datetime) -> di
 
 
 def _find_buckets(device, consumption_type, time_interval) -> Optional[list]:
-    """Return `v[]` for the matching (k, p) sequence, or None."""
+    """Return `v[]` for the matching (k, p) sequence, or None.
+
+    A `v[]` holding only nulls is missing data, not a zero reading.
+    """
     for sequence in getattr(device, "consumptions_sequences", None) or []:
         if (
             sequence.get("k") == consumption_type.value
             and sequence.get("p") == time_interval.value
         ):
-            return sequence.get("v") or None
+            buckets = sequence.get("v")
+            if not buckets or all(value is None for value in buckets):
+                return None
+            return buckets
     return None
 
 
@@ -157,6 +166,11 @@ def _day_bucket_range(day: dt.date) -> tuple[dt.datetime, dt.datetime]:
     start = _utc_hour(dt_util.start_of_local_day(day))
     end = _utc_hour(dt_util.start_of_local_day(day + dt.timedelta(days=1)))
     return start, end
+
+
+def last_bucket_hour(day: dt.date) -> dt.datetime:
+    """Return the UTC start of the last hourly bucket of a local day."""
+    return _day_bucket_range(day)[1] - _HOUR
 
 
 def _sum_hours(
@@ -232,7 +246,7 @@ def period_total(
     refining those is left for future work.
 
     Returns None if the device has not yet fetched any sequences or the
-    expected (k, p) tuple is not present or has empty data.
+    expected (k, p) tuple is not present or has empty or all-null data.
     """
     buckets = _find_buckets(device, consumption_type, time_interval)
     if not buckets:

@@ -12,6 +12,7 @@ from homeassistant.components.sensor import SensorEntity
 from homeassistant.config_entries import ConfigEntry
 from homeassistant.core import HomeAssistant, callback
 from homeassistant.helpers.recorder import get_instance
+from homeassistant.helpers import restore_state
 from homeassistant.helpers.restore_state import (
     ExtraStoredData,
     RestoredExtraData,
@@ -21,7 +22,12 @@ from homeassistant.util import dt as dt_util
 
 from .const import ARISTON_SENSOR_TYPES, AristonSensorEntityDescription
 from .coordinator import DeviceDataUpdateCoordinator
-from .energy import export_history, previous_day_total, restore_history
+from .energy import (
+    export_history,
+    last_bucket_hour,
+    previous_day_total,
+    restore_history,
+)
 from .entity import AristonEntity, register_supported_entities
 
 _LOGGER = logging.getLogger(__name__)
@@ -112,12 +118,17 @@ class AristonDailyConsumptionSensor(AristonSensor, RestoreEntity):
       it, until the next local midnight. This keeps the existing sum.
       A new sensor has no statistics to keep, so it skips this.
     - Midnight: the first fetch of a new day can still revise yesterday's
-      last bucket. Before the new `last_reset` is published, yesterday's
-      final total is written under the old one so Recorder books it.
+      last bucket. Recorder books a state by the time it is written, so a
+      state written after midnight would count the revision as today's
+      usage. The revision is instead added to yesterday's statistics
+      from yesterday's last hour on (`async_adjust_statistics`), and no
+      state is written under yesterday's `last_reset`.
       A failed fetch leaves yesterday's cycle open for the next one.
     - Restart: the hourly history and the last published value are kept
-      in the restore data. After a restart across midnight, the first
-      state closes yesterday and today's value follows right after.
+      in the restore data, so a restart across midnight still books
+      yesterday's revision. The restore data is saved before the
+      adjustment is queued, so a crash can lose a revision but never
+      book it twice.
     """
 
     def __init__(self, coordinator, description) -> None:
@@ -128,7 +139,6 @@ class AristonDailyConsumptionSensor(AristonSensor, RestoreEntity):
         self._baseline_pending = False
         # Last numeric value, its last_reset and the baseline it excludes.
         self._published: tuple[float, datetime, float] | None = None
-        self._override: tuple[float, datetime] | None = None
 
     async def async_added_to_hass(self) -> None:
         """Restore the saved state, or start a baseline after an upgrade."""
@@ -149,23 +159,8 @@ class AristonDailyConsumptionSensor(AristonSensor, RestoreEntity):
         elif await self._has_statistics():
             self._baseline_pending = True
         self._update_baseline()
-        closing = self._closing_value()
-        closing_reset = self._published[1] if closing is not None else None
+        self._close_previous_day()
         self._remember_published()
-        if closing is not None:
-            # The state written right after this method closes yesterday;
-            # today's value follows on the next loop iteration.
-            self._override = (closing, closing_reset)
-            handle = self.hass.loop.call_soon(self._end_startup_closing)
-            self.async_on_remove(handle.cancel)
-
-    @callback
-    def _end_startup_closing(self) -> None:
-        """Publish today's value after the startup closing state."""
-        if self._override is None:
-            return  # A coordinator update already published it.
-        self._override = None
-        self.async_write_ha_state()
 
     async def _has_statistics(self) -> bool:
         """Whether Recorder holds statistics from before the upgrade.
@@ -250,16 +245,12 @@ class AristonDailyConsumptionSensor(AristonSensor, RestoreEntity):
 
     @property
     def native_value(self):
-        """Return today's consumption, or the closing value being written."""
-        if self._override is not None:
-            return self._override[0]
+        """Return today's consumption (since the baseline, if any)."""
         return self._current()[0]
 
     @property
     def last_reset(self) -> datetime | None:
-        """Return local midnight, the baseline instant, or the closed cycle."""
-        if self._override is not None:
-            return self._override[1]
+        """Return local midnight, or the baseline instant."""
         return self._current()[1]
 
     def _closing_value(self) -> float | None:
@@ -282,23 +273,49 @@ class AristonDailyConsumptionSensor(AristonSensor, RestoreEntity):
         total = round(total - offset, 3)
         return total if total > value else None
 
+    def _close_previous_day(self) -> None:
+        """Book the growth of yesterday's total since it was last published.
+
+        The published value becomes yesterday's final total, so the same
+        growth is never booked twice, also after a restart.
+        """
+        closing = self._closing_value()
+        if closing is None or self._published is None:
+            return
+        value, reset, offset = self._published
+        self._published = (closing, reset, offset)
+        hour = last_bucket_hour(dt_util.as_local(reset).date())
+        # Not started eagerly: the restore data must be saved after the
+        # state of this update is written, or it would still hold `value`.
+        self.hass.async_create_task(
+            self._async_book_revision(round(closing - value, 3), hour),
+            eager_start=False,
+        )
+
+    async def _async_book_revision(self, amount: float, hour: datetime) -> None:
+        """Add `amount` to the statistics from `hour` on.
+
+        The restore data is saved first: if Home Assistant stops before the
+        adjustment is stored, the revision is lost, but it is never booked
+        a second time on the next start.
+        """
+        unit = self.native_unit_of_measurement
+        if "recorder" not in self.hass.config.components or unit is None:
+            return
+        await restore_state.async_get(self.hass).async_dump_states()
+        get_instance(self.hass).async_adjust_statistics(
+            self.entity_id, hour, amount, unit
+        )
+
     @callback
     def _handle_coordinator_update(self) -> None:
-        """Close yesterday's cycle, then publish today's value."""
-        # A startup closing state, if any, is already written by now.
-        self._override = None
+        """Book yesterday's revision, then publish today's value."""
         if not self.coordinator.last_update_success:
             # Unavailable: keep the last published cycle, so the next
             # successful fetch can still close yesterday.
             super()._handle_coordinator_update()
             return
-        closing = self._closing_value()
-        if closing is not None and self._published is not None:
-            self._override = (closing, self._published[1])
-            try:
-                self.async_write_ha_state()
-            finally:
-                self._override = None
+        self._close_previous_day()
         self._update_baseline()
         super()._handle_coordinator_update()
         self._remember_published()
