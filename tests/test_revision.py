@@ -167,7 +167,7 @@ def test_same_revision_twice_is_booked_once(db):
         mid = _meta(session)
         _row(session, StatisticsShortTerm, mid, _utc(21, 55), 2.5, 10.0, Y)
         _row(session, Statistics, mid, _utc(21), 2.5, 10.0, Y)
-        _compiled(session, _utc(21, 55))
+        _compiled(session, _utc(22))
         session.commit()
 
     assert _book(db)[0] is RevisionResult.BOOKED
@@ -192,7 +192,7 @@ def test_missing_last_hour_before_todays_rows(db):
         mid = _meta(session)
         _row(session, StatisticsShortTerm, mid, _utc(20, 55), 2.5, 10.0, Y)
         _row(session, Statistics, mid, _utc(20), 2.5, 10.0, Y)
-        _compiled(session, _utc(21, 55))
+        _compiled(session, _utc(22))
         session.commit()
 
     assert _book(db, _revision(3.4))[0] is RevisionResult.BOOKED
@@ -260,7 +260,7 @@ def test_hour_spanning_midnight_keeps_todays_state(db, hass):
         ]
 
 
-def test_not_ready_until_yesterday_is_compiled(db):
+def test_not_ready_until_first_new_day_period_is_compiled(db):
     with db() as session:
         mid = _meta(session)
         _row(session, StatisticsShortTerm, mid, _utc(21, 50), 2.5, 10.0, Y)
@@ -268,10 +268,25 @@ def test_not_ready_until_yesterday_is_compiled(db):
         session.commit()
     assert _book(db) == (RevisionResult.NOT_READY, None)
 
+    # Compiling yesterday's final period is not enough: the first new-day
+    # period must also compile before the correction is booked.
     with db() as session:
         _compiled(session, _utc(21, 55))
         session.commit()
+    assert _book(db) == (RevisionResult.NOT_READY, None)
+
+    with db() as session:
+        _row(session, StatisticsShortTerm, mid, _utc(22), 0.05, 10.05, T)
+        _compiled(session, _utc(22))
+        session.commit()
     assert _book(db)[0] is RevisionResult.BOOKED
+
+    with db() as session:
+        assert _rows(session, StatisticsShortTerm) == [
+            (_utc(21, 50), 2.5, 10.0, Y),
+            (_utc(21, 55), 3.1, 10.6, Y),
+            (_utc(22), 0.05, 10.65, T),
+        ]
 
 
 def test_not_ready_without_any_compiled_run(db):
@@ -294,7 +309,7 @@ def test_skipped_when_the_cycle_is_not_in_the_statistics(db, case):
             _row(session, StatisticsShortTerm, mid, _utc(20), 1.0, 9.0, older)
         elif case == "no state":
             _row(session, StatisticsShortTerm, mid, _utc(20), None, 9.0, Y)
-        _compiled(session, _utc(21, 55))
+        _compiled(session, _utc(22))
         session.commit()
     assert _book(db) == (RevisionResult.SKIPPED, None)
 
@@ -304,7 +319,7 @@ def test_revision_is_converted_to_the_statistics_unit(db):
         mid = _meta(session, unit="Wh")
         _row(session, StatisticsShortTerm, mid, _utc(21, 55), 2500, 10000, Y)
         _row(session, Statistics, mid, _utc(21), 2500, 10000, Y)
-        _compiled(session, _utc(21, 55))
+        _compiled(session, _utc(22))
         session.commit()
 
     assert _book(db)[0] is RevisionResult.BOOKED
@@ -315,7 +330,7 @@ def test_revision_is_converted_to_the_statistics_unit(db):
 def test_unconvertible_unit_is_skipped(db):
     with db() as session:
         _meta(session, unit="m³")
-        _compiled(session, _utc(21, 55))
+        _compiled(session, _utc(22))
         session.commit()
     assert _book(db) == (RevisionResult.SKIPPED, None)
 
@@ -333,7 +348,7 @@ async def test_task_reports_results_and_refreshes_the_run_cache(hass, db):
     with db() as session:
         mid = _meta(session)
         _row(session, StatisticsShortTerm, mid, _utc(20, 55), 2.5, 10.0, Y)
-        _compiled(session, _utc(21, 55))
+        _compiled(session, _utc(22))
         session.commit()
     cache = get_short_term_statistics_run_cache(hass)
     cache.set_latest_id_for_metadata_id(mid, 1)
