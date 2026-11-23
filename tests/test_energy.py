@@ -14,7 +14,6 @@ from ariston.const import ConsumptionTimeInterval, ConsumptionType
 from homeassistant.util import dt as dt_util
 
 from custom_components.ariston.energy import (
-    last_bucket_hour,
     period_last_reset,
     period_total,
     previous_day_total,
@@ -431,15 +430,3 @@ def test_all_null_reply_for_other_intervals_is_missing_data():
     assert period_total(
         _device(sequences), DHW, ConsumptionTimeInterval.LAST_WEEK
     ) is None
-
-
-@pytest.mark.parametrize(
-    ("zone", "expected"),
-    [
-        ("Europe/Rome", dt.datetime(2026, 5, 6, 21, tzinfo=UTC)),
-        ("Asia/Kolkata", dt.datetime(2026, 5, 6, 17, tzinfo=UTC)),
-    ],
-)
-def test_last_bucket_hour(zone, expected):
-    dt_util.set_default_time_zone(zoneinfo.ZoneInfo(zone))
-    assert last_bucket_hour(dt.date(2026, 5, 6)) == expected

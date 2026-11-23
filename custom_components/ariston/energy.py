@@ -168,11 +168,6 @@ def _day_bucket_range(day: dt.date) -> tuple[dt.datetime, dt.datetime]:
     return start, end
 
 
-def last_bucket_hour(day: dt.date) -> dt.datetime:
-    """Return the UTC start of the last hourly bucket of a local day."""
-    return _day_bucket_range(day)[1] - _HOUR
-
-
 def _sum_hours(
     history: dict, start: dt.datetime, end: dt.datetime, *, complete: bool
 ) -> Optional[float]:

@@ -11,8 +11,8 @@ from homeassistant.components.recorder.statistics import get_metadata
 from homeassistant.components.sensor import SensorEntity
 from homeassistant.config_entries import ConfigEntry
 from homeassistant.core import HomeAssistant, callback
+from homeassistant.helpers.event import async_call_later
 from homeassistant.helpers.recorder import get_instance
-from homeassistant.helpers import restore_state
 from homeassistant.helpers.restore_state import (
     ExtraStoredData,
     RestoredExtraData,
@@ -22,13 +22,15 @@ from homeassistant.util import dt as dt_util
 
 from .const import ARISTON_SENSOR_TYPES, AristonSensorEntityDescription
 from .coordinator import DeviceDataUpdateCoordinator
-from .energy import (
-    export_history,
-    last_bucket_hour,
-    previous_day_total,
-    restore_history,
-)
+from .energy import export_history, previous_day_total, restore_history
 from .entity import AristonEntity, register_supported_entities
+from .revision import (
+    FINAL_RESULTS,
+    BookRevisionsTask,
+    Revision,
+    RevisionResult,
+    cycle_end,
+)
 
 _LOGGER = logging.getLogger(__name__)
 
@@ -90,6 +92,27 @@ class AristonSensor(AristonEntity, SensorEntity):
 # Missing on the first start after an upgrade from the hourly/rolling values.
 DAILY_CONSUMPTION_SCHEME = 2
 
+# Retry delay for a revision Recorder could not book yet.
+REVISION_RETRY = timedelta(minutes=5)
+# Revisions older than this are dropped (Recorder purges short-term rows).
+REVISION_MAX_AGE = timedelta(days=7)
+
+
+def _parse_revisions(saved: Any) -> dict[datetime, float]:
+    """Parse the saved {last_reset: final total} of unbooked revisions."""
+    revisions: dict[datetime, float] = {}
+    if not isinstance(saved, dict):
+        return revisions
+    for reset, total in saved.items():
+        parsed = dt_util.parse_datetime(reset) if isinstance(reset, str) else None
+        if parsed is None or parsed.tzinfo is None:
+            continue
+        try:
+            revisions[dt_util.as_utc(parsed)] = float(total)
+        except (TypeError, ValueError):
+            continue
+    return revisions
+
 
 def _parse_published(saved: Any) -> tuple[float, datetime, float] | None:
     """Parse the saved [value, last_reset, baseline] of the last state."""
@@ -120,15 +143,16 @@ class AristonDailyConsumptionSensor(AristonSensor, RestoreEntity):
     - Midnight: the first fetch of a new day can still revise yesterday's
       last bucket. Recorder books a state by the time it is written, so a
       state written after midnight would count the revision as today's
-      usage. The revision is instead added to yesterday's statistics
-      from yesterday's last hour on (`async_adjust_statistics`), and no
-      state is written under yesterday's `last_reset`.
+      usage. The revision is instead written into yesterday's statistics
+      by a Recorder task (see `revision.py`), and no state is written
+      under yesterday's `last_reset`.
       A failed fetch leaves yesterday's cycle open for the next one.
-    - Restart: the hourly history and the last published value are kept
-      in the restore data, so a restart across midnight still books
-      yesterday's revision. The restore data is saved before the
-      adjustment is queued, so a crash can lose a revision but never
-      book it twice.
+    - Restart: the hourly history, the last published value and the
+      revisions not yet confirmed by Recorder are kept in the restore
+      data. Booking a revision is idempotent (Recorder's rows record
+      yesterday's final total), so it is retried until Recorder confirms
+      it, also after a restart from stale restore data, and is never
+      booked twice.
     """
 
     def __init__(self, coordinator, description) -> None:
@@ -139,6 +163,10 @@ class AristonDailyConsumptionSensor(AristonSensor, RestoreEntity):
         self._baseline_pending = False
         # Last numeric value, its last_reset and the baseline it excludes.
         self._published: tuple[float, datetime, float] | None = None
+        # Final totals of closed cycles, by last_reset, not yet booked.
+        self._revisions: dict[datetime, float] = {}
+        self._booking = False
+        self._retry_unsub = None
 
     async def async_added_to_hass(self) -> None:
         """Restore the saved state, or start a baseline after an upgrade."""
@@ -156,11 +184,20 @@ class AristonDailyConsumptionSensor(AristonSensor, RestoreEntity):
                 data.get("history"),
             )
             self._published = _parse_published(data.get("published"))
+            self._revisions = _parse_revisions(data.get("revisions"))
         elif await self._has_statistics():
             self._baseline_pending = True
         self._update_baseline()
         self._close_previous_day()
         self._remember_published()
+        self._book_revisions()
+
+    async def async_will_remove_from_hass(self) -> None:
+        """Stop retrying revisions."""
+        await super().async_will_remove_from_hass()
+        if self._retry_unsub is not None:
+            self._retry_unsub()
+            self._retry_unsub = None
 
     async def _has_statistics(self) -> bool:
         """Whether Recorder holds statistics from before the upgrade.
@@ -210,6 +247,10 @@ class AristonDailyConsumptionSensor(AristonSensor, RestoreEntity):
         if self._published is not None:
             value, reset, offset = self._published
             data["published"] = [value, reset.isoformat(), offset]
+        if self._revisions:
+            data["revisions"] = {
+                reset.isoformat(): total for reset, total in self._revisions.items()
+            }
         return RestoredExtraData(data)
 
     def _day_value(self) -> float | None:
@@ -274,38 +315,61 @@ class AristonDailyConsumptionSensor(AristonSensor, RestoreEntity):
         return total if total > value else None
 
     def _close_previous_day(self) -> None:
-        """Book the growth of yesterday's total since it was last published.
+        """Queue the growth of yesterday's total since it was last published.
 
         The published value becomes yesterday's final total, so the same
-        growth is never booked twice, also after a restart.
+        growth is not queued again on the next update.
         """
         closing = self._closing_value()
         if closing is None or self._published is None:
             return
-        value, reset, offset = self._published
+        _, reset, offset = self._published
         self._published = (closing, reset, offset)
-        hour = last_bucket_hour(dt_util.as_local(reset).date())
-        # Not started eagerly: the restore data must be saved after the
-        # state of this update is written, or it would still hold `value`.
-        self.hass.async_create_task(
-            self._async_book_revision(round(closing - value, 3), hour),
-            eager_start=False,
-        )
+        self._revisions[reset] = max(closing, self._revisions.get(reset, closing))
 
-    async def _async_book_revision(self, amount: float, hour: datetime) -> None:
-        """Add `amount` to the statistics from `hour` on.
-
-        The restore data is saved first: if Home Assistant stops before the
-        adjustment is stored, the revision is lost, but it is never booked
-        a second time on the next start.
-        """
+    @callback
+    def _book_revisions(self) -> None:
+        """Send the unbooked revisions to Recorder (one batch at a time)."""
+        if self._booking or not self._revisions:
+            return
         unit = self.native_unit_of_measurement
         if "recorder" not in self.hass.config.components or unit is None:
+            self._revisions.clear()  # Nowhere to book them.
             return
-        await restore_state.async_get(self.hass).async_dump_states()
-        get_instance(self.hass).async_adjust_statistics(
-            self.entity_id, hour, amount, unit
-        )
+        oldest = dt_util.utcnow() - REVISION_MAX_AGE
+        for reset in [reset for reset in self._revisions if reset < oldest]:
+            del self._revisions[reset]
+        if not self._revisions:
+            return
+        revisions = {
+            Revision(self.entity_id, reset, total, unit, cycle_end(reset)): reset
+            for reset, total in self._revisions.items()
+        }
+        self._booking = True
+        if self._retry_unsub is not None:
+            self._retry_unsub()
+            self._retry_unsub = None
+
+        @callback
+        def done(results: dict[Revision, RevisionResult]) -> None:
+            self._booking = False
+            for revision, result in results.items():
+                reset = revisions[revision]
+                if result in FINAL_RESULTS and self._revisions.get(reset) == (
+                    revision.total
+                ):
+                    del self._revisions[reset]
+            if self._revisions and self.hass is not None:
+                self._retry_unsub = async_call_later(
+                    self.hass, REVISION_RETRY, self._retry_revisions
+                )
+
+        get_instance(self.hass).queue_task(BookRevisionsTask(list(revisions), done))
+
+    @callback
+    def _retry_revisions(self, _now: datetime) -> None:
+        self._retry_unsub = None
+        self._book_revisions()
 
     @callback
     def _handle_coordinator_update(self) -> None:
@@ -319,3 +383,4 @@ class AristonDailyConsumptionSensor(AristonSensor, RestoreEntity):
         self._update_baseline()
         super()._handle_coordinator_update()
         self._remember_published()
+        self._book_revisions()
