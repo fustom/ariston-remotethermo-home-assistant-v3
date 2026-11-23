@@ -12,7 +12,6 @@ from ariston.const import (
     CustomDeviceFeatures,
     DeviceProperties,
 )
-from homeassistant.util import dt as dt_util
 
 from custom_components.ariston.const import (
     ARISTON_NUMBER_TYPES,
@@ -28,6 +27,7 @@ from custom_components.ariston.const import (
     AristonSensorEntityDescription,
     AristonSwitchEntityDescription,
 )
+from custom_components.ariston.energy import period_last_reset
 from custom_components.ariston.binary_sensor import AristonBinarySensor
 from custom_components.ariston.number import AristonNumber
 from custom_components.ariston.select import AristonSelect
@@ -169,7 +169,8 @@ def test_dhw_total_energy_reports_daily_sum_and_reset_time(
     entity = AristonSensor(coordinator, description)
 
     assert entity.native_value == 1.87
-    assert entity.last_reset == dt_util.start_of_local_day()
+    # last_reset is anchored to local midnight, matching the sum's cut-off.
+    assert entity.last_reset == period_last_reset(ConsumptionTimeInterval.LAST_DAY)
 
 
 def test_dhw_program_temperature_sensors_use_distinct_source_values(
