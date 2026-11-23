@@ -198,10 +198,11 @@ def book_revision(session: Session, revision: Revision) -> tuple[RevisionResult,
 
     short_start = revision.short_term_start
     hour_start = revision.hour_start
-    # Rows must only be added to periods the compiler is done with: it
-    # would fail on a duplicate row, and reads the latest row as the base.
+    # Wait until the first period of the new cycle is compiled, while
+    # also waiting for the cutoff hour to finish in fractional-offset zones.
     compiled = _compiled_until(session)
-    if compiled is None or compiled < hour_start + _HOUR - _SHORT_TERM:
+    ready_at = max(revision.cycle_end, hour_start + _HOUR - _SHORT_TERM)
+    if compiled is None or compiled < ready_at:
         return RevisionResult.NOT_READY, None
 
     total = _convert(revision.total, revision.unit, statistic_unit)
