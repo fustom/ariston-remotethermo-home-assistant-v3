@@ -37,7 +37,7 @@ BSB_ZONE_MODE_TEXTS: dict[int, str] = {
 
 BSB_DESIRED_ROOM_TEMP = "desiredRoomTemp"
 
-# Tolerance ussed when comparing the desired temp against the reduced setpoint.
+# Tolerance used when comparing the desired temp against the reduced setpoint.
 BSB_TEMP_COMPARE_TOLERANCE = 0.05
 
 def _normalize_temp(raw: Any) -> float | None:
@@ -95,20 +95,6 @@ class AristonThermostat(AristonEntity, ClimateEntity):
     ) -> None:
         """Initialize the thermostat."""
         super().__init__(coordinator, description, zone)
-
-    def _get_bsb_zone_mode(self) -> BsbZoneMode:
-        """Get BSB zone mode, working around upstream bug with value 0.
-
-        The upstream library uses `value or BsbZoneMode.UNDEFINED` which
-        treats 0 (Protection/OFF) as falsy, returning UNDEFINED (-1).
-        """
-        try:
-            value = self.device.get_zone(self.zone).get("mode", {}).get("value", None)
-            if value is None:
-                return BsbZoneMode.UNDEFINED
-            return BsbZoneMode(value)
-        except (AttributeError, ValueError):
-            return BsbZoneMode.UNDEFINED
 
     def _get_bsb_desired_temp(self) -> float | None:
         """Return the normalized desiredRoomTemp for BSB devices, else None."""
@@ -292,7 +278,7 @@ class AristonThermostat(AristonEntity, ClimateEntity):
         if self.device.plant_mode_supported:
             return self.device.plant_mode_text
         # BSB device — map zone mode value to text
-        mode = self._get_bsb_zone_mode()
+        mode = self.device.get_zone_mode(self.zone)
         if mode is BsbZoneMode.UNDEFINED:
             return None
         return BSB_ZONE_MODE_TEXTS.get(mode.value, str(mode.value))

@@ -1,9 +1,12 @@
 """Tests for BSB zone presets and desiredRoomTemp normalization."""
 
+from statistics import mode
 from unittest.mock import AsyncMock, patch
 
 import pytest
 
+from types import MethodType
+from ariston.bsb_device import AristonBsbDevice
 from ariston.const import BsbZoneMode
 from homeassistant.components.climate import ClimateEntityFeature
 from homeassistant.const import ATTR_TEMPERATURE
@@ -25,7 +28,7 @@ def bsb_device(ariston_device):
     ariston_device.get_zone = lambda z: zone
     ariston_device.get_zone_ch_comf_temp = lambda z: zone["chComfTemp"]
     ariston_device.get_zone_ch_red_temp = lambda z: zone["chRedTemp"]
-    ariston_device.get_zone_mode = lambda z: BsbZoneMode.UNDEFINED
+    ariston_device.get_zone_mode = MethodType(AristonBsbDevice.get_zone_mode, ariston_device)
     ariston_device.get_zone_mode_options = lambda z: [0, 1, 2, 3]
     ariston_device.get_target_temp_value = lambda z: COMFORT["value"]
     ariston_device.get_comfort_temp_min = lambda z: COMFORT["min"]
@@ -175,11 +178,15 @@ def test_bsb_supports_preset_mode(make_entity):
 
 @pytest.mark.parametrize(
     ("mode", "expected"),
-    [(0, "protection"), (1, "automatic"), (2, "reduced"), (3, "comfort")],
+    [
+        (BsbZoneMode.OFF, "protection"),
+        (BsbZoneMode.TIME_PROGRAM, "automatic"),
+        (BsbZoneMode.MANUAL_NIGHT, "reduced"),
+        (BsbZoneMode.MANUAL, "comfort"),
+    ],
 )
 def test_preset_mode_maps_zone_mode(make_entity, bsb_device, mode, expected):
-    # mode 0 covers the workaround for the upstream `value or UNDEFINED` bug
-    bsb_device.zone_data["mode"] = {"value": mode}
+    bsb_device.zone_data["mode"] = {"value": mode.value}
     assert make_entity().preset_mode == expected
 
 
