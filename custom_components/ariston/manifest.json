@@ -1,6 +1,7 @@
 {
   "domain": "ariston",
   "name": "Ariston",
+  "after_dependencies": ["recorder"],
   "categories": ["climate.thermostats_heating", "climate.water_heaters"],
   "codeowners": ["@fustom"],
   "config_flow": true,
@@ -10,8 +11,8 @@
   "iot_class": "cloud_polling",
   "issue_tracker": "https://github.com/fustom/ariston-remotethermo-home-assistant-v3/issues",
   "loggers": ["ariston"],
-  "requirements": ["ariston==0.19.15"],
+  "requirements": ["ariston==0.19.17"],
   "ssdp": [],
-  "version": "0.20.6",
+  "version": "0.20.9",
   "zeroconf": []
 }

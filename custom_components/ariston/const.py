@@ -39,7 +39,6 @@ from homeassistant.components.sensor import (
 from homeassistant.components.switch import SwitchEntityDescription
 from homeassistant.const import UnitOfEnergy, UnitOfTemperature, UnitOfTime
 from homeassistant.helpers.entity import EntityCategory, EntityDescription
-from homeassistant.util import dt as dt_util
 
 try:
     from homeassistant.components.water_heater import WaterHeaterEntityDescription
@@ -50,6 +49,8 @@ except ImportError:
     WaterHeaterEntityDescription = WaterHeaterEntityEntityDescription
 
 import datetime as dt
+
+from .energy import period_last_reset, period_total
 
 DOMAIN: Final[str] = "ariston"
 NAME: Final[str] = "Ariston"
@@ -71,6 +72,9 @@ MENU_ITEM_CH_FLOW_TEMP_BOILER: Final[int] = 123
 MENU_ITEM_GAS_POWER: Final[int] = 125
 MENU_ITEM_DHW_FLOW_RATE: Final[int] = 127
 MENU_ITEM_PUMP_MODULATION: Final[int] = 115
+MENU_ITEM_CH_BACKUP_RESISTANCE_1: Final[int] = 337
+MENU_ITEM_HP_MODE: Final[int] = 340
+MENU_ITEM_HP_OUTSIDE_AIR_TEMP: Final[int] = 341
 MENU_ITEM_HP_WATER_FLOW_TEMP: Final[int] = 348
 
 ATTR_TARGET_TEMP_STEP: Final[str] = "target_temp_step"
@@ -100,24 +104,6 @@ def _get_dhw_flame(entity: Any) -> bool:
         bool(entity.device.get_zone_heat_request_value(zone))
         for zone in entity.device.zone_numbers
     )
-
-
-def _get_dhw_total_energy_today(entity: Any) -> float | None:
-    """Sum the hourly DHW energy readings for today."""
-    for sequence in entity.device.consumptions_sequences:
-        if (
-            sequence.get("k") == ConsumptionType.DOMESTIC_HOT_WATER_TOTAL_ENERGY.value
-            and sequence.get("p") == ConsumptionTimeInterval.LAST_DAY.value
-        ):
-            values = sequence.get("v") or []
-            return round(sum(values), 3) if values else None
-
-    return None
-
-
-def _get_local_day_start(_entity: Any) -> dt.datetime:
-    """Return the local midnight when today's energy total started."""
-    return dt_util.start_of_local_day()
 
 
 @dataclass(kw_only=True, frozen=True)
@@ -187,6 +173,9 @@ class AristonSensorEntityDescription(
     get_native_unit_of_measurement: Callable[[Any], str] | None = None
     get_last_reset: Callable[[Any], dt.datetime] | None = None
     get_native_value: Callable[[Any], Any]
+    # Set on the daily consumption sensors: today's total of this cloud
+    # sequence, reset at local midnight (see AristonDailyConsumptionSensor).
+    daily_consumption_type: ConsumptionType | None = None
 
 
 @dataclass(kw_only=True, frozen=True)
@@ -335,6 +324,7 @@ ARISTON_SENSOR_TYPES: list[AristonSensorEntityDescription] = [
         name=f"{NAME} CH return temp",
         device_class=SensorDeviceClass.TEMPERATURE,
         state_class=SensorStateClass.MEASUREMENT,
+        device_features=[str(MenuItemNames.CH_RETURN_TEMP.value)],
         get_native_value=lambda entity: entity.device.ch_return_temp_value,
         get_native_unit_of_measurement=lambda entity: entity.device.ch_return_temp_unit,
         system_types=[SystemType.GALEVO],
@@ -351,6 +341,30 @@ ARISTON_SENSOR_TYPES: list[AristonSensorEntityDescription] = [
         get_native_unit_of_measurement=lambda entity: entity.device.get_menu_item_unit(
             MENU_ITEM_HP_WATER_FLOW_TEMP
         ),
+        system_types=[SystemType.GALEVO],
+    ),
+    AristonSensorEntityDescription(
+        key=str(MENU_ITEM_HP_OUTSIDE_AIR_TEMP),
+        name=f"{NAME} HP outside air temp",
+        device_class=SensorDeviceClass.TEMPERATURE,
+        state_class=SensorStateClass.MEASUREMENT,
+        entity_category=EntityCategory.DIAGNOSTIC,
+        device_features=[str(MENU_ITEM_HP_OUTSIDE_AIR_TEMP)],
+        get_native_value=lambda entity: entity.device.get_menu_item_value(
+            MENU_ITEM_HP_OUTSIDE_AIR_TEMP
+        ),
+        get_native_unit_of_measurement=lambda entity: entity.device.get_menu_item_unit(
+            MENU_ITEM_HP_OUTSIDE_AIR_TEMP
+        ),
+        system_types=[SystemType.GALEVO],
+    ),
+    AristonSensorEntityDescription(
+        key=str(MENU_ITEM_HP_MODE),
+        name=f"{NAME} HP mode",
+        icon="mdi:heat-pump",
+        entity_category=EntityCategory.DIAGNOSTIC,
+        device_features=[str(MENU_ITEM_HP_MODE)],
+        get_native_value=lambda entity: entity.device.hp_mode_value,
         system_types=[SystemType.GALEVO],
     ),
     AristonSensorEntityDescription(
@@ -508,8 +522,13 @@ ARISTON_SENSOR_TYPES: list[AristonSensorEntityDescription] = [
             ConsumptionType.CENTRAL_HEATING_TOTAL_ENERGY.name,
         ],
         coordinator=ENERGY_COORDINATOR,
-        get_native_value=lambda entity: entity.device.central_heating_total_energy_consumption,
-        get_last_reset=lambda entity: entity.device.consumption_sequence_last_changed_utc,
+        daily_consumption_type=ConsumptionType.CENTRAL_HEATING_TOTAL_ENERGY,
+        get_native_value=lambda entity: period_total(
+            entity.device,
+            ConsumptionType.CENTRAL_HEATING_TOTAL_ENERGY,
+            ConsumptionTimeInterval.LAST_DAY,
+        ),
+        get_last_reset=lambda entity: period_last_reset(ConsumptionTimeInterval.LAST_DAY),
     ),
     AristonSensorEntityDescription(
         key="Domestic hot water total energy consumption",
@@ -524,8 +543,13 @@ ARISTON_SENSOR_TYPES: list[AristonSensorEntityDescription] = [
             ConsumptionType.DOMESTIC_HOT_WATER_TOTAL_ENERGY.name,
         ],
         coordinator=ENERGY_COORDINATOR,
-        get_native_value=_get_dhw_total_energy_today,
-        get_last_reset=_get_local_day_start,
+        daily_consumption_type=ConsumptionType.DOMESTIC_HOT_WATER_TOTAL_ENERGY,
+        get_native_value=lambda entity: period_total(
+            entity.device,
+            ConsumptionType.DOMESTIC_HOT_WATER_TOTAL_ENERGY,
+            ConsumptionTimeInterval.LAST_DAY,
+        ),
+        get_last_reset=lambda entity: period_last_reset(ConsumptionTimeInterval.LAST_DAY),
     ),
     AristonSensorEntityDescription(
         key="Central heating gas consumption",
@@ -540,8 +564,13 @@ ARISTON_SENSOR_TYPES: list[AristonSensorEntityDescription] = [
             ConsumptionType.CENTRAL_HEATING_GAS.name,
         ],
         coordinator=ENERGY_COORDINATOR,
-        get_native_value=lambda entity: entity.device.central_heating_gas_consumption,
-        get_last_reset=lambda entity: entity.device.consumption_sequence_last_changed_utc,
+        daily_consumption_type=ConsumptionType.CENTRAL_HEATING_GAS,
+        get_native_value=lambda entity: period_total(
+            entity.device,
+            ConsumptionType.CENTRAL_HEATING_GAS,
+            ConsumptionTimeInterval.LAST_DAY,
+        ),
+        get_last_reset=lambda entity: period_last_reset(ConsumptionTimeInterval.LAST_DAY),
     ),
     AristonSensorEntityDescription(
         key="Domestic hot water heating pump electricity consumption",
@@ -556,8 +585,13 @@ ARISTON_SENSOR_TYPES: list[AristonSensorEntityDescription] = [
             ConsumptionType.DOMESTIC_HOT_WATER_HEATING_PUMP_ELECTRICITY.name,
         ],
         coordinator=ENERGY_COORDINATOR,
-        get_native_value=lambda entity: entity.device.domestic_hot_water_heating_pump_electricity_consumption,
-        get_last_reset=lambda entity: entity.device.consumption_sequence_last_changed_utc,
+        daily_consumption_type=ConsumptionType.DOMESTIC_HOT_WATER_HEATING_PUMP_ELECTRICITY,
+        get_native_value=lambda entity: period_total(
+            entity.device,
+            ConsumptionType.DOMESTIC_HOT_WATER_HEATING_PUMP_ELECTRICITY,
+            ConsumptionTimeInterval.LAST_DAY,
+        ),
+        get_last_reset=lambda entity: period_last_reset(ConsumptionTimeInterval.LAST_DAY),
     ),
     AristonSensorEntityDescription(
         key="Domestic hot water resistor electricity consumption",
@@ -572,8 +606,13 @@ ARISTON_SENSOR_TYPES: list[AristonSensorEntityDescription] = [
             ConsumptionType.DOMESTIC_HOT_WATER_RESISTOR_ELECTRICITY.name,
         ],
         coordinator=ENERGY_COORDINATOR,
-        get_native_value=lambda entity: entity.device.domestic_hot_water_resistor_electricity_consumption,
-        get_last_reset=lambda entity: entity.device.consumption_sequence_last_changed_utc,
+        daily_consumption_type=ConsumptionType.DOMESTIC_HOT_WATER_RESISTOR_ELECTRICITY,
+        get_native_value=lambda entity: period_total(
+            entity.device,
+            ConsumptionType.DOMESTIC_HOT_WATER_RESISTOR_ELECTRICITY,
+            ConsumptionTimeInterval.LAST_DAY,
+        ),
+        get_last_reset=lambda entity: period_last_reset(ConsumptionTimeInterval.LAST_DAY),
     ),
     AristonSensorEntityDescription(
         key="Domestic hot water gas consumption",
@@ -588,8 +627,13 @@ ARISTON_SENSOR_TYPES: list[AristonSensorEntityDescription] = [
             ConsumptionType.DOMESTIC_HOT_WATER_GAS.name,
         ],
         coordinator=ENERGY_COORDINATOR,
-        get_native_value=lambda entity: entity.device.domestic_hot_water_gas_consumption,
-        get_last_reset=lambda entity: entity.device.consumption_sequence_last_changed_utc,
+        daily_consumption_type=ConsumptionType.DOMESTIC_HOT_WATER_GAS,
+        get_native_value=lambda entity: period_total(
+            entity.device,
+            ConsumptionType.DOMESTIC_HOT_WATER_GAS,
+            ConsumptionTimeInterval.LAST_DAY,
+        ),
+        get_last_reset=lambda entity: period_last_reset(ConsumptionTimeInterval.LAST_DAY),
     ),
     AristonSensorEntityDescription(
         key="Central heating electricity consumption",
@@ -604,8 +648,13 @@ ARISTON_SENSOR_TYPES: list[AristonSensorEntityDescription] = [
             ConsumptionType.CENTRAL_HEATING_ELECTRICITY.name,
         ],
         coordinator=ENERGY_COORDINATOR,
-        get_native_value=lambda entity: entity.device.central_heating_electricity_consumption,
-        get_last_reset=lambda entity: entity.device.consumption_sequence_last_changed_utc,
+        daily_consumption_type=ConsumptionType.CENTRAL_HEATING_ELECTRICITY,
+        get_native_value=lambda entity: period_total(
+            entity.device,
+            ConsumptionType.CENTRAL_HEATING_ELECTRICITY,
+            ConsumptionTimeInterval.LAST_DAY,
+        ),
+        get_last_reset=lambda entity: period_last_reset(ConsumptionTimeInterval.LAST_DAY),
     ),
     AristonSensorEntityDescription(
         key="Domestic hot water electricity consumption",
@@ -620,8 +669,13 @@ ARISTON_SENSOR_TYPES: list[AristonSensorEntityDescription] = [
             ConsumptionType.DOMESTIC_HOT_WATER_ELECTRICITY.name,
         ],
         coordinator=ENERGY_COORDINATOR,
-        get_native_value=lambda entity: entity.device.domestic_hot_water_electricity_consumption,
-        get_last_reset=lambda entity: entity.device.consumption_sequence_last_changed_utc,
+        daily_consumption_type=ConsumptionType.DOMESTIC_HOT_WATER_ELECTRICITY,
+        get_native_value=lambda entity: period_total(
+            entity.device,
+            ConsumptionType.DOMESTIC_HOT_WATER_ELECTRICITY,
+            ConsumptionTimeInterval.LAST_DAY,
+        ),
+        get_last_reset=lambda entity: period_last_reset(ConsumptionTimeInterval.LAST_DAY),
     ),
     AristonSensorEntityDescription(
         key=EvoDeviceProperties.RM_TM,
@@ -747,6 +801,15 @@ ARISTON_BINARY_SENSOR_TYPES: list[AristonBinarySensorEntityDescription] = [
         icon="mdi:heat-pump-outline",
         get_is_on=lambda entity: entity.device.is_heating_pump_on_value,
         device_features=[DeviceFeatures.HYBRID_SYS],
+        system_types=[SystemType.GALEVO],
+    ),
+    AristonBinarySensorEntityDescription(
+        key=str(MENU_ITEM_CH_BACKUP_RESISTANCE_1),
+        name=f"{NAME} CH backup resistance 1",
+        icon="mdi:heating-coil",
+        entity_category=EntityCategory.DIAGNOSTIC,
+        device_features=[str(MENU_ITEM_CH_BACKUP_RESISTANCE_1)],
+        get_is_on=lambda entity: entity.device.ch_backup_resistance_1_value,
         system_types=[SystemType.GALEVO],
     ),
     AristonBinarySensorEntityDescription(

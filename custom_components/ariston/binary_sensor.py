@@ -21,7 +21,7 @@ from .const import (
     AristonBinarySensorEntityDescription,
 )
 from .coordinator import DeviceDataUpdateCoordinator
-from .entity import AristonEntity, is_entity_description_available
+from .entity import AristonEntity, register_supported_entities
 
 _LOGGER = logging.getLogger(__name__)
 
@@ -45,22 +45,16 @@ async def async_setup_entry(
         entry.unique_id
     ].get(COORDINATOR)
 
-    for description in ARISTON_BINARY_SENSOR_TYPES:
-        coordinator: DeviceDataUpdateCoordinator | None = hass.data[DOMAIN][
-            entry.unique_id
-        ].get(description.coordinator)
-        if is_entity_description_available(coordinator, description):
-            if description.zone:
-                for zone_number in coordinator.device.zone_numbers:
-                    ariston_binary_sensors.append(
-                        AristonBinarySensor(coordinator, description, zone_number)
-                    )
-            else:
-                ariston_binary_sensors.append(
-                    AristonBinarySensor(coordinator, description)
-                )
-
-    async_add_entities(ariston_binary_sensors)
+    register_supported_entities(
+        hass,
+        entry,
+        ARISTON_BINARY_SENSOR_TYPES,
+        lambda coordinator, description, zone=0: AristonBinarySensor(
+            coordinator, description, zone
+        ),
+        async_add_entities,
+        registered_entities=ariston_binary_sensors,
+    )
 
     # Register create_vacation whenever the device exposes a holiday setter
     # (Galevo natively, Velis Slp/Nuos via the library's async_set_holiday).
