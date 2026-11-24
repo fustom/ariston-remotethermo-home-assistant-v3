@@ -291,7 +291,11 @@ class BookRevisionsTask(RecorderTask):
         finally:
             if changed:
                 # The latest short-term row may be a new one now.
-                get_short_term_statistics_run_cache(
-                    instance.hass
-                ).remove_metadata_ids(changed)
+                cache = get_short_term_statistics_run_cache(instance.hass)
+                if remove_metadata_ids := getattr(cache, "remove_metadata_ids", None):
+                    remove_metadata_ids(changed)
+                else:
+                    # Core 2026.10 has no cache-invalidation method.
+                    for metadata_id in changed:
+                        cache._latest_id_by_metadata_id.pop(metadata_id, None)
             instance.hass.loop.call_soon_threadsafe(self.on_done, results)

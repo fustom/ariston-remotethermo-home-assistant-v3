@@ -344,14 +344,20 @@ async def _run(hass, db, revisions, session_factory=None):
     return results
 
 
-async def test_task_reports_results_and_refreshes_the_run_cache(hass, db):
+@pytest.mark.parametrize("legacy_cache", [False, True], ids=["native", "legacy"])
+async def test_task_reports_results_and_refreshes_the_run_cache(
+    hass, db, monkeypatch, legacy_cache
+):
     with db() as session:
         mid = _meta(session)
         _row(session, StatisticsShortTerm, mid, _utc(20, 55), 2.5, 10.0, Y)
         _compiled(session, _utc(22))
         session.commit()
     cache = get_short_term_statistics_run_cache(hass)
+    if legacy_cache:
+        monkeypatch.delattr(type(cache), "remove_metadata_ids", raising=False)
     cache.set_latest_id_for_metadata_id(mid, 1)
+    cache.set_latest_id_for_metadata_id(mid + 1, 42)
 
     revision = _revision()
     other = _revision(reset=dt.datetime(2026, 5, 4, tzinfo=ROME))
@@ -359,7 +365,7 @@ async def test_task_reports_results_and_refreshes_the_run_cache(hass, db):
         {revision: RevisionResult.BOOKED, other: RevisionResult.SKIPPED}
     ]
     # The new 21:55 row is the latest now: Recorder must look it up again.
-    assert cache.get_latest_ids({mid}) == {}
+    assert cache.get_latest_ids({mid, mid + 1}) == {mid + 1: 42}
 
 
 async def test_task_reports_a_database_error(hass, db):
