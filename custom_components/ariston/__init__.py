@@ -36,7 +36,7 @@ from .const import (
     ENERGY_SCAN_INTERVAL,
     RATED_POWER_W,
 )
-from .coordinator import DeviceDataUpdateCoordinator
+from .coordinator import DeviceDataUpdateCoordinator, rate_limit_retry_after
 
 _LOGGER = logging.getLogger(__name__)
 
@@ -179,6 +179,16 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
     except (ConfigEntryAuthFailed, ConfigEntryNotReady):
         raise
     except Exception as error:
+        if (retry_after := rate_limit_retry_after(error)) is not None:
+            # Expected while the cloud blocks the account: no traceback, and
+            # let the setup retry wait out the block window.
+            not_ready = ConfigEntryNotReady(
+                "Ariston cloud is rate limiting requests (HTTP 429)"
+            )
+            # Set as an attribute: the retry_after keyword only exists on
+            # Home Assistant 2026.11+, older versions ignore the attribute.
+            not_ready.retry_after = retry_after or None
+            raise not_ready from error
         _LOGGER.exception("")
         raise ConfigEntryNotReady from error
 
