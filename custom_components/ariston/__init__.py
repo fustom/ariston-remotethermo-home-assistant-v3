@@ -174,7 +174,7 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
                 async_set_item_by_id_service,
                 schema=SET_ITEM_BY_ID_SCHEMA,
             )
-    except ConfigEntryAuthFailed:
+    except (ConfigEntryAuthFailed, ConfigEntryNotReady):
         raise
     except Exception as error:
         _LOGGER.exception("")

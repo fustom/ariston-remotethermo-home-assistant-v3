@@ -5,11 +5,13 @@ from __future__ import annotations
 from collections.abc import Callable
 from datetime import timedelta
 import logging
+from typing import Any
 
+from ariston.ariston_api import ConnectionException
 from ariston.base_device import AristonBaseDevice
 from homeassistant.config_entries import ConfigEntry
 from homeassistant.core import HomeAssistant
-from homeassistant.helpers.update_coordinator import DataUpdateCoordinator
+from homeassistant.helpers.update_coordinator import DataUpdateCoordinator, UpdateFailed
 
 from .const import DOMAIN
 
@@ -39,3 +41,13 @@ class DeviceDataUpdateCoordinator(DataUpdateCoordinator):
         )
 
         self.device = device
+
+    async def _async_update_data(self) -> Any:
+        """Report Ariston HTTP server errors as failed updates."""
+        try:
+            return await super()._async_update_data()
+        except ConnectionException as error:
+            match error.args:
+                case (int(status),) if 500 <= status < 600:
+                    raise UpdateFailed(f"Ariston cloud returned HTTP {status}") from error
+            raise
