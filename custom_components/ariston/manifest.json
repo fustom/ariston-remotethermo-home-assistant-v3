@@ -13,6 +13,6 @@
   "loggers": ["ariston"],
   "requirements": ["ariston==0.19.17"],
   "ssdp": [],
-  "version": "0.20.9",
+  "version": "0.20.10",
   "zeroconf": []
 }
