@@ -179,7 +179,7 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
     except (ConfigEntryAuthFailed, ConfigEntryNotReady):
         raise
     except Exception as error:
-        if (retry_after := rate_limit_retry_after(error)) is not None:
+        if (retry_after := rate_limit_retry_after(error, ariston.api)) is not None:
             # Expected while the cloud blocks the account: no traceback, and
             # let the setup retry wait out the block window.
             not_ready = ConfigEntryNotReady(

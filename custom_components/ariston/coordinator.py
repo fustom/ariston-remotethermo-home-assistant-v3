@@ -5,11 +5,12 @@ from __future__ import annotations
 from collections.abc import Callable
 from datetime import timedelta
 import logging
+import time
 from typing import Any
 
 from ariston.ariston_api import ConnectionException
 from ariston.base_device import AristonBaseDevice
-from homeassistant.config_entries import ConfigEntry
+from homeassistant.config_entries import ConfigEntry, ConfigEntryState
 from homeassistant.core import HomeAssistant
 from homeassistant.helpers.update_coordinator import DataUpdateCoordinator, UpdateFailed
 
@@ -18,16 +19,37 @@ from .const import DOMAIN
 _LOGGER = logging.getLogger(__name__)
 
 
-def rate_limit_retry_after(error: BaseException) -> float | None:
+def _find_rate_limit(error: BaseException | None) -> ConnectionException | None:
+    """Return the Ariston 429 in error or its cause chain, if any.
+
+    The client wraps a 429 raised during login in an empty
+    ConnectionException, so the status is only on error.__cause__.
+    """
+    seen: set[int] = set()
+    while error is not None and id(error) not in seen:
+        seen.add(id(error))
+        if isinstance(error, ConnectionException) and error.args[:1] == (429,):
+            return error
+        error = error.__cause__
+    return None
+
+
+def rate_limit_retry_after(error: BaseException, api: Any = None) -> float | None:
     """Return seconds to wait if error is an Ariston 429, else None.
 
-    Newer ariston libraries raise RateLimitException with a retry_after
-    attribute; older ones raise ConnectionException(429, ...) without it,
-    which maps to 0 (rate limited, duration unknown).
+    The delay comes from a retry_after attribute on the exception when the
+    client provides one, otherwise from the client's own block deadline
+    (AristonAPI._blocked_until), which it sets from the block duration in
+    the 429 body. 0 means rate limited with no known duration.
     """
-    if not isinstance(error, ConnectionException) or error.args[:1] != (429,):
+    if (rate_limit := _find_rate_limit(error)) is None:
         return None
-    return float(getattr(error, "retry_after", 0) or 0)
+    if (retry_after := getattr(rate_limit, "retry_after", None)) is not None:
+        return max(0.0, float(retry_after))
+    blocked_until = getattr(api, "_blocked_until", None)
+    if isinstance(blocked_until, (int, float)):
+        return max(0.0, blocked_until - time.time())
+    return 0.0
 
 
 class DeviceDataUpdateCoordinator(DataUpdateCoordinator):
@@ -60,18 +82,31 @@ class DeviceDataUpdateCoordinator(DataUpdateCoordinator):
         try:
             return await super()._async_update_data()
         except ConnectionException as error:
-            if (retry_after := rate_limit_retry_after(error)) is not None:
-                # Only ever slow polling down: a block shorter than the normal
-                # interval must not make this coordinator poll sooner.
-                interval = (
-                    self.update_interval.total_seconds() if self.update_interval else 0
-                )
+            retry_after = rate_limit_retry_after(error, getattr(self.device, "api", None))
+            if retry_after is not None:
                 raise UpdateFailed(
-                    f"Ariston cloud is rate limiting requests (HTTP 429); "
-                    f"retrying in {max(retry_after, interval):.0f} seconds",
-                    retry_after=retry_after if retry_after > interval else None,
+                    "Ariston cloud is rate limiting requests (HTTP 429)",
+                    retry_after=self._rate_limit_delay(retry_after),
                 ) from error
             match error.args:
                 case (int(status),) if 500 <= status < 600:
                     raise UpdateFailed(f"Ariston cloud returned HTTP {status}") from error
             raise
+
+    def _rate_limit_delay(self, retry_after: float) -> float | None:
+        """Return the retry_after to report for a 429, or None for the default.
+
+        During setup (first refresh) Home Assistant retries after its own short
+        back-off, so any known delay is passed on. After setup, polling only
+        ever slows down: a block shorter than the scan interval keeps the
+        normal schedule.
+        """
+        if not retry_after:
+            return None
+        if (
+            self.config_entry is not None
+            and self.config_entry.state is ConfigEntryState.SETUP_IN_PROGRESS
+        ):
+            return retry_after
+        interval = self.update_interval.total_seconds() if self.update_interval else 0
+        return retry_after if retry_after > interval else None
