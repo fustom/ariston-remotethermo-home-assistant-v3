@@ -181,6 +181,9 @@ class AristonThermostat(AristonEntity, ClimateEntity):
     @property
     def hvac_action(self):
         """Return the current running hvac operation."""
+        if self.hvac_mode == HVACMode.OFF:
+            return HVACAction.OFF
+
         if_flame_on = bool(self.device.is_flame_on_value)
         if_heating_pump_on = bool(getattr(self.device, 'is_heating_pump_on_value', False))
 
@@ -217,10 +220,8 @@ class AristonThermostat(AristonEntity, ClimateEntity):
             current_plant_mode = self.device.plant_mode
 
             if hvac_mode == HVACMode.OFF:
-                if self.device.is_plant_mode_options_contains_off:
-                    await self.device.async_set_plant_mode(PlantMode.OFF)
-                else:
-                    await self.device.async_set_plant_mode(PlantMode.SUMMER)
+                if ZoneMode.OFF.value in zone_modes:
+                    await self.device.async_set_zone_mode(ZoneMode.OFF, self.zone)
             elif hvac_mode == HVACMode.AUTO:
                 if current_plant_mode in [
                     PlantMode.WINTER,
