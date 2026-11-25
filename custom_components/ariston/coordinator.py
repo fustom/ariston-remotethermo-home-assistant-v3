@@ -10,7 +10,7 @@ from typing import Any
 
 from ariston.ariston_api import ConnectionException
 from ariston.base_device import AristonBaseDevice
-from homeassistant.config_entries import ConfigEntry, ConfigEntryState
+from homeassistant.config_entries import ConfigEntry
 from homeassistant.core import HomeAssistant
 from homeassistant.helpers.update_coordinator import DataUpdateCoordinator, UpdateFailed
 
@@ -76,6 +76,15 @@ class DeviceDataUpdateCoordinator(DataUpdateCoordinator):
 
         self.device = device
         self.rated_power_w: int | None = None
+        self._in_first_refresh = False
+
+    async def async_config_entry_first_refresh(self) -> None:
+        """First refresh during setup; marks it for the 429 delay rule."""
+        self._in_first_refresh = True
+        try:
+            await super().async_config_entry_first_refresh()
+        finally:
+            self._in_first_refresh = False
 
     async def _async_update_data(self) -> Any:
         """Report Ariston rate limits and HTTP server errors as failed updates."""
@@ -96,17 +105,15 @@ class DeviceDataUpdateCoordinator(DataUpdateCoordinator):
     def _rate_limit_delay(self, retry_after: float) -> float | None:
         """Return the retry_after to report for a 429, or None for the default.
 
-        During setup (first refresh) Home Assistant retries after its own short
-        back-off, so any known delay is passed on. After setup, polling only
-        ever slows down: a block shorter than the scan interval keeps the
-        normal schedule.
+        On the config entry's first refresh, Home Assistant would otherwise
+        retry setup after its own short back-off, so any known delay is passed
+        on. Every other refresh (later polls, and the optional bus-error and
+        energy refreshes during setup) only ever slows down: a block shorter
+        than the scan interval keeps the normal schedule.
         """
         if not retry_after:
             return None
-        if (
-            self.config_entry is not None
-            and self.config_entry.state is ConfigEntryState.SETUP_IN_PROGRESS
-        ):
+        if self._in_first_refresh:
             return retry_after
         interval = self.update_interval.total_seconds() if self.update_interval else 0
         return retry_after if retry_after > interval else None

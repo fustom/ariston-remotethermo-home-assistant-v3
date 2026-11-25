@@ -278,3 +278,60 @@ async def test_first_refresh_passes_short_block_through(hass, monkeypatch):
         await async_setup_entry(hass, entry)
 
     assert ctx.value.retry_after == 60
+
+
+async def test_optional_refresh_during_setup_keeps_its_interval(hass):
+    """Bus-error/energy refreshes during setup must not adopt a short block."""
+    entry = _entry()
+    entry.add_to_hass(hass)
+    entry._async_set_state(hass, ConfigEntryState.SETUP_IN_PROGRESS, None)
+    coordinator = DeviceDataUpdateCoordinator(
+        hass,
+        SimpleNamespace(name="Test boiler"),
+        600,
+        "bus_errors",
+        AsyncMock(side_effect=_RateLimitException(60)),
+        config_entry=entry,
+    )
+
+    await coordinator.async_refresh()
+
+    assert isinstance(coordinator.last_exception, UpdateFailed)
+    assert coordinator.last_exception.retry_after is None
+
+
+async def test_setup_retry_waits_out_known_block_without_contacting_ariston(hass):
+    """A retry inside a known block (e.g. at HA startup) makes no request."""
+    entry = _entry()
+    session, patches = _pinned_cloud_patches(b"Requests are blocked for 900 seconds")
+    with patches[0], patches[1], pytest.raises(ConfigEntryNotReady):
+        await async_setup_entry(hass, entry)
+    requests_after_first_attempt = session.requests
+
+    with patches[0], patches[1], pytest.raises(ConfigEntryNotReady) as ctx:
+        await async_setup_entry(hass, entry)
+
+    assert session.requests == requests_after_first_attempt  # nothing sent
+    assert ctx.value.retry_after == pytest.approx(900, abs=10)
+
+
+async def test_first_refresh_block_is_remembered_for_the_next_setup(hass, monkeypatch):
+    device = _mock_device()
+    device.async_update_state.side_effect = _RateLimitException(900)
+    _setup_client(monkeypatch, device)
+    monkeypatch.setattr(
+        hass.config_entries, "async_forward_entry_setups", AsyncMock()
+    )
+    entry = _entry()
+    entry.add_to_hass(hass)
+    entry._async_set_state(hass, ConfigEntryState.SETUP_IN_PROGRESS, None)
+    with pytest.raises(ConfigEntryNotReady):
+        await async_setup_entry(hass, entry)
+
+    client_factory = MagicMock()
+    monkeypatch.setattr("custom_components.ariston.Ariston", client_factory)
+    with pytest.raises(ConfigEntryNotReady) as ctx:
+        await async_setup_entry(hass, entry)
+
+    client_factory.assert_not_called()  # no new client, no request
+    assert ctx.value.retry_after == pytest.approx(900, abs=10)
