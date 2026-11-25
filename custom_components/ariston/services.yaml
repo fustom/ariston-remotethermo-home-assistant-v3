@@ -1,8 +1,9 @@
 create_vacation:
   name: Create vacation
   description: >-
-    Create a vacation on the selected device. If end date is not specified, the
-    vacation is going to be deleted.
+    Schedule a holiday on the selected Ariston device. Leave the end date empty
+    to clear an existing holiday. Supported on Galevo systems and on Velis Slp
+    (Nuos Split) heat pumps.
   fields:
     device_id:
       name: Device
@@ -13,9 +14,10 @@ create_vacation:
           integration: ariston
     end_date:
       name: End date
-      description: Date the vacation ends in the YYYY-mm-dd format.
+      description: Date the holiday ends. Leave empty to clear an active holiday.
+      example: "2026-08-15"
       selector:
-        text:
+        date:
 set_item_by_id:
   name: Set item by id
   description: Ariston device or thermostat property

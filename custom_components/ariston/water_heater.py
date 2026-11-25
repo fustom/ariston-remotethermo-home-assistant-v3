@@ -19,7 +19,11 @@ from .const import (
     AristonWaterHeaterEntityDescription,
 )
 from .coordinator import DeviceDataUpdateCoordinator
-from .entity import AristonEntity
+from .entity import (
+    AristonEntity,
+    async_refresh_after_set,
+    is_entity_description_available,
+)
 
 _LOGGER = logging.getLogger(__name__)
 
@@ -30,19 +34,11 @@ async def async_setup_entry(
     """Set up the Ariston water heater device from config entry."""
     ariston_water_heaters: list[AristonWaterHeater] = []
     for description in ARISTON_WATER_HEATER_TYPES:
-        coordinator: DeviceDataUpdateCoordinator = hass.data[DOMAIN][entry.unique_id][
-            description.coordinator
-        ]
+        coordinator: DeviceDataUpdateCoordinator | None = hass.data[DOMAIN][
+            entry.unique_id
+        ].get(description.coordinator)
 
-        if (
-            coordinator
-            and coordinator.device
-            and coordinator.device.are_device_features_available(
-                description.device_features,
-                description.system_types,
-                description.whe_types,
-            )
-        ):
+        if is_entity_description_available(coordinator, description):
             ariston_water_heaters.append(AristonWaterHeater(coordinator, description))
 
     async_add_entities(ariston_water_heaters)
@@ -75,7 +71,7 @@ class AristonWaterHeater(AristonEntity, WaterHeaterEntity):
         return "mdi:water-pump"
 
     @property
-    def current_temperature(self):
+    def native_current_temperature(self) -> float:
         """Return the temperature."""
         return self.device.water_heater_current_temperature
 
@@ -85,7 +81,7 @@ class AristonWaterHeater(AristonEntity, WaterHeaterEntity):
         return self.device.water_heater_minimum_temperature
 
     @property
-    def target_temperature(self):
+    def native_target_temperature(self) -> float:
         """Return the temperature we try to reach."""
         return self.device.water_heater_target_temperature
 
@@ -100,9 +96,27 @@ class AristonWaterHeater(AristonEntity, WaterHeaterEntity):
         return 1 / 10**self.device.water_heater_temperature_decimals
 
     @property
-    def temperature_unit(self):
+    def native_temperature_unit(self) -> str:
         """Return the unit of measurement."""
         return self.device.water_heater_temperature_unit
+
+    # Backward compatibility with Home Assistant < 2026.11, which only reads
+    # the non-native property names. On 2026.11+, when an entity provides
+    # both, the native_* members take precedence without deprecation warning.
+    @property
+    def temperature_unit(self) -> str:
+        """Return the unit of measurement (HA < 2026.11)."""
+        return self.native_temperature_unit
+
+    @property
+    def current_temperature(self) -> float:
+        """Return the current temperature (HA < 2026.11)."""
+        return self.native_current_temperature
+
+    @property
+    def target_temperature(self) -> float:
+        """Return the target temperature (HA < 2026.11)."""
+        return self.native_target_temperature
 
     @property
     def supported_features(self) -> int:
@@ -141,17 +155,19 @@ class AristonWaterHeater(AristonEntity, WaterHeaterEntity):
         )
 
         await self.device.async_set_water_heater_temperature(temperature)
-        self.async_write_ha_state()
+        await async_refresh_after_set(self)
 
     async def async_set_operation_mode(self, operation_mode):
         """Set operation mode."""
         await self.device.async_set_water_heater_operation_mode(operation_mode)
-        self.async_write_ha_state()
+        await async_refresh_after_set(self)
 
     async def async_turn_off(self, **kwargs) -> None:
         """Turn the water heater off."""
         await self.device.async_set_power(False)
+        await async_refresh_after_set(self)
 
     async def async_turn_on(self, **kwargs) -> None:
         """Turn the water heater on."""
         await self.device.async_set_power(True)
+        await async_refresh_after_set(self)

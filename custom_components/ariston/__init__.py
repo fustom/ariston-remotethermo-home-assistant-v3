@@ -58,7 +58,7 @@ SET_ITEM_BY_ID_SCHEMA = vol.Schema(
     {
         vol.Required(ATTR_DEVICE_ID): cv.string,
         vol.Required(ATTR_ITEM_ID): cv.string,
-        vol.Required(ATTR_ZONE): cv.positive_int,
+        vol.Required(ATTR_ZONE): vol.All(cv.positive_int, vol.Range(min=1)),
         vol.Required(ATTR_VALUE): vol.Coerce(float),
     }
 )
@@ -98,7 +98,12 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
             CONF_SCAN_INTERVAL, DEFAULT_SCAN_INTERVAL_SECONDS
         )
         coordinator = DeviceDataUpdateCoordinator(
-            hass, device, scan_interval_seconds, COORDINATOR, device.async_update_state
+            hass,
+            device,
+            scan_interval_seconds,
+            COORDINATOR,
+            device.async_update_state,
+            config_entry=entry,
         )
 
         hass.data.setdefault(DOMAIN, {}).setdefault(
@@ -117,11 +122,12 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
             bus_errors_scan_interval_seconds,
             BUS_ERRORS_COORDINATOR,
             device.async_get_bus_errors,
+            config_entry=entry,
         )
         hass.data[DOMAIN][entry.unique_id][BUS_ERRORS_COORDINATOR] = (
             bus_errors_coordinator
         )
-        await bus_errors_coordinator.async_config_entry_first_refresh()
+        await bus_errors_coordinator.async_refresh()
 
         if device.has_metering:
             energy_interval_minutes = entry.options.get(
@@ -133,9 +139,10 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
                 energy_interval_minutes * 60,
                 ENERGY_COORDINATOR,
                 device.async_update_energy,
+                config_entry=entry,
             )
             hass.data[DOMAIN][entry.unique_id][ENERGY_COORDINATOR] = energy_coordinator
-            await energy_coordinator.async_config_entry_first_refresh()
+            await energy_coordinator.async_refresh()
 
         await hass.config_entries.async_forward_entry_setups(entry, PLATFORMS)
 
@@ -167,7 +174,7 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
                 async_set_item_by_id_service,
                 schema=SET_ITEM_BY_ID_SCHEMA,
             )
-    except ConfigEntryAuthFailed:
+    except (ConfigEntryAuthFailed, ConfigEntryNotReady):
         raise
     except Exception as error:
         _LOGGER.exception("")
