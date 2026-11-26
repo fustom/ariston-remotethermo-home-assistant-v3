@@ -97,6 +97,20 @@ def _get_ch_heat_request(entity: Any) -> bool:
     return bool(entity.device.get_zone_heat_request_value(entity.zone))
 
 
+def _get_estimated_power(entity: Any) -> int | None:
+    """Estimate the instantaneous power of a resistive water heater.
+
+    The rated power while heating, 0 while idle. None when no rated power is
+    configured or the heating state is unknown, so the sensor reports unknown
+    instead of a misleading 0 W.
+    """
+    rated_power_w = entity.coordinator.rated_power_w
+    is_heating = entity.device.is_heating
+    if rated_power_w is None or is_heating is None:
+        return None
+    return rated_power_w if is_heating else 0
+
+
 def _get_dhw_flame(entity: Any) -> bool:
     """Approximate DHW flame for boilers that only expose a global flame flag."""
     if not bool(entity.device.is_flame_on_value):
@@ -780,15 +794,15 @@ ARISTON_SENSOR_TYPES: list[AristonSensorEntityDescription] = [
         whe_types=[
             WheType.Evo,
             WheType.Evo2,
+            # Resistive heaters only: they draw a fixed rated power while
+            # heating. Hybrid heat pump models modulate, so the estimate
+            # would be wrong and they are deliberately excluded.
             WheType.Lydos,
-            WheType.LydosHybrid,
             WheType.Lux,
             WheType.Lux2,
             WheType.Andris2,
         ],
-        get_native_value=lambda entity: (
-            entity.coordinator.rated_power_w if entity.device.is_heating else 0
-        ) if entity.coordinator.rated_power_w is not None else None,
+        get_native_value=_get_estimated_power,
     ),
 ]
 

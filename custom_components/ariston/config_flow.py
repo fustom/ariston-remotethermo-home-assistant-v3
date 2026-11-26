@@ -169,6 +169,13 @@ class AristonOptionsFlow(config_entries.OptionsFlow):
     async def async_step_init(self, user_input=None):
         """Manage the options."""
         if user_input is not None:
+            if user_input.get(RATED_POWER_W) is None:
+                # An emptied field clears the saved rating.
+                user_input = {
+                    key: value
+                    for key, value in user_input.items()
+                    if key != RATED_POWER_W
+                }
             return self.async_create_entry(title="", data=user_input)
 
         options = self.config_entry.options
@@ -196,14 +203,14 @@ class AristonOptionsFlow(config_entries.OptionsFlow):
             ): int,
         }
 
-        if rated_power_w is not None:
-            schema_dict[vol.Optional(RATED_POWER_W, default=rated_power_w)] = vol.All(
-                int, vol.Range(min=1)
+        # A suggested value instead of a default: the saved rating is shown
+        # pre-filled, but the field can still be emptied to clear it.
+        schema_dict[
+            vol.Optional(
+                RATED_POWER_W,
+                description={"suggested_value": rated_power_w},
             )
-        else:
-            schema_dict[vol.Optional(RATED_POWER_W)] = vol.Any(
-                None, vol.All(int, vol.Range(min=1))
-            )
+        ] = vol.Any(None, vol.All(int, vol.Range(min=1)))
 
         return self.async_show_form(
             step_id="init",
