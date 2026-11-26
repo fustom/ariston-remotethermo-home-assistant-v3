@@ -37,7 +37,11 @@ from .const import (
     ENERGY_SCAN_INTERVAL,
     RATED_POWER_W,
 )
-from .coordinator import DeviceDataUpdateCoordinator, rate_limit_retry_after
+from .coordinator import (
+    DeviceDataUpdateCoordinator,
+    pad_block_delay,
+    rate_limit_retry_after,
+)
 
 _LOGGER = logging.getLogger(__name__)
 
@@ -77,8 +81,24 @@ def _rate_limited(retry_after: float | None) -> ConfigEntryNotReady:
     not_ready = ConfigEntryNotReady("Ariston cloud is rate limiting requests (HTTP 429)")
     # Set as an attribute: the retry_after keyword only exists on Home
     # Assistant 2026.11+, older versions ignore the attribute.
-    not_ready.retry_after = retry_after or None
+    not_ready.retry_after = pad_block_delay(retry_after) if retry_after else None
     return not_ready
+
+
+def _reported_delay(error: BaseException) -> float | None:
+    """Return the first retry_after set on error or its cause chain.
+
+    Home Assistant 2026.11+ copies the coordinator's retry_after onto the
+    ConfigEntryNotReady of a failed first refresh; 2026.10 leaves it on the
+    UpdateFailed cause only.
+    """
+    seen: set[int] = set()
+    while error is not None and id(error) not in seen:
+        seen.add(id(error))
+        if (retry_after := getattr(error, "retry_after", None)) is not None:
+            return retry_after
+        error = error.__cause__
+    return None
 
 
 def _remember_block(hass: HomeAssistant, entry: ConfigEntry, retry_after: float | None) -> None:
@@ -209,12 +229,18 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
     except ConfigEntryAuthFailed:
         raise
     except ConfigEntryNotReady as error:
-        # A 429 on the first refresh arrives here with its delay attached.
-        if rate_limit_retry_after(error) is not None:
-            _remember_block(hass, entry, getattr(error, "retry_after", None))
+        # A 429 on the first refresh: remember the block, taking its delay
+        # from the coordinator or, failing that, from the client's deadline.
+        api = getattr(ariston, "api", None)
+        if (retry_after := rate_limit_retry_after(error, api)) is not None:
+            retry_after = _reported_delay(error) or retry_after
+            _remember_block(hass, entry, retry_after)
+            # Already padded by the coordinator when it came from there.
+            error.retry_after = retry_after or None
         raise
     except Exception as error:
-        if (retry_after := rate_limit_retry_after(error, ariston.api)) is not None:
+        api = getattr(ariston, "api", None)
+        if (retry_after := rate_limit_retry_after(error, api)) is not None:
             # Expected while the cloud blocks the account: no traceback, and
             # let the setup retry wait out the block window.
             _remember_block(hass, entry, retry_after)

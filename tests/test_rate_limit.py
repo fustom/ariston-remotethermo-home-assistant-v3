@@ -90,7 +90,7 @@ async def test_long_block_delays_next_poll(hass, ariston_device):
 
     assert not coordinator.last_update_success
     assert isinstance(coordinator.last_exception, UpdateFailed)
-    assert coordinator.last_exception.retry_after == 900
+    assert coordinator.last_exception.retry_after == 902  # padded for timer rounding
 
 
 async def test_short_block_never_polls_sooner_than_interval(hass, ariston_device):
@@ -135,7 +135,7 @@ async def test_setup_429_raises_not_ready_with_retry_after(hass, monkeypatch, ca
     with caplog.at_level(logging.ERROR), pytest.raises(ConfigEntryNotReady) as ctx:
         await async_setup_entry(hass, entry)
 
-    assert ctx.value.retry_after == 900
+    assert ctx.value.retry_after == 902
     assert "Traceback" not in caplog.text
 
 
@@ -153,7 +153,7 @@ async def test_first_refresh_429_keeps_retry_after(hass, monkeypatch):
     with pytest.raises(ConfigEntryNotReady) as ctx:
         await async_setup_entry(hass, entry)
 
-    assert ctx.value.retry_after == 900
+    assert ctx.value.retry_after == 902
 
 
 # --- Pinned ariston client behind a fake Ariston cloud ------------
@@ -234,7 +234,7 @@ async def test_pinned_client_block_duration_schedules_next_poll(hass):
         await coordinator.async_refresh()
 
     assert isinstance(coordinator.last_exception, UpdateFailed)
-    assert coordinator.last_exception.retry_after == pytest.approx(901, abs=5)
+    assert coordinator.last_exception.retry_after == pytest.approx(903, abs=5)
     assert session.requests in (1, 2)  # 0.19.18 retries once, 0.19.21+ does not
 
     now = dt_util.utcnow()
@@ -257,7 +257,7 @@ async def test_pinned_client_login_429_raises_not_ready(hass, caplog):
     ) as ctx:
         await async_setup_entry(hass, entry)
 
-    assert ctx.value.retry_after == pytest.approx(901, abs=5)
+    assert ctx.value.retry_after == pytest.approx(903, abs=5)
     assert "Traceback" not in caplog.text
     assert session.requests in (1, 2)  # 0.19.18 retries once, 0.19.21+ does not
 
@@ -277,7 +277,7 @@ async def test_first_refresh_passes_short_block_through(hass, monkeypatch):
     with pytest.raises(ConfigEntryNotReady) as ctx:
         await async_setup_entry(hass, entry)
 
-    assert ctx.value.retry_after == 60
+    assert ctx.value.retry_after == 62
 
 
 async def test_optional_refresh_during_setup_keeps_its_interval(hass):
@@ -335,3 +335,63 @@ async def test_first_refresh_block_is_remembered_for_the_next_setup(hass, monkey
 
     client_factory.assert_not_called()  # no new client, no request
     assert ctx.value.retry_after == pytest.approx(900, abs=10)
+
+
+async def test_first_refresh_block_without_copied_retry_after(hass, monkeypatch):
+    """Home Assistant 2026.10 keeps retry_after on the UpdateFailed cause only."""
+    device = _mock_device()
+    _setup_client(monkeypatch, device)
+    entry = _entry()
+    entry.add_to_hass(hass)
+
+    async def first_refresh(self):
+        try:
+            try:
+                raise ConnectionException(429, b"Requests are blocked")
+            except ConnectionException as rate_limit:
+                raise UpdateFailed("rate limited", retry_after=902) from rate_limit
+        except UpdateFailed as update_failed:
+            not_ready = ConfigEntryNotReady()  # no retry_after, as on 2026.10
+            raise not_ready from update_failed
+
+    monkeypatch.setattr(
+        DeviceDataUpdateCoordinator, "async_config_entry_first_refresh", first_refresh
+    )
+    with pytest.raises(ConfigEntryNotReady) as ctx:
+        await async_setup_entry(hass, entry)
+    assert ctx.value.retry_after == 902
+
+    client_factory = MagicMock()
+    monkeypatch.setattr("custom_components.ariston.Ariston", client_factory)
+    with pytest.raises(ConfigEntryNotReady):
+        await async_setup_entry(hass, entry)
+    client_factory.assert_not_called()  # the startup retry stays offline
+
+
+async def test_first_scheduled_retry_reaches_ariston(hass, freezer):
+    """The retry after a block sends a request even if its timer fires early.
+
+    Home Assistant schedules the refresh from the loop time truncated to whole
+    seconds, plus 0.05-0.5 s, so it can fire up to 0.95 s before the delay.
+    """
+    api = AristonAPI("user", "pass")
+
+    async def update():
+        return await api._async_get("https://example/menuItems")
+
+    device = SimpleNamespace(name="Test boiler", api=api)
+    coordinator = DeviceDataUpdateCoordinator(hass, device, 300, "test", update)
+    coordinator.async_add_listener(lambda: None)
+    session, patches = _pinned_cloud_patches(b"Requests are blocked for 900 seconds")
+    with patches[0], patches[1]:
+        await coordinator.async_refresh()
+    requests_before = session.requests
+    retry_after = coordinator.last_exception.retry_after
+
+    # Worst case: the timer fires 0.95 s before the reported delay.
+    freezer.tick(retry_after - 0.95)
+    with patches[0], patches[1]:
+        async_fire_time_changed(hass, dt_util.utcnow(), fire_all=True)
+        await hass.async_block_till_done()
+
+    assert session.requests == requests_before + 1  # not skipped by the client

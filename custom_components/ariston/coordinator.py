@@ -5,6 +5,7 @@ from __future__ import annotations
 from collections.abc import Callable
 from datetime import timedelta
 import logging
+import math
 import time
 from typing import Any
 
@@ -17,6 +18,17 @@ from homeassistant.helpers.update_coordinator import DataUpdateCoordinator, Upda
 from .const import DOMAIN
 
 _LOGGER = logging.getLogger(__name__)
+
+# Home Assistant schedules a coordinator's next refresh from the loop time
+# truncated to whole seconds, so a timer can fire up to a second early. Pad
+# every delay reported for a block so the retry lands after the block ends,
+# instead of being skipped by the client and pushed back a full interval.
+RATE_LIMIT_MARGIN_SECONDS = 2
+
+
+def pad_block_delay(retry_after: float) -> float:
+    """Return retry_after rounded up, plus a margin for timer rounding."""
+    return math.ceil(retry_after) + RATE_LIMIT_MARGIN_SECONDS
 
 
 def _find_rate_limit(error: BaseException | None) -> ConnectionException | None:
@@ -109,11 +121,12 @@ class DeviceDataUpdateCoordinator(DataUpdateCoordinator):
         retry setup after its own short back-off, so any known delay is passed
         on. Every other refresh (later polls, and the optional bus-error and
         energy refreshes during setup) only ever slows down: a block shorter
-        than the scan interval keeps the normal schedule.
+        than the scan interval keeps the normal schedule. A reported delay is
+        padded (see pad_block_delay) so the retry is not skipped by the client.
         """
         if not retry_after:
             return None
         if self._in_first_refresh:
-            return retry_after
+            return pad_block_delay(retry_after)
         interval = self.update_interval.total_seconds() if self.update_interval else 0
-        return retry_after if retry_after > interval else None
+        return pad_block_delay(retry_after) if retry_after > interval else None
