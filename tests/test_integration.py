@@ -17,6 +17,7 @@ from ariston.const import (
     ConsumptionType,
     DeviceFeatures,
     DeviceProperties,
+    LuxPlantMode,
     LydosDeviceProperties,
     LydosPlantMode,
     PlantMode,
@@ -29,14 +30,23 @@ from ariston.const import (
     ZoneMode,
 )
 from ariston.galevo_device import AristonGalevoDevice
+from ariston.lydos_device import AristonLydosDevice
 from ariston.lydos_hybrid_device import AristonLydosHybridDevice
 from homeassistant.components.climate.const import ATTR_CURRENT_TEMPERATURE
+from homeassistant.components.sensor import (
+    ATTR_STATE_CLASS,
+    SensorDeviceClass,
+    SensorStateClass,
+)
 from homeassistant.const import (
+    ATTR_DEVICE_CLASS,
     ATTR_DEVICE_ID,
+    ATTR_UNIT_OF_MEASUREMENT,
     CONF_DEVICE,
     CONF_PASSWORD,
     CONF_USERNAME,
     STATE_UNAVAILABLE,
+    UnitOfTemperature,
 )
 from homeassistant.config_entries import ConfigEntryState
 from homeassistant.exceptions import ConfigEntryAuthFailed, ConfigEntryNotReady
@@ -218,25 +228,31 @@ async def test_setup_continues_when_bus_errors_first_refresh_fails(
     assert sensor.native_value == 1
 
 
-def _mock_lydos_hybrid(hass, monkeypatch, **options):
+def _mock_lydos(hass, monkeypatch, *, whe_type=WheType.LydosHybrid, **options):
     entry = _entry(**options)
+    if whe_type is WheType.LydosHybrid:
+        device_class = AristonLydosHybridDevice
+        mode = LydosPlantMode.GREEN
+    else:
+        device_class = AristonLydosDevice
+        mode = LuxPlantMode.MANUAL
     api = MagicMock(spec=AristonAPI)
     api.async_get_features_for_device.return_value = {}
     api.async_get_velis_plant_settings.return_value = {}
     api.async_get_velis_plant_data.return_value = {
-        LydosDeviceProperties.MODE: LydosPlantMode.GREEN.value,
+        LydosDeviceProperties.MODE: mode.value,
         LydosDeviceProperties.ON: True,
         LydosDeviceProperties.TEMP: 48,
         LydosDeviceProperties.REQ_TEMP: 55,
     }
     api.async_get_bus_errors.return_value = []
-    device = AristonLydosHybridDevice(
+    device = device_class(
         api,
         {
             **entry.data[CONF_DEVICE],
             DeviceAttribute.SYS: SystemType.VELIS.value,
             DeviceAttribute.SN: "lydos-1",
-            VelisDeviceAttribute.WHE_TYPE: WheType.LydosHybrid.value,
+            VelisDeviceAttribute.WHE_TYPE: whe_type.value,
         },
     )
     _mock_client(
@@ -250,6 +266,23 @@ def _mock_lydos_hybrid(hass, monkeypatch, **options):
     return entry, api
 
 
+@pytest.mark.parametrize("whe_type", [WheType.LydosHybrid, WheType.Lydos])
+async def test_lydos_current_temperature_sensor(
+    hass, enable_custom_integrations, monkeypatch, whe_type
+):
+    entry, _ = _mock_lydos(hass, monkeypatch, whe_type=whe_type)
+
+    assert await hass.config_entries.async_setup(entry.entry_id)
+    await hass.async_block_till_done()
+
+    sensor = hass.states.get("sensor.test_boiler_ariston_current_temperature")
+    assert sensor is not None
+    assert sensor.state == "48"
+    assert sensor.attributes[ATTR_DEVICE_CLASS] == SensorDeviceClass.TEMPERATURE
+    assert sensor.attributes[ATTR_STATE_CLASS] == SensorStateClass.MEASUREMENT
+    assert sensor.attributes[ATTR_UNIT_OF_MEASUREMENT] == UnitOfTemperature.CELSIUS
+
+
 @pytest.mark.parametrize(
     "fail_at_startup", [True, False], ids=["startup", "polling"]
 )
@@ -257,7 +290,7 @@ async def test_lydos_energy_http_500_does_not_interrupt_water_heater(
     hass, enable_custom_integrations, monkeypatch, fail_at_startup
 ):
     """Load the real platforms and recover energy data after a cloud failure."""
-    entry, api = _mock_lydos_hybrid(hass, monkeypatch, **{ENERGY_SCAN_INTERVAL: 1})
+    entry, api = _mock_lydos(hass, monkeypatch, **{ENERGY_SCAN_INTERVAL: 1})
     api.async_get_features_for_device.return_value = {
         DeviceFeatures.HAS_METERING: True
     }
@@ -315,7 +348,7 @@ async def test_lydos_energy_http_500_does_not_interrupt_water_heater(
 async def test_velis_recovers_after_state_poll_http_500(
     hass, enable_custom_integrations, monkeypatch, caplog
 ):
-    entry, api = _mock_lydos_hybrid(hass, monkeypatch)
+    entry, api = _mock_lydos(hass, monkeypatch)
     fetch_state = api.async_get_velis_plant_data
     initial_state = fetch_state.return_value
     recovered_state = {**initial_state, LydosDeviceProperties.TEMP: 51}
@@ -367,7 +400,7 @@ async def test_velis_recovers_after_state_poll_http_500(
 async def test_velis_retries_setup_after_first_state_poll_http_500(
     hass, enable_custom_integrations, monkeypatch, caplog
 ):
-    entry, api = _mock_lydos_hybrid(hass, monkeypatch)
+    entry, api = _mock_lydos(hass, monkeypatch)
     fetch_state = api.async_get_velis_plant_data
     fetch_state.side_effect = [ConnectionException(500), fetch_state.return_value]
     caplog.set_level(logging.INFO, logger="homeassistant.config_entries")

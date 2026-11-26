@@ -761,6 +761,8 @@ ARISTON_SENSOR_TYPES: list[AristonSensorEntityDescription] = [
         system_types=[SystemType.VELIS],
         whe_types=[
             WheType.Evo,
+            WheType.Lydos,
+            WheType.LydosHybrid,
         ],
     ),
     AristonSensorEntityDescription(
