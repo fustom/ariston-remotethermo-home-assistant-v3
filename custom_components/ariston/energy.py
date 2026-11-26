@@ -18,7 +18,7 @@ This module accesses `device.consumptions_sequences` directly and exposes:
     period as a single accumulating window.
   - `previous_day_total(device, consumption_type)` returns yesterday's
     final total, used to close yesterday's cycle right after midnight.
-  - `export_history` / `restore_history` save and restore the hourly
+  - `export_history` / `restore_history` save and restore the bucket
     history across Home Assistant restarts.
 """
 
@@ -27,7 +27,12 @@ from __future__ import annotations
 import datetime as dt
 from typing import Any, Optional
 
-from ariston.const import ConsumptionTimeInterval, ConsumptionType
+from ariston.const import (
+    ConsumptionTimeInterval,
+    ConsumptionType,
+    SystemType,
+    WheType,
+)
 from homeassistant.util import dt as dt_util
 
 
@@ -52,6 +57,17 @@ _HISTORY_ATTR = "_ha_hourly_history"
 _HOUR = dt.timedelta(hours=1)
 
 
+def daily_bucket_hours(device, consumption_type: ConsumptionType) -> int:
+    """Return the bucket length of a LAST_DAY sequence."""
+    if (
+        consumption_type != ConsumptionType.DOMESTIC_HOT_WATER_TOTAL_ENERGY
+        or getattr(device, "system_type", None) != SystemType.VELIS
+    ):
+        return 1
+    model = (getattr(device, "whe_type", None), getattr(device, "whe_model_type", None))
+    return 2 if model in ((WheType.Evo2, 4), (WheType.Lydos, 21)) else 1
+
+
 def _history_state(device, key) -> dict:
     """Return the history kept on the device for one consumption type."""
     store = getattr(device, _HISTORY_ATTR, None)
@@ -65,14 +81,14 @@ def _history_state(device, key) -> dict:
 
 
 def export_history(device, consumption_type: ConsumptionType) -> dict[str, Any]:
-    """Return the hourly history of a consumption type, keyed by ISO hour."""
+    """Return the history of a consumption type, keyed by ISO bucket start."""
     store = getattr(device, _HISTORY_ATTR, None)
     state = store.get(consumption_type.value) if isinstance(store, dict) else None
     if not state:
         return {}
     return {
-        hour.isoformat(): value
-        for hour, value in state["hours"].items()
+        start.isoformat(): value
+        for start, value in state["hours"].items()
         if value is not None
     }
 
@@ -84,33 +100,37 @@ def restore_history(
     *,
     now: Optional[dt.datetime] = None,
 ) -> None:
-    """Merge saved hourly buckets into the history.
+    """Merge saved buckets into the history.
 
     Buckets already in the history come from the cloud after the restart,
     so they win. Buckets older than the retained window are dropped.
     """
     if not isinstance(saved, dict):
         return
-    hours = _history_state(device, consumption_type.value)["hours"]
-    oldest = _utc_hour(_local_now(now)) - (_RETAINED_HOURS - 1) * _HOUR
+    history = _history_state(device, consumption_type.value)["hours"]
+    bucket_hours = daily_bucket_hours(device, consumption_type)
+    latest = _latest_bucket_start(_local_now(now), bucket_hours)
+    oldest = latest - (_RETAINED_HOURS - 1) * _HOUR
     for text, value in saved.items():
-        hour = dt_util.parse_datetime(text) if isinstance(text, str) else None
-        if hour is None or hour.tzinfo is None or value is None:
+        start = dt_util.parse_datetime(text) if isinstance(text, str) else None
+        if start is None or start.tzinfo is None or value is None:
             continue
-        hour = dt_util.as_utc(hour)
-        if hour >= oldest:
+        start = dt_util.as_utc(start)
+        if oldest <= start <= latest and _bucket_start(start, bucket_hours) == start:
             try:
-                hours.setdefault(hour, float(value))
+                history.setdefault(start, float(value))
             except (TypeError, ValueError):
                 continue
 
 
-def _hourly_history(device, key, buckets: list, current_hour: dt.datetime) -> dict:
-    """Return the hourly buckets seen so far, keyed by the UTC start of the hour.
+def _bucket_history(
+    device, key, buckets: list, latest: dt.datetime, step: dt.timedelta
+) -> dict:
+    """Return the buckets seen so far, keyed by UTC start time.
 
     The cloud replaces `v[]` on every fetch, so a list object we have not
-    seen before is fresh data: its buckets are stamped with the hour they
-    belong to (`v[23]` = `current_hour`) and merged into the history kept on
+    seen before is fresh data: its buckets are stamped with their start time
+    (`v[23]` = `latest`) and merged into the history kept on
     the device. A list we have already seen is not stamped again, so data
     that was fetched before midnight is never attributed to the new day.
     A null bucket never replaces a known value: the cloud sometimes
@@ -121,13 +141,15 @@ def _hourly_history(device, key, buckets: list, current_hour: dt.datetime) -> di
     """
     state = _history_state(device, key)
     if state["source"] is not buckets:
-        hours = state["hours"]
+        history = state["hours"]
         last = len(buckets) - 1
         for index, value in enumerate(buckets):
             if value is not None:
-                hours[current_hour - (last - index) * _HOUR] = value
-        oldest = current_hour - (_RETAINED_HOURS - 1) * _HOUR
-        state["hours"] = {h: v for h, v in hours.items() if h >= oldest}
+                history[latest - (last - index) * step] = value
+        oldest = latest - (_RETAINED_HOURS - 1) * _HOUR
+        state["hours"] = {
+            start: value for start, value in history.items() if start >= oldest
+        }
         state["source"] = buckets
     return state["hours"]
 
@@ -149,42 +171,76 @@ def _find_buckets(device, consumption_type, time_interval) -> Optional[list]:
     return None
 
 
-def _utc_hour(moment: dt.datetime) -> dt.datetime:
-    """Return the start of the whole UTC hour containing `moment`."""
-    return dt_util.as_utc(moment).replace(minute=0, second=0, microsecond=0)
+def _bucket_start(moment: dt.datetime, bucket_hours: int) -> dt.datetime:
+    """Return the UTC start of the bucket containing `moment`."""
+    hour = dt_util.as_utc(moment).replace(minute=0, second=0, microsecond=0)
+    # Issue #552 samples put two-hour boundaries on odd UTC hours.
+    # shortcut: The samples cover winter. Verify the grid with summer data.
+    if bucket_hours == 2 and hour.hour % 2 == 0:
+        return hour - _HOUR
+    return hour
 
 
-def _day_bucket_range(day: dt.date) -> tuple[dt.datetime, dt.datetime]:
-    """Return the [first, end) bucket hours, in UTC, of a local day.
+def _latest_bucket_start(moment: dt.datetime, bucket_hours: int) -> dt.datetime:
+    """Return the start of the latest bucket the cloud includes."""
+    current = _bucket_start(moment, bucket_hours)
+    return current - 2 * _HOUR if bucket_hours == 2 else current
 
-    History keys are whole UTC hours. Where local midnight is not on a
-    whole UTC hour (e.g. Asia/Kolkata, UTC+5:30), one bucket spans it: that
-    bucket belongs to the new day. Storing and lookup both go through this
-    function, so every bucket belongs to exactly one local day. A DST day
-    spans 23 or 25 buckets.
+
+def _day_bucket_range(
+    day: dt.date, bucket_hours: int
+) -> tuple[dt.datetime, dt.datetime]:
+    """Return the [first, end) buckets of a local day in UTC.
+
+    A bucket that spans midnight belongs to the new day. A bucket that ends
+    at midnight belongs to the day that ended.
     """
-    start = _utc_hour(dt_util.start_of_local_day(day))
-    end = _utc_hour(dt_util.start_of_local_day(day + dt.timedelta(days=1)))
-    return start, end
+    start = dt_util.start_of_local_day(day)
+    end = dt_util.start_of_local_day(day + dt.timedelta(days=1))
+    return _bucket_start(start, bucket_hours), _bucket_start(end, bucket_hours)
 
 
-def _sum_hours(
-    history: dict, start: dt.datetime, end: dt.datetime, *, complete: bool
+def _sum_buckets(
+    history: dict,
+    start: dt.datetime,
+    end: dt.datetime,
+    step: dt.timedelta,
+    *,
+    complete: bool,
 ) -> Optional[float]:
     """Sum the history buckets in [start, end).
 
     With `complete`, a missing bucket returns None instead of being skipped.
     """
     total = 0.0
-    hour = start
-    while hour < end:
-        value = history.get(hour)
+    while start < end:
+        value = history.get(start)
         if value is not None:
             total += float(value)
         elif complete:
             return None
-        hour += _HOUR
+        start += step
     return round(total, 3)
+
+
+def _daily_total(
+    device,
+    consumption_type: ConsumptionType,
+    buckets: list,
+    local: dt.datetime,
+    bucket_hours: int,
+    *,
+    previous_day: bool,
+) -> Optional[float]:
+    """Sum today's available buckets or all of yesterday's buckets."""
+    step = bucket_hours * _HOUR
+    latest = _latest_bucket_start(local, bucket_hours)
+    history = _bucket_history(device, consumption_type.value, buckets, latest, step)
+    day = local.date() - dt.timedelta(days=1) if previous_day else local.date()
+    start, end = _day_bucket_range(day, bucket_hours)
+    if not previous_day:
+        end = min(end, latest + step)
+    return _sum_buckets(history, start, end, step, complete=previous_day)
 
 
 def previous_day_total(
@@ -193,24 +249,26 @@ def previous_day_total(
     *,
     now: Optional[dt.datetime] = None,
 ) -> Optional[float]:
-    """Final total of the local day before `now`, from the hourly history.
+    """Final total of the local day before `now`, from the bucket history.
 
     Used to close yesterday's cycle right after midnight: the first fetch of
     the new day can still revise yesterday's last bucket, and that revision
     must be booked under yesterday's `last_reset`, not dropped.
 
-    Returns None when the history does not cover every hour of that day
+    Returns None when the history does not cover every bucket of that day
     (e.g. after a restart), because a partial sum would understate it.
     """
     buckets = _find_buckets(device, consumption_type, ConsumptionTimeInterval.LAST_DAY)
     if not buckets or len(buckets) != 24:
         return None
-    local = _local_now(now)
-    history = _hourly_history(
-        device, consumption_type.value, buckets, _utc_hour(local)
+    return _daily_total(
+        device,
+        consumption_type,
+        buckets,
+        _local_now(now),
+        daily_bucket_hours(device, consumption_type),
+        previous_day=True,
     )
-    start, end = _day_bucket_range(local.date() - dt.timedelta(days=1))
-    return _sum_hours(history, start, end, complete=True)
 
 
 def period_total(
@@ -222,20 +280,12 @@ def period_total(
 ) -> Optional[float]:
     """Sum of bucket values for the given consumption type and period.
 
-    Live API inspection (2026-05-06) showed that `v[]` for `LAST_DAY` is a
-    rolling 24-hour series of hourly buckets where `v[23]` is the current
-    hour and `v[0]` is 23 hours ago. Summing the whole array therefore
-    produces a rolling-24h total, not "today so far", and bleeds yesterday
-    into today's reading.
-
-    For `LAST_DAY` we sum today's buckets only, where "today" is the
-    calendar day in Home Assistant's configured time zone, so the value
-    pairs cleanly with `last_reset = local midnight` for HA's Energy
-    Dashboard (the value drops to ~0 exactly when `last_reset` changes).
-    The buckets come from the hourly history (see `_hourly_history`), so
-    the midnight bucket is still counted in the last hour of a DST
-    fall-back day, when it has already left the cloud's 24-hour window.
-    Which buckets make up a day is decided by `_day_bucket_range`.
+    For `LAST_DAY`, the 24 rolling buckets usually end with the current
+    hour. For the VELIS models confirmed in #552, DHW total energy ends with
+    the last completed two-hour bucket. In both cases we sum the buckets
+    assigned to the day in Home Assistant's configured time zone, where
+    `last_reset` is local midnight. History keeps today's older buckets
+    after they leave the cloud's window on a DST fall-back day.
 
     For other intervals (week / month / year) we sum the whole `v[]`;
     refining those is left for future work.
@@ -246,16 +296,19 @@ def period_total(
     buckets = _find_buckets(device, consumption_type, time_interval)
     if not buckets:
         return None
-    if time_interval == ConsumptionTimeInterval.LAST_DAY and len(buckets) == 24:
-        local = _local_now(now)
-        current_hour = _utc_hour(local)
-        history = _hourly_history(device, consumption_type.value, buckets, current_hour)
-        # Today's buckets up to the current one. Where midnight is not on a
-        # whole UTC hour, the current bucket can already belong to tomorrow.
-        start, end = _day_bucket_range(local.date())
-        return _sum_hours(
-            history, start, min(end, current_hour + _HOUR), complete=False
-        )
+    if time_interval == ConsumptionTimeInterval.LAST_DAY:
+        bucket_hours = daily_bucket_hours(device, consumption_type)
+        if len(buckets) == 24:
+            return _daily_total(
+                device,
+                consumption_type,
+                buckets,
+                _local_now(now),
+                bucket_hours,
+                previous_day=False,
+            )
+        if bucket_hours == 2:
+            return None
     total = 0.0
     for value in buckets:
         if value is None:
@@ -271,7 +324,7 @@ def period_last_reset(
 ) -> dt.datetime:
     """Return a stable start-of-period timestamp in HA's time zone.
 
-    The Ariston cloud rolls hourly buckets within `LAST_DAY`, daily
+    The Ariston cloud rolls sub-day buckets within `LAST_DAY`, daily
     buckets within `LAST_WEEK`/`LAST_MONTH`, and so on. Anchoring
     `last_reset` to the start of the period (local midnight, week start,
     etc.) means HA sees one reset per period instead of one per cloud
