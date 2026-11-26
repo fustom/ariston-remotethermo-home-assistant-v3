@@ -24,6 +24,7 @@ from .const import ARISTON_SENSOR_TYPES, AristonSensorEntityDescription
 from .coordinator import DeviceDataUpdateCoordinator
 from .energy import (
     daily_bucket_hours,
+    export_bucket_snapshot,
     export_history,
     previous_day_total,
     restore_history,
@@ -196,6 +197,7 @@ class AristonDailyConsumptionSensor(AristonSensor, RestoreEntity):
                 self.device,
                 self.entity_description.daily_consumption_type,
                 data.get("history"),
+                saved_snapshot=data.get("bucket_snapshot"),
             )
             self._published = _parse_published(data.get("published"))
             self._pending_closing = _parse_published(data.get("pending_closing"))
@@ -261,6 +263,12 @@ class AristonDailyConsumptionSensor(AristonSensor, RestoreEntity):
         data["history"] = export_history(
             self.device, self.entity_description.daily_consumption_type
         )
+        if (
+            snapshot := export_bucket_snapshot(
+                self.device, self.entity_description.daily_consumption_type
+            )
+        ) is not None:
+            data["bucket_snapshot"] = snapshot
         for key, published in (
             ("published", self._published),
             ("pending_closing", self._pending_closing),

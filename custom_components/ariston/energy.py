@@ -55,10 +55,18 @@ def _local_now(now: Optional[dt.datetime]) -> dt.datetime:
 _RETAINED_HOURS = 48
 _HISTORY_ATTR = "_ha_hourly_history"
 _HOUR = dt.timedelta(hours=1)
+_GALEVO_TWO_HOUR_TYPES = {
+    ConsumptionType.CENTRAL_HEATING_GAS,
+    ConsumptionType.DOMESTIC_HOT_WATER_GAS,
+    ConsumptionType.CENTRAL_HEATING_ELECTRICITY,
+    ConsumptionType.DOMESTIC_HOT_WATER_ELECTRICITY,
+}
 
 
 def daily_bucket_hours(device, consumption_type: ConsumptionType) -> int:
     """Return the bucket length of a LAST_DAY sequence."""
+    if _uses_galevo_two_hour_buckets(device, consumption_type):
+        return 2
     if (
         consumption_type != ConsumptionType.DOMESTIC_HOT_WATER_TOTAL_ENERGY
         or getattr(device, "system_type", None) != SystemType.VELIS
@@ -66,6 +74,13 @@ def daily_bucket_hours(device, consumption_type: ConsumptionType) -> int:
         return 1
     model = (getattr(device, "whe_type", None), getattr(device, "whe_model_type", None))
     return 2 if model in ((WheType.Evo2, 4), (WheType.Lydos, 21)) else 1
+
+
+def _uses_galevo_two_hour_buckets(device, consumption_type: ConsumptionType) -> bool:
+    return (
+        getattr(device, "system_type", None) == SystemType.GALEVO
+        and consumption_type in _GALEVO_TWO_HOUR_TYPES
+    )
 
 
 def _history_state(device, key) -> dict:
@@ -93,30 +108,82 @@ def export_history(device, consumption_type: ConsumptionType) -> dict[str, Any]:
     }
 
 
+def export_bucket_snapshot(
+    device, consumption_type: ConsumptionType
+) -> tuple[str, tuple] | None:
+    """Return the last GALEVO snapshot with its latest bucket start."""
+    store = getattr(device, _HISTORY_ATTR, None)
+    state = store.get(consumption_type.value) if isinstance(store, dict) else None
+    if state and (snapshot := state.get("snapshot")) is not None:
+        start, buckets = snapshot
+        return start.isoformat(), buckets
+    return None
+
+
+def _parse_bucket_snapshot(
+    saved: Any, latest: dt.datetime
+) -> tuple[dt.datetime, tuple] | None:
+    """Read the saved GALEVO snapshot and validate its bucket start."""
+    if not isinstance(saved, (list, tuple)) or len(saved) != 2:
+        return None
+    text, buckets = saved
+    if (
+        not isinstance(text, str)
+        or not isinstance(buckets, (list, tuple))
+        or len(buckets) != 24
+        or any(
+            value is not None and not isinstance(value, (float, int, str))
+            for value in buckets
+        )
+    ):
+        return None
+    try:
+        start = dt.datetime.fromisoformat(text)
+        if start.tzinfo is None:
+            return None
+        start = dt_util.as_utc(start)
+    except (ValueError, OverflowError):
+        return None
+    if start > latest or _bucket_start(start, 2, 0) != start:
+        return None
+    return start, tuple(buckets)
+
+
 def restore_history(
     device,
     consumption_type: ConsumptionType,
     saved: Any,
     *,
+    saved_snapshot: Any = None,
     now: Optional[dt.datetime] = None,
 ) -> None:
-    """Merge saved buckets into the history.
+    """Restore saved buckets and the snapshot used to date them for GALEVO.
 
     Buckets already in the history come from the cloud after the restart,
     so they win. Buckets older than the retained window are dropped.
     """
     if not isinstance(saved, dict):
         return
-    history = _history_state(device, consumption_type.value)["hours"]
+    state = _history_state(device, consumption_type.value)
     bucket_hours = daily_bucket_hours(device, consumption_type)
-    latest = _latest_bucket_start(_local_now(now), bucket_hours)
+    phase = _bucket_phase(device)
+    latest = _latest_bucket_start(_local_now(now), bucket_hours, phase)
     oldest = latest - (_RETAINED_HOURS - 1) * _HOUR
+    if _uses_galevo_two_hour_buckets(device, consumption_type):
+        snapshot = _parse_bucket_snapshot(saved_snapshot, latest)
+        if snapshot is not None:
+            state.setdefault("snapshot", snapshot)
+            latest = snapshot[0]
+    history = state["hours"]
     for text, value in saved.items():
         start = dt_util.parse_datetime(text) if isinstance(text, str) else None
         if start is None or start.tzinfo is None or value is None:
             continue
         start = dt_util.as_utc(start)
-        if oldest <= start <= latest and _bucket_start(start, bucket_hours) == start:
+        if (
+            oldest <= start <= latest
+            and _bucket_start(start, bucket_hours, phase) == start
+        ):
             try:
                 history.setdefault(start, float(value))
             except (TypeError, ValueError):
@@ -124,15 +191,20 @@ def restore_history(
 
 
 def _bucket_history(
-    device, key, buckets: list, latest: dt.datetime, step: dt.timedelta
+    device,
+    key,
+    buckets: list,
+    latest: dt.datetime,
+    step: dt.timedelta,
+    *,
+    remember_snapshot: bool,
 ) -> dict:
     """Return the buckets seen so far, keyed by UTC start time.
 
-    The cloud replaces `v[]` on every fetch, so a list object we have not
-    seen before is fresh data: its buckets are stamped with their start time
-    (`v[23]` = `latest`) and merged into the history kept on
-    the device. A list we have already seen is not stamped again, so data
-    that was fetched before midnight is never attributed to the new day.
+    The cloud replaces `v[]` on every fetch. The buckets of a new list are
+    stamped with their start time (`v[23]` = `latest`) and merged into the
+    history. A list already seen keeps its timestamps across midnight.
+    An equal list also keeps its timestamps for GALEVO two-hour sequences.
     A null bucket never replaces a known value: the cloud sometimes
     returns nulls for hours it already reported.
 
@@ -140,17 +212,25 @@ def _bucket_history(
     it survives a restart.
     """
     state = _history_state(device, key)
-    if state["source"] is not buckets:
-        history = state["hours"]
-        last = len(buckets) - 1
-        for index, value in enumerate(buckets):
-            if value is not None:
-                history[latest - (last - index) * step] = value
-        oldest = latest - (_RETAINED_HOURS - 1) * _HOUR
-        state["hours"] = {
-            start: value for start, value in history.items() if start >= oldest
-        }
+    if remember_snapshot:
+        values = tuple(buckets)
+        snapshot = state.get("snapshot")
+        if snapshot is not None and snapshot[1] == values:
+            return state["hours"]
+        state["snapshot"] = (latest, values)
+    elif state["source"] is buckets:
+        return state["hours"]
+    else:
         state["source"] = buckets
+    history = state["hours"]
+    last = len(buckets) - 1
+    for index, value in enumerate(buckets):
+        if value is not None:
+            history[latest - (last - index) * step] = value
+    oldest = latest - (_RETAINED_HOURS - 1) * _HOUR
+    state["hours"] = {
+        start: value for start, value in history.items() if start >= oldest
+    }
     return state["hours"]
 
 
@@ -171,24 +251,29 @@ def _find_buckets(device, consumption_type, time_interval) -> Optional[list]:
     return None
 
 
-def _bucket_start(moment: dt.datetime, bucket_hours: int) -> dt.datetime:
+def _bucket_phase(device) -> int:
+    """Return the UTC hour parity for the device's two-hour grid."""
+    # Issue #552 samples align VELIS on odd hours, and #553 aligns GALEVO on even hours.
+    # shortcut: The samples cover winter. Verify the grid with summer data.
+    return int(getattr(device, "system_type", None) == SystemType.VELIS)
+
+
+def _bucket_start(moment: dt.datetime, bucket_hours: int, phase: int) -> dt.datetime:
     """Return the UTC start of the bucket containing `moment`."""
     hour = dt_util.as_utc(moment).replace(minute=0, second=0, microsecond=0)
-    # Issue #552 samples put two-hour boundaries on odd UTC hours.
-    # shortcut: The samples cover winter. Verify the grid with summer data.
-    if bucket_hours == 2 and hour.hour % 2 == 0:
-        return hour - _HOUR
-    return hour
+    return hour - ((hour.hour - phase) % bucket_hours) * _HOUR
 
 
-def _latest_bucket_start(moment: dt.datetime, bucket_hours: int) -> dt.datetime:
+def _latest_bucket_start(
+    moment: dt.datetime, bucket_hours: int, phase: int
+) -> dt.datetime:
     """Return the start of the latest bucket the cloud includes."""
-    current = _bucket_start(moment, bucket_hours)
+    current = _bucket_start(moment, bucket_hours, phase)
     return current - 2 * _HOUR if bucket_hours == 2 else current
 
 
 def _day_bucket_range(
-    day: dt.date, bucket_hours: int
+    day: dt.date, bucket_hours: int, phase: int
 ) -> tuple[dt.datetime, dt.datetime]:
     """Return the [first, end) buckets of a local day in UTC.
 
@@ -197,7 +282,10 @@ def _day_bucket_range(
     """
     start = dt_util.start_of_local_day(day)
     end = dt_util.start_of_local_day(day + dt.timedelta(days=1))
-    return _bucket_start(start, bucket_hours), _bucket_start(end, bucket_hours)
+    return (
+        _bucket_start(start, bucket_hours, phase),
+        _bucket_start(end, bucket_hours, phase),
+    )
 
 
 def _sum_buckets(
@@ -234,10 +322,18 @@ def _daily_total(
 ) -> Optional[float]:
     """Sum today's available buckets or all of yesterday's buckets."""
     step = bucket_hours * _HOUR
-    latest = _latest_bucket_start(local, bucket_hours)
-    history = _bucket_history(device, consumption_type.value, buckets, latest, step)
+    phase = _bucket_phase(device)
+    latest = _latest_bucket_start(local, bucket_hours, phase)
+    history = _bucket_history(
+        device,
+        consumption_type.value,
+        buckets,
+        latest,
+        step,
+        remember_snapshot=_uses_galevo_two_hour_buckets(device, consumption_type),
+    )
     day = local.date() - dt.timedelta(days=1) if previous_day else local.date()
-    start, end = _day_bucket_range(day, bucket_hours)
+    start, end = _day_bucket_range(day, bucket_hours, phase)
     if not previous_day:
         end = min(end, latest + step)
     return _sum_buckets(history, start, end, step, complete=previous_day)
@@ -281,8 +377,9 @@ def period_total(
     """Sum of bucket values for the given consumption type and period.
 
     For `LAST_DAY`, the 24 rolling buckets usually end with the current
-    hour. For the VELIS models confirmed in #552, DHW total energy ends with
-    the last completed two-hour bucket. In both cases we sum the buckets
+    hour. For the VELIS DHW total energy and GALEVO gas and electricity
+    sequences confirmed in #552 and #553, the latest bucket is the last
+    completed two-hour bucket. In both cases we sum the buckets
     assigned to the day in Home Assistant's configured time zone, where
     `last_reset` is local midnight. History keeps today's older buckets
     after they leave the cloud's window on a DST fall-back day.
