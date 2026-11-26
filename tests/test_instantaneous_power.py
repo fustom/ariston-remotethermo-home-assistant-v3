@@ -1,9 +1,27 @@
 """Tests for the estimated instantaneous power sensor and its rated power option."""
 
+from unittest.mock import AsyncMock, MagicMock
+
 import pytest
 
-from ariston.const import WheType
+from ariston import DeviceAttribute
+from ariston.ariston_api import AristonAPI
+from ariston.const import (
+    EvoDeviceProperties,
+    SystemType,
+    VelisDeviceAttribute,
+    WheType,
+)
+from ariston.evo_device import AristonEvoDevice
+from homeassistant.config_entries import ConfigEntryState
+from homeassistant.const import (
+    CONF_DEVICE,
+    CONF_PASSWORD,
+    CONF_USERNAME,
+    STATE_UNKNOWN,
+)
 from homeassistant.data_entry_flow import FlowResultType
+from homeassistant.helpers import entity_registry as er
 from pytest_homeassistant.common import MockConfigEntry
 
 from custom_components.ariston.const import (
@@ -138,3 +156,83 @@ async def test_options_flow_rejects_non_positive_rating(hass):
         await hass.config_entries.options.async_configure(
             result["flow_id"], BASE_OPTIONS | {RATED_POWER_W: 0}
         )
+
+
+async def test_rated_power_reaches_sensor_through_options_and_reload(
+    hass, enable_custom_integrations, monkeypatch
+):
+    """Load a real Velis Evo, then set, change and clear the rating."""
+    entry = MockConfigEntry(
+        domain=DOMAIN,
+        unique_id="gateway-1",
+        data={
+            CONF_USERNAME: "user@example.com",
+            CONF_PASSWORD: "secret",
+            CONF_DEVICE: {
+                DeviceAttribute.GW: "gateway-1",
+                DeviceAttribute.NAME: "Test boiler",
+            },
+        },
+        options=BASE_OPTIONS,
+    )
+    api = MagicMock(spec=AristonAPI)
+    api.async_get_features_for_device.return_value = {}
+    api.async_get_velis_plant_settings.return_value = {}
+    api.async_get_velis_plant_data.return_value = {
+        EvoDeviceProperties.ON: True,
+        EvoDeviceProperties.HEAT_REQ: True,
+        EvoDeviceProperties.TEMP: 48,
+        EvoDeviceProperties.REQ_TEMP: 55,
+    }
+    api.async_get_bus_errors.return_value = []
+    device = AristonEvoDevice(
+        api,
+        {
+            **entry.data[CONF_DEVICE],
+            DeviceAttribute.SYS: SystemType.VELIS.value,
+            DeviceAttribute.SN: "evo-1",
+            VelisDeviceAttribute.WHE_TYPE: WheType.Evo.value,
+        },
+    )
+    client = MagicMock()
+    client.async_connect = AsyncMock(return_value=True)
+    client.async_hello = AsyncMock(return_value=device)
+    monkeypatch.setattr(
+        "custom_components.ariston.Ariston", MagicMock(return_value=client)
+    )
+    entry.add_to_hass(hass)
+
+    assert await hass.config_entries.async_setup(entry.entry_id)
+    await hass.async_block_till_done()
+    assert entry.state is ConfigEntryState.LOADED
+
+    registry = er.async_get(hass)
+    power = [
+        e.entity_id
+        for e in er.async_entries_for_config_entry(registry, entry.entry_id)
+        if e.entity_id.endswith("instantaneous_power")
+    ]
+    assert len(power) == 1
+    power_id = power[0]
+    # Registered but not configured yet: unknown, not 0 W.
+    assert hass.states.get(power_id).state == STATE_UNKNOWN
+
+    async def configure(options):
+        result = await hass.config_entries.options.async_init(entry.entry_id)
+        result = await hass.config_entries.options.async_configure(
+            result["flow_id"], options
+        )
+        assert result["type"] == FlowResultType.CREATE_ENTRY
+        # The update listener reloads the entry with the new options.
+        await hass.async_block_till_done()
+        assert entry.state is ConfigEntryState.LOADED
+
+    await configure(BASE_OPTIONS | {RATED_POWER_W: 1500})
+    assert hass.states.get(power_id).state == "1500"
+
+    await configure(BASE_OPTIONS | {RATED_POWER_W: 2000})
+    assert hass.states.get(power_id).state == "2000"
+
+    await configure(BASE_OPTIONS)
+    assert RATED_POWER_W not in entry.options
+    assert hass.states.get(power_id).state == STATE_UNKNOWN
