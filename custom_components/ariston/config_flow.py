@@ -27,6 +27,7 @@ from .const import (
     DEFAULT_SCAN_INTERVAL_SECONDS,
     DOMAIN,
     ENERGY_SCAN_INTERVAL,
+    RATED_POWER_W,
 )
 
 _LOGGER = logging.getLogger(__name__)
@@ -168,6 +169,13 @@ class AristonOptionsFlow(config_entries.OptionsFlow):
     async def async_step_init(self, user_input=None):
         """Manage the options."""
         if user_input is not None:
+            if user_input.get(RATED_POWER_W) is None:
+                # An emptied field clears the saved rating.
+                user_input = {
+                    key: value
+                    for key, value in user_input.items()
+                    if key != RATED_POWER_W
+                }
             return self.async_create_entry(title="", data=user_input)
 
         options = self.config_entry.options
@@ -178,24 +186,34 @@ class AristonOptionsFlow(config_entries.OptionsFlow):
         bus_errors_scan_interval = options.get(
             BUS_ERRORS_SCAN_INTERVAL, DEFAULT_BUS_ERRORS_SCAN_INTERVAL_SECONDS
         )
+        rated_power_w = options.get(RATED_POWER_W)
+
+        schema_dict = {
+            vol.Optional(
+                CONF_SCAN_INTERVAL,
+                default=scan_interval,
+            ): int,
+            vol.Optional(
+                ENERGY_SCAN_INTERVAL,
+                default=energy_scan_interval,
+            ): int,
+            vol.Optional(
+                BUS_ERRORS_SCAN_INTERVAL,
+                default=bus_errors_scan_interval,
+            ): int,
+        }
+
+        # A suggested value instead of a default: the saved rating is shown
+        # pre-filled, but the field can still be emptied to clear it.
+        schema_dict[
+            vol.Optional(
+                RATED_POWER_W,
+                description={"suggested_value": rated_power_w},
+            )
+        ] = vol.Any(None, vol.All(int, vol.Range(min=1)))
 
         return self.async_show_form(
             step_id="init",
-            data_schema=vol.Schema(
-                {
-                    vol.Optional(
-                        CONF_SCAN_INTERVAL,
-                        default=scan_interval,
-                    ): int,
-                    vol.Optional(
-                        ENERGY_SCAN_INTERVAL,
-                        default=energy_scan_interval,
-                    ): int,
-                    vol.Optional(
-                        BUS_ERRORS_SCAN_INTERVAL,
-                        default=bus_errors_scan_interval,
-                    ): int,
-                }
-            ),
+            data_schema=vol.Schema(schema_dict),
             last_step=True,
         )
