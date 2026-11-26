@@ -1,7 +1,7 @@
 """Tests for generic sensor, binary sensor, switch, number, and select entities."""
 
 from datetime import datetime, timezone
-from unittest.mock import AsyncMock, patch
+from unittest.mock import AsyncMock, MagicMock, patch
 
 import pytest
 
@@ -10,8 +10,14 @@ from ariston.const import (
     ConsumptionTimeInterval,
     ConsumptionType,
     CustomDeviceFeatures,
+    DeviceAttribute,
     DeviceProperties,
+    PropertyType,
+    SystemType,
 )
+from ariston.galevo_device import AristonGalevoDevice
+from homeassistant.components.sensor import SensorDeviceClass, SensorStateClass
+from homeassistant.const import UnitOfTemperature
 
 from custom_components.ariston.const import (
     ARISTON_NUMBER_TYPES,
@@ -27,7 +33,9 @@ from custom_components.ariston.const import (
     AristonSensorEntityDescription,
     AristonSwitchEntityDescription,
 )
+from custom_components.ariston.coordinator import DeviceDataUpdateCoordinator
 from custom_components.ariston.energy import period_last_reset
+from custom_components.ariston.entity import is_entity_description_available
 from custom_components.ariston.binary_sensor import AristonBinarySensor
 from custom_components.ariston.number import AristonNumber
 from custom_components.ariston.select import AristonSelect
@@ -203,6 +211,103 @@ def test_dhw_program_temperature_sensors_use_distinct_source_values(
     assert AristonSensor(coordinator, comfort).native_value == 52.5
     assert AristonSensor(coordinator, economy).native_value == 40.0
     assert AristonSensor(coordinator, comfort).native_unit_of_measurement == "°C"
+
+
+def _dhw_temperature_descriptions():
+    """Return the DHW current and target temperature sensor descriptions."""
+    sensor_by_key = {description.key: description for description in ARISTON_SENSOR_TYPES}
+    return (
+        sensor_by_key[DeviceProperties.DHW_STORAGE_TEMPERATURE],
+        sensor_by_key[DeviceProperties.DHW_TEMP],
+    )
+
+
+def _make_dhw_coordinator(hass, system_type, has_dhw, has_storage_temperature=True):
+    """Return a coordinator backed by a real device with DHW temperature data."""
+    device = AristonGalevoDevice(
+        MagicMock(),
+        {
+            DeviceAttribute.GW: "gateway-1",
+            DeviceAttribute.NAME: "Test heat pump",
+            DeviceAttribute.SN: "serial-1",
+            DeviceAttribute.SYS: system_type.value,
+        },
+    )
+    device.custom_features = {
+        CustomDeviceFeatures.HAS_DHW: has_dhw,
+        DeviceProperties.DHW_STORAGE_TEMPERATURE: has_storage_temperature,
+    }
+    device.data = {
+        "items": [
+            {
+                "id": DeviceProperties.DHW_STORAGE_TEMPERATURE,
+                PropertyType.VALUE: 47.5,
+                PropertyType.ZONE: 0,
+            },
+            {
+                "id": DeviceProperties.DHW_TEMP,
+                PropertyType.VALUE: 55.0,
+                PropertyType.ZONE: 0,
+            },
+        ]
+    }
+    return DeviceDataUpdateCoordinator(hass, device, 300, "test", AsyncMock())
+
+
+def test_dhw_temperature_sensors_read_distinct_values_in_celsius(hass):
+    coordinator = _make_dhw_coordinator(hass, SystemType.GALEVO, has_dhw=True)
+    current, target = _dhw_temperature_descriptions()
+
+    current_sensor = AristonSensor(coordinator, current)
+    target_sensor = AristonSensor(coordinator, target)
+
+    assert current_sensor.native_value == 47.5
+    assert target_sensor.native_value == 55.0
+    for sensor in (current_sensor, target_sensor):
+        assert sensor.native_unit_of_measurement == UnitOfTemperature.CELSIUS
+        assert sensor.device_class == SensorDeviceClass.TEMPERATURE
+        assert sensor.state_class == SensorStateClass.MEASUREMENT
+
+
+def test_galevo_dhw_current_temperature_is_unknown_without_storage_reading(hass):
+    coordinator = _make_dhw_coordinator(
+        hass, SystemType.GALEVO, has_dhw=True, has_storage_temperature=False
+    )
+    current, target = _dhw_temperature_descriptions()
+
+    # The library getter substitutes the target for the missing measurement.
+    assert coordinator.device.water_heater_current_temperature == 55.0
+    assert AristonSensor(coordinator, current).native_value is None
+    assert AristonSensor(coordinator, target).native_value == 55.0
+
+
+def test_bsb_dhw_current_temperature_uses_its_own_reading(coordinator, ariston_device):
+    ariston_device.system_type = SystemType.BSB
+    ariston_device.water_heater_current_temperature = 48.0
+    current, _ = _dhw_temperature_descriptions()
+
+    assert AristonSensor(coordinator, current).native_value == 48.0
+
+
+@pytest.mark.parametrize(
+    ("system_type", "has_dhw", "expected"),
+    [
+        (SystemType.GALEVO, True, True),
+        (SystemType.BSB, True, True),
+        (SystemType.GALEVO, False, False),
+        (SystemType.BSB, False, False),
+        (SystemType.VELIS, True, False),
+    ],
+)
+def test_dhw_temperature_sensors_require_dhw_on_galevo_or_bsb(
+    hass, system_type, has_dhw, expected
+):
+    coordinator = _make_dhw_coordinator(hass, system_type, has_dhw)
+
+    for description in _dhw_temperature_descriptions():
+        assert description.device_features == [CustomDeviceFeatures.HAS_DHW]
+        assert description.system_types == [SystemType.GALEVO, SystemType.BSB]
+        assert is_entity_description_available(coordinator, description) is expected
 
 
 def test_hybrid_menu_sensors_read_their_values_and_reported_units(
