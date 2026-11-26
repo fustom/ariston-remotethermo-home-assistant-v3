@@ -13,6 +13,7 @@ Runs in Europe/Rome; the cloud's v[] has 24 hourly buckets, v[23] = now.
 
 import asyncio
 import datetime as dt
+import json
 from types import SimpleNamespace
 from unittest.mock import AsyncMock, patch
 import zoneinfo
@@ -53,27 +54,31 @@ def _midnight(day: int) -> dt.datetime:
     return dt.datetime(2026, 5, day, tzinfo=ROME)
 
 
-def _set_buckets(device, values):
-    device.consumptions_sequences = [{"k": DHW.value, "p": DAY.value, "v": values}]
+def _set_buckets(device, values, consumption_type=DHW):
+    device.consumptions_sequences = [
+        {"k": consumption_type.value, "p": DAY.value, "v": values}
+    ]
 
 
-def _description():
-    return next(d for d in ARISTON_SENSOR_TYPES if d.daily_consumption_type == DHW)
+def _description(consumption_type=DHW):
+    return next(
+        d for d in ARISTON_SENSOR_TYPES if d.daily_consumption_type == consumption_type
+    )
 
 
-def _new_entity(hass, coordinator):
-    entity = AristonDailyConsumptionSensor(coordinator, _description())
+def _new_entity(hass, coordinator, consumption_type=DHW):
+    entity = AristonDailyConsumptionSensor(coordinator, _description(consumption_type))
     entity.hass = hass
     entity.entity_id = "sensor.dhw_total"
     return entity
 
 
-async def _sensor(hass, coordinator, restored=None, *, legacy=True):
+async def _sensor(hass, coordinator, restored=None, *, legacy=True, consumption_type=DHW):
     """Return an added sensor whose state writes are collected in `writes`.
 
     `legacy`: Recorder holds statistics from before the upgrade.
     """
-    entity = _new_entity(hass, coordinator)
+    entity = _new_entity(hass, coordinator, consumption_type)
     entity.async_get_last_extra_data = AsyncMock(
         return_value=None if restored is None else RestoredExtraData(restored)
     )
@@ -454,21 +459,100 @@ async def test_baseline_cycle_closes_after_an_empty_midnight_fetch(
 
 async def _restart(hass, coordinator, ariston_device, entity):
     """Restart: drop the in-memory history, restore a new entity, add it."""
-    saved = dict(entity.extra_restore_state_data.as_dict())
+    saved = json.loads(json.dumps(entity.extra_restore_state_data.as_dict()))
     del ariston_device._ha_hourly_history
-    restarted = await _sensor(hass, coordinator, saved)
+    restarted = await _sensor(
+        hass,
+        coordinator,
+        saved,
+        consumption_type=entity.entity_description.daily_consumption_type,
+    )
     restarted.async_write_ha_state()  # the state HA writes after adding
     await _drain()
     return restarted
 
 
-async def test_two_hour_sensor_migrates_hourly_restore_data(
+async def test_galevo_restart_keeps_unchanged_buckets_at_their_original_times(
     hass, coordinator, ariston_device, freezer
 ):
-    ariston_device.system_type = SystemType.VELIS
+    await hass.config.async_set_time_zone("Europe/Bucharest")
+    bucharest = zoneinfo.ZoneInfo("Europe/Bucharest")
+    consumption_type = ConsumptionType.CENTRAL_HEATING_GAS
+    buckets = [None] + [1.0] * 22 + [2.0]
+    freezer.move_to(dt.datetime(2026, 11, 26, 10, 19, tzinfo=bucharest))
+    _set_buckets(ariston_device, buckets, consumption_type)
+    entity = await _sensor(
+        hass, coordinator, legacy=False, consumption_type=consumption_type
+    )
+    assert entity.native_value == pytest.approx(6.0)
+
+    freezer.move_to(dt.datetime(2026, 11, 26, 12, 19, tzinfo=bucharest))
+    unchanged = buckets.copy()
+    buckets[0] = 9.0  # The saved snapshot must not depend on the old API list.
+    _set_buckets(ariston_device, unchanged, consumption_type)
+    restarted = await _restart(hass, coordinator, ariston_device, entity)
+    assert restarted.native_value == pytest.approx(6.0)
+
+    shifted = [*unchanged[1:], 0.1]
+    _set_buckets(ariston_device, shifted, consumption_type)
+    restarted._handle_coordinator_update()
+    assert restarted.native_value == pytest.approx(6.1)
+
+    freezer.move_to(dt.datetime(2026, 11, 26, 14, 19, tzinfo=bucharest))
+    _set_buckets(ariston_device, shifted.copy(), consumption_type)
+    restarted._handle_coordinator_update()
+    assert restarted.native_value == pytest.approx(6.1)
+
+
+async def test_galevo_restart_at_midnight_waits_for_the_final_bucket(
+    hass, coordinator, ariston_device, freezer
+):
+    await hass.config.async_set_time_zone("Europe/Bucharest")
+    bucharest = zoneinfo.ZoneInfo("Europe/Bucharest")
+    consumption_type = ConsumptionType.CENTRAL_HEATING_GAS
+    yesterday = dt.datetime(2026, 11, 25, tzinfo=bucharest)
+    today = dt.datetime(2026, 11, 26, tzinfo=bucharest)
+    buckets = [1.0] * 23 + [2.0]
+    freezer.move_to(today - dt.timedelta(minutes=41))
+    _set_buckets(ariston_device, buckets, consumption_type)
+    entity = await _sensor(
+        hass, coordinator, legacy=False, consumption_type=consumption_type
+    )
+    assert entity.native_value == pytest.approx(12.0)
+
+    freezer.move_to(today + dt.timedelta(minutes=19))
+    _set_buckets(ariston_device, buckets.copy(), consumption_type)
+    restarted = await _restart(hass, coordinator, ariston_device, entity)
+    assert restarted.writes == [(pytest.approx(0.0), today)]
+    assert restarted.booked == []
+
+    shifted = [*buckets[1:], 0.1]
+    _set_buckets(ariston_device, shifted, consumption_type)
+    restarted._handle_coordinator_update()
+    assert restarted.native_value == 0.0
+    assert restarted.booked == [_closed(yesterday, 12.1)]
+
+    freezer.move_to(today + dt.timedelta(hours=2, minutes=19))
+    _set_buckets(ariston_device, [*shifted[1:], 0.2], consumption_type)
+    restarted._handle_coordinator_update()
+    assert restarted.native_value == pytest.approx(0.2)
+    assert restarted.booked == [_closed(yesterday, 12.1)]
+
+
+@pytest.mark.parametrize(
+    ("system_type", "consumption_type", "hour"),
+    [
+        (SystemType.VELIS, DHW, 2),
+        (SystemType.GALEVO, ConsumptionType.CENTRAL_HEATING_GAS, 3),
+    ],
+)
+async def test_two_hour_sensor_migrates_hourly_restore_data(
+    hass, coordinator, ariston_device, freezer, system_type, consumption_type, hour
+):
+    ariston_device.system_type = system_type
     ariston_device.whe_type = WheType.Evo2
     ariston_device.whe_model_type = 4
-    now = dt.datetime(2026, 11, 26, 2, 5, tzinfo=ROME)
+    now = dt.datetime(2026, 11, 26, hour, 5, tzinfo=ROME)
     freezer.move_to(now)
     saved = {
         "scheme": 2,
@@ -476,24 +560,33 @@ async def test_two_hour_sensor_migrates_hourly_restore_data(
         "baseline_reset": "2026-11-26T00:00:00+00:00",
         "history": {"2026-11-25T23:00:00+00:00": 2.75},
         "published": [2.75, "2026-11-26T00:00:00+00:00", 0.0],
+        "pending_closing": [2.5, "2026-11-24T23:00:00+00:00", 0.0],
         "revisions": {"2026-11-24T23:00:00+00:00": 2.5},
     }
-    _set_buckets(ariston_device, [2.75])  # A short reply cannot start the baseline.
-    entity = await _sensor(hass, coordinator, saved)
+    # A short reply cannot start the baseline.
+    _set_buckets(ariston_device, [2.75], consumption_type)
+    entity = await _sensor(hass, coordinator, saved, consumption_type=consumption_type)
     assert entity.native_value is None
     assert entity.extra_restore_state_data is None
     assert entity.booked == []
 
-    _set_buckets(ariston_device, [0.0] * 23 + [1.425])
+    _set_buckets(ariston_device, [0.0] * 23 + [1.425], consumption_type)
     entity._handle_coordinator_update()
     assert entity.writes == [(pytest.approx(0.0), now)]
     assert entity.booked == []
-    assert entity.extra_restore_state_data.as_dict()["baseline"] == pytest.approx(1.425)
+    saved = entity.extra_restore_state_data.as_dict()
+    assert saved["baseline"] == pytest.approx(1.425)
+    assert ("bucket_snapshot" in saved) == (system_type == SystemType.GALEVO)
 
     freezer.move_to(now + dt.timedelta(minutes=10))
     restarted = await _restart(hass, coordinator, ariston_device, entity)
     assert restarted.last_reset == now
     assert restarted.booked == []
+
+    freezer.move_to(now + dt.timedelta(hours=2))
+    _set_buckets(ariston_device, [0.0] * 22 + [1.425, 0.575], consumption_type)
+    restarted._handle_coordinator_update()
+    assert restarted.writes[-1] == (pytest.approx(0.575), now)
 
 
 @pytest.mark.parametrize("prior_bucket_arrives", [True, False])
