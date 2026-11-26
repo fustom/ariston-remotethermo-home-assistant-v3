@@ -2,10 +2,13 @@
 
 from unittest.mock import AsyncMock, MagicMock
 
+import pytest
+
 from ariston.ariston_api import ConnectionException
 from ariston.const import (
     DeviceAttribute,
     DeviceFeatures,
+    DeviceProperties,
     MenuItemNames,
     PropertyType,
     SystemType,
@@ -29,6 +32,7 @@ from custom_components.ariston import (
 from custom_components.ariston.binary_sensor import AristonBinarySensor
 from custom_components.ariston.climate import AristonThermostat
 from custom_components.ariston.const import (
+    ARISTON_BINARY_SENSOR_TYPES,
     BUS_ERRORS_COORDINATOR,
     COORDINATOR,
     DOMAIN,
@@ -40,6 +44,7 @@ from custom_components.ariston.const import (
 )
 from custom_components.ariston.coordinator import DeviceDataUpdateCoordinator
 from custom_components.ariston.binary_sensor import SERVICE_CREATE_VACATION
+from custom_components.ariston.entity import is_entity_description_available
 from custom_components.ariston.number import AristonNumber
 from custom_components.ariston.select import AristonSelect
 from custom_components.ariston.sensor import AristonSensor
@@ -137,6 +142,43 @@ def _make_real_galevo_device(menu_side_effect):
     return device
 
 
+@pytest.mark.parametrize(
+    ("features", "expected"),
+    [
+        ({DeviceFeatures.HP_SYS: True}, True),
+        ({DeviceFeatures.HYBRID_SYS: True}, True),
+        (
+            {
+                DeviceFeatures.HP_SYS: True,
+                DeviceFeatures.HYBRID_SYS: True,
+            },
+            True,
+        ),
+        (
+            {
+                DeviceFeatures.HP_SYS: False,
+                DeviceFeatures.HYBRID_SYS: False,
+            },
+            False,
+        ),
+        ({}, False),
+    ],
+)
+def test_heating_pump_sensor_requires_a_supported_heat_pump_feature(
+    features, expected
+):
+    device = _make_real_galevo_device([])
+    device.features = features
+    coordinator = MagicMock(device=device)
+    description = next(
+        description
+        for description in ARISTON_BINARY_SENSOR_TYPES
+        if description.key == DeviceProperties.IS_HEATING_PUMP_ON
+    )
+
+    assert is_entity_description_available(coordinator, description) is expected
+
+
 async def test_menu_item_feature_gating_with_real_device_hides_missing_items(hass):
     device = _make_real_galevo_device(
         [
@@ -183,6 +225,7 @@ async def test_menu_item_feature_gating_with_real_device_hides_missing_items(has
     added_binary_sensors = []
     await binary_sensor.async_setup_entry(hass, entry, added_binary_sensors.extend)
     binary_keys = {entity.entity_description.key for entity in added_binary_sensors}
+    assert DeviceProperties.IS_HEATING_PUMP_ON in binary_keys
     assert str(MENU_ITEM_CH_BACKUP_RESISTANCE_1) not in binary_keys
 
     await real_coordinator.async_shutdown()

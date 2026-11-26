@@ -142,6 +142,7 @@ class AristonBaseEntityDescription(EntityDescription):
     """An abstract class that describes Ariston entites."""
 
     device_features: list[str] | None = None
+    device_features_any: list[str] | None = None
     coordinator: str = COORDINATOR
     extra_states: list[dict[str, Any]] | None = None
     system_types: list[SystemType] | None = None
@@ -878,7 +879,7 @@ ARISTON_BINARY_SENSOR_TYPES: list[AristonBinarySensorEntityDescription] = [
         name=f"{NAME} is heating pump on",
         icon="mdi:heat-pump-outline",
         get_is_on=lambda entity: entity.device.is_heating_pump_on_value,
-        device_features=[DeviceFeatures.HYBRID_SYS],
+        device_features_any=[DeviceFeatures.HYBRID_SYS, DeviceFeatures.HP_SYS],
         system_types=[SystemType.GALEVO],
     ),
     AristonBinarySensorEntityDescription(

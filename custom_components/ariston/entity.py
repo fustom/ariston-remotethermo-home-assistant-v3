@@ -30,14 +30,20 @@ def is_entity_description_available(
     description: AristonBaseEntityDescription,
 ) -> bool:
     """Return True if the entity description is supported by the device."""
-    return bool(
-        coordinator
-        and coordinator.device
-        and coordinator.device.are_device_features_available(
-            description.device_features,
-            description.system_types,
-            description.whe_types,
-        )
+    if not coordinator or not coordinator.device:
+        return False
+
+    device = coordinator.device
+    if not device.are_device_features_available(
+        description.device_features,
+        description.system_types,
+        description.whe_types,
+    ):
+        return False
+
+    return description.device_features_any is None or any(
+        device.are_device_features_available([feature], None, None)
+        for feature in description.device_features_any
     )
 
 
