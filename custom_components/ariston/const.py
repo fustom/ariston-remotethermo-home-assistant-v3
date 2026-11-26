@@ -1266,4 +1266,15 @@ ARISTON_SELECT_TYPES: list[AristonSelectEntityDescription] = [
         system_types=[SystemType.VELIS],
         whe_types=[WheType.Evo],
     ),
+    AristonSelectEntityDescription(
+        key=NuosSplitProperties.MODE,
+        name=f"{NAME} plant mode",
+        icon="mdi:calendar-clock",
+        get_current_option=lambda entity: entity.device.water_heater_plant_mode_text,
+        get_options=lambda entity: entity.device.water_heater_plant_mode_texts,
+        select_option=lambda entity,
+        option: entity.device.async_set_water_heater_plant_mode(option),
+        system_types=[SystemType.VELIS],
+        whe_types=[WheType.NuosSplit],
+    ),
 ]
