@@ -22,7 +22,12 @@ from homeassistant.util import dt as dt_util
 
 from .const import ARISTON_SENSOR_TYPES, AristonSensorEntityDescription
 from .coordinator import DeviceDataUpdateCoordinator
-from .energy import export_history, previous_day_total, restore_history
+from .energy import (
+    daily_bucket_hours,
+    export_history,
+    previous_day_total,
+    restore_history,
+)
 from .entity import AristonEntity, register_supported_entities
 from .revision import (
     FINAL_RESULTS,
@@ -147,7 +152,7 @@ class AristonDailyConsumptionSensor(AristonSensor, RestoreEntity):
       by a Recorder task (see `revision.py`), and no state is written
       under yesterday's `last_reset`.
       A failed fetch leaves yesterday's cycle open for the next one.
-    - Restart: the hourly history, the last published value and the
+    - Restart: the bucket history, the last published value and the
       revisions not yet confirmed by Recorder are kept in the restore
       data. Booking a revision is idempotent (Recorder's rows record
       yesterday's final total), so it is retried until Recorder confirms
@@ -158,11 +163,16 @@ class AristonDailyConsumptionSensor(AristonSensor, RestoreEntity):
     def __init__(self, coordinator, description) -> None:
         """Initialize the entity."""
         super().__init__(coordinator, description)
+        self._bucket_hours = daily_bucket_hours(
+            self.device, description.daily_consumption_type
+        )
         self._baseline: float | None = None
         self._baseline_reset: datetime | None = None
         self._baseline_pending = False
         # Last numeric value, its last_reset and the baseline it excludes.
         self._published: tuple[float, datetime, float] | None = None
+        # Yesterday's publication while its final total is incomplete.
+        self._pending_closing: tuple[float, datetime, float] | None = None
         # Final totals of closed cycles, by last_reset, not yet booked.
         self._revisions: dict[datetime, float] = {}
         self._booking = False
@@ -173,7 +183,11 @@ class AristonDailyConsumptionSensor(AristonSensor, RestoreEntity):
         await super().async_added_to_hass()
         extra = await self.async_get_last_extra_data()
         data = extra.as_dict() if extra is not None else {}
-        if data.get("scheme") == DAILY_CONSUMPTION_SCHEME:
+        # Scheme 2 data without a bucket length was calculated as hourly.
+        if (
+            data.get("scheme") == DAILY_CONSUMPTION_SCHEME
+            and data.get("bucket_hours", 1) == self._bucket_hours
+        ):
             baseline_reset = data.get("baseline_reset")
             if data.get("baseline") is not None and baseline_reset:
                 self._baseline = float(data["baseline"])
@@ -184,6 +198,7 @@ class AristonDailyConsumptionSensor(AristonSensor, RestoreEntity):
                 data.get("history"),
             )
             self._published = _parse_published(data.get("published"))
+            self._pending_closing = _parse_published(data.get("pending_closing"))
             self._revisions = _parse_revisions(data.get("revisions"))
         elif await self._has_statistics():
             self._baseline_pending = True
@@ -238,15 +253,21 @@ class AristonDailyConsumptionSensor(AristonSensor, RestoreEntity):
         if self._baseline_pending:
             return None  # Still on the old values: migrate on next start.
         data: dict[str, Any] = {"scheme": DAILY_CONSUMPTION_SCHEME}
+        if self._bucket_hours != 1:
+            data["bucket_hours"] = self._bucket_hours
         if self._baseline_reset is not None:
             data["baseline"] = self._baseline
             data["baseline_reset"] = self._baseline_reset.isoformat()
         data["history"] = export_history(
             self.device, self.entity_description.daily_consumption_type
         )
-        if self._published is not None:
-            value, reset, offset = self._published
-            data["published"] = [value, reset.isoformat(), offset]
+        for key, published in (
+            ("published", self._published),
+            ("pending_closing", self._pending_closing),
+        ):
+            if published is not None:
+                value, reset, offset = published
+                data[key] = [value, reset.isoformat(), offset]
         if self._revisions:
             data["revisions"] = {
                 reset.isoformat(): total for reset, total in self._revisions.items()
@@ -294,38 +315,34 @@ class AristonDailyConsumptionSensor(AristonSensor, RestoreEntity):
         """Return local midnight, or the baseline instant."""
         return self._current()[1]
 
-    def _closing_value(self) -> float | None:
-        """Yesterday's final total, if it grew since it was last published."""
-        if self._published is None:
-            return None
-        value, reset, offset = self._published
-        day_reset = self._day_reset()
-        if reset >= day_reset:
-            return None
-        if dt_util.as_local(reset).date() != (
-            dt_util.as_local(day_reset).date() - timedelta(days=1)
-        ):
-            return None  # Not yesterday's cycle (e.g. a long outage).
+    def _close_previous_day(self) -> None:
+        """Queue the growth of yesterday's total since it was last published."""
+        yesterday = dt_util.as_local(self._day_reset()).date() - timedelta(days=1)
+        for published in (self._pending_closing, self._published):
+            if (
+                published is not None
+                and dt_util.as_local(published[1]).date() == yesterday
+            ):
+                break
+        else:
+            self._pending_closing = None
+            return
+
+        value, reset, offset = published
         total = previous_day_total(
             self.device, self.entity_description.daily_consumption_type
         )
         if total is None:
-            return None
-        total = round(total - offset, 3)
-        return total if total > value else None
-
-    def _close_previous_day(self) -> None:
-        """Queue the growth of yesterday's total since it was last published.
-
-        The published value becomes yesterday's final total, so the same
-        growth is not queued again on the next update.
-        """
-        closing = self._closing_value()
-        if closing is None or self._published is None:
+            if self._bucket_hours == 2:
+                # Today's readings can arrive before yesterday's final bucket.
+                self._pending_closing = published
             return
-        _, reset, offset = self._published
-        self._published = (closing, reset, offset)
-        self._revisions[reset] = max(closing, self._revisions.get(reset, closing))
+        self._pending_closing = None
+        closing = round(total - offset, 3)
+        if closing > value:
+            if self._published == published:
+                self._published = (closing, reset, offset)
+            self._revisions[reset] = max(closing, self._revisions.get(reset, closing))
 
     @callback
     def _book_revisions(self) -> None:

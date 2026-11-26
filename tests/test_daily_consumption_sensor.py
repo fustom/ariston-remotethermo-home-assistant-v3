@@ -18,7 +18,12 @@ from unittest.mock import AsyncMock, patch
 import zoneinfo
 
 import pytest
-from ariston.const import ConsumptionTimeInterval, ConsumptionType
+from ariston.const import (
+    ConsumptionTimeInterval,
+    ConsumptionType,
+    SystemType,
+    WheType,
+)
 from homeassistant.helpers.restore_state import RestoredExtraData
 from homeassistant.util import dt as dt_util
 from pytest_homeassistant.common import async_fire_time_changed
@@ -455,6 +460,87 @@ async def _restart(hass, coordinator, ariston_device, entity):
     restarted.async_write_ha_state()  # the state HA writes after adding
     await _drain()
     return restarted
+
+
+async def test_two_hour_sensor_migrates_hourly_restore_data(
+    hass, coordinator, ariston_device, freezer
+):
+    ariston_device.system_type = SystemType.VELIS
+    ariston_device.whe_type = WheType.Evo2
+    ariston_device.whe_model_type = 4
+    now = dt.datetime(2026, 11, 26, 2, 5, tzinfo=ROME)
+    freezer.move_to(now)
+    saved = {
+        "scheme": 2,
+        "baseline": 2.75,
+        "baseline_reset": "2026-11-26T00:00:00+00:00",
+        "history": {"2026-11-25T23:00:00+00:00": 2.75},
+        "published": [2.75, "2026-11-26T00:00:00+00:00", 0.0],
+        "revisions": {"2026-11-24T23:00:00+00:00": 2.5},
+    }
+    _set_buckets(ariston_device, [2.75])  # A short reply cannot start the baseline.
+    entity = await _sensor(hass, coordinator, saved)
+    assert entity.native_value is None
+    assert entity.extra_restore_state_data is None
+    assert entity.booked == []
+
+    _set_buckets(ariston_device, [0.0] * 23 + [1.425])
+    entity._handle_coordinator_update()
+    assert entity.writes == [(pytest.approx(0.0), now)]
+    assert entity.booked == []
+    assert entity.extra_restore_state_data.as_dict()["baseline"] == pytest.approx(1.425)
+
+    freezer.move_to(now + dt.timedelta(minutes=10))
+    restarted = await _restart(hass, coordinator, ariston_device, entity)
+    assert restarted.last_reset == now
+    assert restarted.booked == []
+
+
+@pytest.mark.parametrize("prior_bucket_arrives", [True, False])
+async def test_two_hour_sensor_keeps_both_cycles_after_missing_bucket_and_restart(
+    hass, coordinator, ariston_device, freezer, prior_bucket_arrives
+):
+    ariston_device.system_type = SystemType.VELIS
+    ariston_device.whe_type = WheType.Lydos
+    ariston_device.whe_model_type = 21
+    yesterday = dt.datetime(2026, 11, 25, tzinfo=ROME)
+    today = dt.datetime(2026, 11, 26, tzinfo=ROME)
+    freezer.move_to(dt.datetime(2026, 11, 25, 23, 55, tzinfo=ROME))
+    _set_buckets(ariston_device, [0.1] * 24)
+    entity = await _sensor(hass, coordinator, legacy=False)
+    assert entity.native_value == pytest.approx(1.1)
+
+    freezer.move_to(dt.datetime(2026, 11, 26, 0, 5, tzinfo=ROME))
+    _set_buckets(ariston_device, [0.1] * 23 + [None])
+    entity._handle_coordinator_update()
+    assert entity.writes == [(pytest.approx(0.0), today)]
+    assert entity.booked == []
+
+    freezer.move_to(dt.datetime(2026, 11, 26, 2, 5, tzinfo=ROME))
+    _set_buckets(ariston_device, [0.1] * 22 + [None, 0.2])
+    entity._handle_coordinator_update()
+    assert entity.writes[-1] == (pytest.approx(0.2), today)
+
+    restarted = await _restart(hass, coordinator, ariston_device, entity)
+    assert restarted.booked == []
+    if prior_bucket_arrives:
+        freezer.move_to(dt.datetime(2026, 11, 26, 2, 35, tzinfo=ROME))
+        _set_buckets(ariston_device, [0.1] * 22 + [0.425, 0.2])
+        restarted._handle_coordinator_update()
+        restarted._handle_coordinator_update()
+        assert restarted.writes[-2:] == [(pytest.approx(0.2), today)] * 2
+        assert restarted.booked == [_closed(yesterday, 1.525)]
+
+    # The next midnight still closes today, even if yesterday never closed.
+    tomorrow = dt.datetime(2026, 11, 27, tzinfo=ROME)
+    freezer.move_to(tomorrow + dt.timedelta(minutes=5))
+    _set_buckets(ariston_device, [0.0] * 12 + [0.2] + [0.0] * 10 + [0.3])
+    restarted._handle_coordinator_update()
+    assert restarted.writes[-1] == (pytest.approx(0.0), tomorrow)
+    assert restarted.booked == (
+        ([_closed(yesterday, 1.525)] if prior_bucket_arrives else [])
+        + [_closed(today, 0.5)]
+    )
 
 
 async def test_restart_across_midnight_still_closes_yesterday(

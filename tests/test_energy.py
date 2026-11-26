@@ -10,7 +10,12 @@ import zoneinfo
 from types import SimpleNamespace
 
 import pytest
-from ariston.const import ConsumptionTimeInterval, ConsumptionType
+from ariston.const import (
+    ConsumptionTimeInterval,
+    ConsumptionType,
+    SystemType,
+    WheType,
+)
 from homeassistant.util import dt as dt_util
 
 from custom_components.ariston.energy import (
@@ -44,6 +49,96 @@ def _day_sequence(values):
 
 def _total(values, now):
     return period_total(_device(_day_sequence(values)), DHW, DAY, now=now)
+
+
+def test_velis_evo2_sample_across_dublin_midnight():
+    """Issue #552 comment 7186292744: the 23:00–01:00 UTC bucket is today's."""
+    dt_util.set_default_time_zone(zoneinfo.ZoneInfo("Europe/Dublin"))
+    # The 23:55, 00:05 and 00:55 samples contained the same 24 values.
+    before_shift = [
+        0.0, 0.0, 1.175, 0.0, 0.225, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0,
+        0.0, 0.0, 1.275, 0.0, 0.175, 0.0, 0.0, 0.0, 1.1, 0.075, 0.0, 0.0,
+    ]
+    device = _device(_day_sequence(before_shift.copy()))
+    device.system_type = SystemType.VELIS
+    device.whe_type = WheType.Evo2
+    device.whe_model_type = 4
+
+    before_midnight = dt.datetime(2026, 11, 25, 23, 55, 3, tzinfo=UTC)
+    assert period_total(device, DHW, DAY, now=before_midnight) == pytest.approx(2.625)
+    after_midnight = dt.datetime(2026, 11, 26, 0, 5, 6, tzinfo=UTC)
+    device.consumptions_sequences = _day_sequence(before_shift.copy())
+    assert period_total(device, DHW, DAY, now=after_midnight) == 0.0
+    assert previous_day_total(device, DHW, now=after_midnight) == pytest.approx(2.625)
+
+    # The reporter's app assigned the new 01:05 sample to November 26.
+    after_shift = [
+        0.0, 1.175, 0.0, 0.225, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0,
+        0.0, 1.275, 0.0, 0.175, 0.0, 0.0, 0.0, 1.1, 0.075, 0.0, 0.0, 1.425,
+    ]
+    device.consumptions_sequences = _day_sequence(after_shift.copy())
+    after_boundary = dt.datetime(2026, 11, 26, 1, 5, 3, tzinfo=UTC)
+    assert period_total(device, DHW, DAY, now=after_boundary) == pytest.approx(1.425)
+    assert previous_day_total(device, DHW, now=after_boundary) == pytest.approx(2.625)
+
+    # The 02:05 sample was also unchanged. A new poll must not retimestamp it.
+    device.consumptions_sequences = _day_sequence(after_shift.copy())
+    after_unchanged = dt.datetime(2026, 11, 26, 2, 5, 3, tzinfo=UTC)
+    assert period_total(device, DHW, DAY, now=after_unchanged) == pytest.approx(1.425)
+    assert previous_day_total(device, DHW, now=after_unchanged) == pytest.approx(2.625)
+
+
+def test_velis_lydos_sample_across_madrid_midnight():
+    """Issue #552 comment 7185186905: the bucket ending at midnight is yesterday's."""
+    madrid = zoneinfo.ZoneInfo("Europe/Madrid")
+    dt_util.set_default_time_zone(madrid)
+    before_shift = [
+        0.0, 0.0, 0.375, 0.0, 0.0, 0.45, 0.0, 1.45, 0.375, 0.425, 0.0, 0.0,
+        0.0, 0.4, 0.0, 0.0, 0.475, 1.025, 0.575, 0.0, 0.0, 0.425, 0.0, 0.0,
+    ]
+    device = _device(_day_sequence(before_shift.copy()))
+    device.system_type = SystemType.VELIS
+    device.whe_type = WheType.Lydos
+    device.whe_model_type = 21
+
+    midnight = dt.datetime(2026, 11, 26, 0, 5, 38, tzinfo=madrid)
+    assert period_total(device, DHW, DAY, now=midnight) == 0.0
+    assert previous_day_total(device, DHW, now=midnight) == pytest.approx(2.9)
+    device.consumptions_sequences = _day_sequence(before_shift.copy())
+    one_am = dt.datetime(2026, 11, 26, 1, 5, 47, tzinfo=madrid)
+    assert period_total(device, DHW, DAY, now=one_am) == 0.0
+    assert previous_day_total(device, DHW, now=one_am) == pytest.approx(2.9)
+
+    after_shift = [
+        0.0, 0.375, 0.0, 0.0, 0.45, 0.0, 1.45, 0.375, 0.425, 0.0, 0.0, 0.0,
+        0.4, 0.0, 0.0, 0.475, 1.025, 0.575, 0.0, 0.0, 0.425, 0.0, 0.0, 0.425,
+    ]
+    device.consumptions_sequences = _day_sequence(after_shift)
+    two_am = dt.datetime(2026, 11, 26, 2, 5, 55, tzinfo=madrid)
+    assert period_total(device, DHW, DAY, now=two_am) == pytest.approx(0.425)
+    assert previous_day_total(device, DHW, now=two_am) == pytest.approx(2.9)
+
+
+@pytest.mark.parametrize(
+    ("system_type", "whe_type", "model", "consumption_type", "expected"),
+    [
+        (SystemType.VELIS, WheType.Evo2, 4, DHW, 0.1),
+        (SystemType.GALEVO, WheType.Evo2, 4, DHW, 0.3),
+        (SystemType.VELIS, WheType.Evo, 4, DHW, 0.3),
+        (SystemType.VELIS, WheType.Evo2, 5, DHW, 0.3),
+        (SystemType.VELIS, WheType.Evo2, 4, ConsumptionType.DOMESTIC_HOT_WATER_ELECTRICITY, 0.3),
+    ],
+)
+def test_two_hour_buckets_apply_only_to_confirmed_model_and_consumption_type(
+    system_type, whe_type, model, consumption_type, expected
+):
+    device = _device([{"k": consumption_type.value, "p": DAY.value, "v": [0.1] * 24}])
+    device.system_type = system_type
+    device.whe_type = whe_type
+    device.whe_model_type = model
+    now = dt.datetime(2026, 11, 26, 2, 5, tzinfo=ROME)
+
+    assert period_total(device, consumption_type, DAY, now=now) == pytest.approx(expected)
 
 
 def test_period_total_last_day_slices_to_local_today_only():
