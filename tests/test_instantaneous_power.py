@@ -79,10 +79,11 @@ def test_power_sensor_reports_watts():
     assert description.state_class == "measurement"
 
 
-def test_power_sensor_excludes_hybrid_heat_pump():
+def test_power_sensor_excludes_hybrid_heat_pump_and_lux2():
     whe_types = _power_description().whe_types
 
     assert WheType.LydosHybrid not in whe_types
+    assert WheType.Lux2 not in whe_types
     assert WheType.Evo in whe_types
     assert WheType.Lydos in whe_types
 
@@ -161,7 +162,7 @@ async def test_options_flow_rejects_non_positive_rating(hass):
 async def test_rated_power_reaches_sensor_through_options_and_reload(
     hass, enable_custom_integrations, monkeypatch
 ):
-    """Load a real Velis Evo, then set, change and clear the rating."""
+    """Load a Velis Evo2 (AristonEvoDevice), then set, change and clear the rating."""
     entry = MockConfigEntry(
         domain=DOMAIN,
         unique_id="gateway-1",
@@ -190,8 +191,8 @@ async def test_rated_power_reaches_sensor_through_options_and_reload(
         {
             **entry.data[CONF_DEVICE],
             DeviceAttribute.SYS: SystemType.VELIS.value,
-            DeviceAttribute.SN: "evo-1",
-            VelisDeviceAttribute.WHE_TYPE: WheType.Evo.value,
+            DeviceAttribute.SN: "evo2-1",
+            VelisDeviceAttribute.WHE_TYPE: WheType.Evo2.value,
         },
     )
     client = MagicMock()

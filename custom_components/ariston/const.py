@@ -794,12 +794,13 @@ ARISTON_SENSOR_TYPES: list[AristonSensorEntityDescription] = [
         whe_types=[
             WheType.Evo,
             WheType.Evo2,
-            # Resistive heaters only: they draw a fixed rated power while
-            # heating. Hybrid heat pump models modulate, so the estimate
-            # would be wrong and they are deliberately excluded.
+            # Resistive heaters with a single heating power only, so that
+            # rated power x heating state holds. Excluded on purpose:
+            # hybrid heat pump models (LydosHybrid), whose power modulates,
+            # and Lux2, whose POWER mode heats with more power than normal
+            # mode, so one rating is wrong in at least one of the two.
             WheType.Lydos,
             WheType.Lux,
-            WheType.Lux2,
             WheType.Andris2,
         ],
         get_native_value=_get_estimated_power,
