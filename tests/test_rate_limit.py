@@ -156,7 +156,7 @@ async def test_first_refresh_429_keeps_retry_after(hass, monkeypatch):
     assert ctx.value.retry_after == 900
 
 
-# --- Pinned client (ariston==0.19.18) behind a fake Ariston cloud ------------
+# --- Pinned ariston client behind a fake Ariston cloud ------------
 
 
 class _FakeContent:
@@ -202,7 +202,7 @@ def _pinned_cloud_patches(body: bytes):
     session = _blocked_cloud(body)
     return session, (
         patch("ariston.ariston_api.aiohttp.ClientSession", session),
-        # The client sleeps out a parsed block once before re-raising.
+        # Older clients sleep out a parsed block once before re-raising.
         patch("ariston.ariston_api.asyncio.sleep", AsyncMock()),
     )
 
@@ -235,7 +235,7 @@ async def test_pinned_client_block_duration_schedules_next_poll(hass):
 
     assert isinstance(coordinator.last_exception, UpdateFailed)
     assert coordinator.last_exception.retry_after == pytest.approx(901, abs=5)
-    assert session.requests == 2  # first request + the client's one retry
+    assert session.requests in (1, 2)  # 0.19.18 retries once, 0.19.21+ does not
 
     now = dt_util.utcnow()
     async_fire_time_changed(hass, now + timedelta(seconds=310))
@@ -259,7 +259,7 @@ async def test_pinned_client_login_429_raises_not_ready(hass, caplog):
 
     assert ctx.value.retry_after == pytest.approx(901, abs=5)
     assert "Traceback" not in caplog.text
-    assert session.requests == 2
+    assert session.requests in (1, 2)  # 0.19.18 retries once, 0.19.21+ does not
 
 
 async def test_first_refresh_passes_short_block_through(hass, monkeypatch):
