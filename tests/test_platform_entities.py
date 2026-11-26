@@ -222,7 +222,7 @@ def _dhw_temperature_descriptions():
     )
 
 
-def _make_dhw_coordinator(hass, system_type, has_dhw):
+def _make_dhw_coordinator(hass, system_type, has_dhw, has_storage_temperature=True):
     """Return a coordinator backed by a real device with DHW temperature data."""
     device = AristonGalevoDevice(
         MagicMock(),
@@ -235,7 +235,7 @@ def _make_dhw_coordinator(hass, system_type, has_dhw):
     )
     device.custom_features = {
         CustomDeviceFeatures.HAS_DHW: has_dhw,
-        DeviceProperties.DHW_STORAGE_TEMPERATURE: True,
+        DeviceProperties.DHW_STORAGE_TEMPERATURE: has_storage_temperature,
     }
     device.data = {
         "items": [
@@ -267,6 +267,26 @@ def test_dhw_temperature_sensors_read_distinct_values_in_celsius(hass):
         assert sensor.native_unit_of_measurement == UnitOfTemperature.CELSIUS
         assert sensor.device_class == SensorDeviceClass.TEMPERATURE
         assert sensor.state_class == SensorStateClass.MEASUREMENT
+
+
+def test_galevo_dhw_current_temperature_is_unknown_without_storage_reading(hass):
+    coordinator = _make_dhw_coordinator(
+        hass, SystemType.GALEVO, has_dhw=True, has_storage_temperature=False
+    )
+    current, target = _dhw_temperature_descriptions()
+
+    # The library getter substitutes the target for the missing measurement.
+    assert coordinator.device.water_heater_current_temperature == 55.0
+    assert AristonSensor(coordinator, current).native_value is None
+    assert AristonSensor(coordinator, target).native_value == 55.0
+
+
+def test_bsb_dhw_current_temperature_uses_its_own_reading(coordinator, ariston_device):
+    ariston_device.system_type = SystemType.BSB
+    ariston_device.water_heater_current_temperature = 48.0
+    current, _ = _dhw_temperature_descriptions()
+
+    assert AristonSensor(coordinator, current).native_value == 48.0
 
 
 @pytest.mark.parametrize(

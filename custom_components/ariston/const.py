@@ -95,6 +95,21 @@ def _get_ch_heat_request(entity: Any) -> bool:
     return bool(entity.device.get_zone_heat_request_value(entity.zone))
 
 
+def _get_dhw_current_temperature(entity: Any) -> float | None:
+    """Return the measured DHW temperature, never the target as a substitute.
+
+    The GALEVO getter falls back to the target temperature when the device has
+    no usable storage temperature reading, so that case must report no value.
+    """
+    device = entity.device
+    if device.system_type == SystemType.GALEVO and not device.custom_features.get(
+        DeviceProperties.DHW_STORAGE_TEMPERATURE
+    ):
+        return None
+
+    return device.water_heater_current_temperature
+
+
 def _get_dhw_flame(entity: Any) -> bool:
     """Approximate DHW flame for boilers that only expose a global flame flag."""
     if not bool(entity.device.is_flame_on_value):
@@ -772,7 +787,7 @@ ARISTON_SENSOR_TYPES: list[AristonSensorEntityDescription] = [
         icon="mdi:thermometer-water",
         device_class=SensorDeviceClass.TEMPERATURE,
         state_class=SensorStateClass.MEASUREMENT,
-        get_native_value=lambda entity: entity.device.water_heater_current_temperature,
+        get_native_value=_get_dhw_current_temperature,
         native_unit_of_measurement=UnitOfTemperature.CELSIUS,
         device_features=[CustomDeviceFeatures.HAS_DHW],
         system_types=[SystemType.GALEVO, SystemType.BSB],
