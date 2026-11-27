@@ -46,12 +46,14 @@ BSB_SETPOINT_REDUCED = "reduced"
 # Tolerance used when comparing the desired temp against the reduced setpoint.
 BSB_TEMP_COMPARE_TOLERANCE = 0.05
 
+
 def _normalize_temp(raw: Any) -> float | None:
     """Normalize a temperature value to float.
     
-    Accepts either a scalar (int / float / numeric str) or a mapping 
+    Accepts either a scalar (int / float / numeric str) or a mapping
     containing a "value" key (e.g. {"value": 18.5, "min": 10, ...}).
-    Returns None if the value is missing or not numeric."""
+    Returns None if the value is missing or not numeric.
+    """
     if isinstance(raw, Mapping):
         raw = raw.get("value", None)
     if raw is None or isinstance(raw, bool):
