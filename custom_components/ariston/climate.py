@@ -28,11 +28,14 @@ from .entity import (
 
 _LOGGER = logging.getLogger(__name__)
 
-BSB_ZONE_MODE_TEXTS: dict[int, str] = {
-    0: "protection",
-    1: "automatic",
-    2: "reduced",
-    3: "comfort",
+BSB_PRESET_ZONE_MODES: dict[str, BsbZoneMode] = {
+    "protection": BsbZoneMode.OFF,
+    "automatic": BsbZoneMode.TIME_PROGRAM,
+    "reduced": BsbZoneMode.MANUAL_NIGHT,
+    "comfort": BsbZoneMode.MANUAL,
+}
+BSB_ZONE_MODE_PRESETS: dict[BsbZoneMode, str] = {
+    mode: preset for preset, mode in BSB_PRESET_ZONE_MODES.items()
 }
 
 BSB_DESIRED_ROOM_TEMP = "desiredRoomTemp"
@@ -100,6 +103,25 @@ class AristonThermostat(AristonEntity, ClimateEntity):
         super().__init__(coordinator, description, zone)
         self._bsb_last_setpoint: str = BSB_SETPOINT_COMFORT
 
+    def _get_bsb_zone_mode(self) -> BsbZoneMode:
+        """Return the BSB zone mode; UNDEFINED for unknown API values."""
+        try:
+            return self.device.get_zone_mode(self.zone)
+        except:
+            return BsbZoneMode.UNDEFINED
+
+    def _get_bsb_presets(self) -> dict[str, BsbZoneMode]:
+        """Return the presets offered by the API that we know how to handle"""
+        presets: dict[str, BsbZoneMode] = {}
+        for option in self.device.get_zone_mode_options(self.zone) or []:
+            try:
+                mode = BsbZoneMode(option)
+            except ValueError:
+                continue
+            if (preset := BSB_ZONE_MODE_PRESETS.get(mode)) is not None:
+                presets[preset] = mode
+        return presets
+
     def _get_bsb_desired_temp(self) -> float | None:
         """Return the normalized desiredRoomTemp for BSB devices, else None."""
         if self.device.plant_mode_supported:
@@ -138,7 +160,7 @@ class AristonThermostat(AristonEntity, ClimateEntity):
         """
         if self.device.plant_mode_supported:
             return None
-        mode = self.device.get_zone_mode(self.zone)
+        mode = self._get_bsb_zone_mode()
         if mode is BsbZoneMode.MANUAL:
             setpoint = BSB_SETPOINT_COMFORT
         elif mode is BsbZoneMode.MANUAL_NIGHT:
@@ -320,22 +342,17 @@ class AristonThermostat(AristonEntity, ClimateEntity):
         if self.device.plant_mode_supported:
             return self.device.plant_mode_text
         # BSB device — map zone mode value to text
-        mode = self.device.get_zone_mode(self.zone)
+        mode = self._get_bsb_zone_mode()
         if mode is BsbZoneMode.UNDEFINED:
             return None
-        return BSB_ZONE_MODE_TEXTS.get(mode.value, str(mode.value))
+        return BSB_ZONE_MODE_PRESETS.get(self._get_bsb_zone_mode())
 
     @property
     def preset_modes(self) -> list[str]:
         """Return a list of available preset modes."""
         if self.device.plant_mode_supported:
             return self.device.plant_mode_opt_texts
-        # BSB device — map zone mode options to texts
-        try:
-            options = self.device.get_zone_mode_options(self.zone) or []
-            return [BSB_ZONE_MODE_TEXTS.get(opt, str(opt)) for opt in options]
-        except (AttributeError, ValueError):
-            return []
+        return list(self._get_bsb_presets())
 
     async def async_set_hvac_mode(self, hvac_mode):
         """Set new target hvac mode."""
@@ -411,17 +428,14 @@ class AristonThermostat(AristonEntity, ClimateEntity):
         )
 
         if not self.device.plant_mode_supported:
-            # BSB device — map preset text back to BsbZoneMode
-            options = self.device.get_zone_mode_options(self.zone) or []
-            texts = [BSB_ZONE_MODE_TEXTS.get(opt, str(opt)) for opt in options]
-            if preset_mode not in texts:
+            zone_mode = self._get_bsb_presets().get(preset_mode)
+            if zone_mode is None:
                 _LOGGER.error(
-                    "Unsupported preset mode %s for %s.", preset_mode, self.name
+                    "Unsupported preset mode %s for %s", preset_mode, self.name
                 )
                 return
-            zone_mode = BsbZoneMode(options[texts.index(preset_mode)])
             await self.device.async_set_zone_mode(zone_mode, self.zone)
-            await async_refresh_after_set(self)
+            await async_refresh_after_set(self)            
             return
 
         # Don't assume index maps to enum value directly

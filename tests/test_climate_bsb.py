@@ -319,3 +319,23 @@ async def test_set_bsb_preset_mode_rejects_unknown(make_entity, bsb_device):
         await entity.async_set_preset_mode("turbo")
 
     bsb_device.async_set_zone_mode.assert_not_awaited()
+
+def test_preset_modes_skip_unknown_api_option(make_entity, bsb_device):
+    bsb_device.get_zone_mode_options = lambda z: [0, 1, 2, 3, 4]
+    assert make_entity().preset_modes == [
+        "protection",
+        "automatic",
+        "reduced",
+        "comfort"
+    ]
+
+async def test_set_unknown_api_option_is_rejected(make_entity, bsb_device):
+    bsb_device.get_zone_mode_options = lambda z: [0, 1, 2, 3, 4]
+    entity = make_entity()
+    with patch.object(entity, "async_write_ha_state"):
+        await entity.async_set_preset_mode("4")
+    bsb_device.async_set_zone_mode.assert_not_awaited()
+
+def test_preset_mode_none_for_unknown_zone_mode(make_entity, bsb_device):
+    bsb_device.zone_data["mode"] = {"value": 4} # library get_zone_mode_raises
+    assert make_entity().preset_mode is None
