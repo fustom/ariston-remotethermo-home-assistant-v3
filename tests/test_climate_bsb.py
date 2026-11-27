@@ -248,6 +248,25 @@ def test_automatic_follows_schedule_switch(make_entity, bsb_device):
     assert entity._is_bsb_currently_reduced() is False
 
 
+# --- target shows written value until next refresh ------------------------------------------
+async def test_target_shows_written_value_until_refresh(make_entity):
+    entity = make_entity(18.0)
+    with patch.object(entity, "async_write_ha_state"):
+        await entity.async_set_temperature(**{ATTR_TEMPERATURE: 17.0})
+        assert entity.native_target_temperature == 17.0  # refresh mock: no new data
+
+        entity._handle_coordinator_update()              # refresh arrives
+    assert entity.native_target_temperature == 18.0      # back to desiredRoomTemp
+
+
+async def test_pending_target_not_used_for_plant_devices(make_entity, bsb_device):
+    bsb_device.plant_mode_supported = True
+    entity = make_entity()
+    with patch.object(entity, "async_write_ha_state"):
+        await entity.async_set_temperature(**{ATTR_TEMPERATURE: 22.0})
+    assert entity.native_target_temperature == COMFORT["value"]
+
+
 # --- BSB presets ----------------------------------------------------------------------------
 def test_bsb_supports_preset_mode(make_entity):
     assert make_entity(18.0).supported_features & ClimateEntityFeature.PRESET_MODE

@@ -16,7 +16,7 @@ from homeassistant.components.climate import (
 )
 from homeassistant.config_entries import ConfigEntry
 from homeassistant.const import ATTR_TEMPERATURE
-from homeassistant.core import HomeAssistant
+from homeassistant.core import HomeAssistant, callback
 
 from .const import ARISTON_CLIMATE_TYPES, DOMAIN, AristonClimateEntityDescription
 from .coordinator import DeviceDataUpdateCoordinator
@@ -104,6 +104,15 @@ class AristonThermostat(AristonEntity, ClimateEntity):
         """Initialize the thermostat."""
         super().__init__(coordinator, description, zone)
         self._bsb_last_setpoint: str = BSB_SETPOINT_COMFORT
+        self._bsb_pending_target: float | None = None
+
+    @callback
+    def _handle_coordinator_update(self) -> None:
+        """Fresh data arrived - drop optimistic target."""
+        self._bsb_pending_target = None
+        super()._handle_coordinator_update()
+
+    
 
     def _get_bsb_zone_mode(self) -> BsbZoneMode:
         """Return the BSB zone mode; UNDEFINED for unknown API values."""
@@ -113,7 +122,7 @@ class AristonThermostat(AristonEntity, ClimateEntity):
             return BsbZoneMode.UNDEFINED
 
     def _get_bsb_presets(self) -> dict[str, BsbZoneMode]:
-        """Return the presets offered by the API that we know how to handle"""
+        """Return the presets offered by the API that we know how to handle."""
         presets: dict[str, BsbZoneMode] = {}
         for option in self.device.get_zone_mode_options(self.zone) or []:
             try:
@@ -239,6 +248,8 @@ class AristonThermostat(AristonEntity, ClimateEntity):
         truth. If it is missing or invalid, fall back to the value of the 
         active setpoint, then to the library's target temp.
         """
+        if self._bsb_pending_target is not None:
+            return self._bsb_pending_target
         desired = self._get_bsb_desired_temp()
         if desired is not None:
             return desired
@@ -480,4 +491,6 @@ class AristonThermostat(AristonEntity, ClimateEntity):
             await self.device.async_set_reduced_temp(temperature, self.zone)
         else:
             await self.device.async_set_comfort_temp(temperature, self.zone)
+        if not self.device.plant_mode_supported:
+            self._bsb_pending_target = _normalize_temp(temperature)
         await async_refresh_after_set(self)
