@@ -118,7 +118,7 @@ class AristonThermostat(AristonEntity, ClimateEntity):
         """Return the BSB zone mode; UNDEFINED for unknown API values."""
         try:
             return self.device.get_zone_mode(self.zone)
-        except:
+        except ValueError:
             return BsbZoneMode.UNDEFINED
 
     def _get_bsb_presets(self) -> dict[str, BsbZoneMode]:
