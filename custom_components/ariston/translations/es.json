@@ -30,5 +30,21 @@
         "title": "Configurar Ariston"
       }
     }
+  },
+  "entity": {
+    "climate": {
+      "ariston_thermostat": {
+        "state_attributes": {
+          "preset_mode": {
+            "state": {
+              "protection": "Protection",
+              "automatic": "Automatic",
+              "reduced": "Reduced",
+              "comfort": "Comfort"
+            }
+          }
+        }
+      }
+    }
   }
 }
