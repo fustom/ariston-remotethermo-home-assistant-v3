@@ -19,6 +19,7 @@ from homeassistant.util import dt as dt_util
 from pytest_homeassistant.common import MockConfigEntry, async_fire_time_changed
 
 from custom_components.ariston import DOMAIN, async_setup_entry
+from custom_components.ariston.const import API_URL_SETTING
 from custom_components.ariston.coordinator import (
     DeviceDataUpdateCoordinator,
     rate_limit_retry_after,
@@ -368,7 +369,10 @@ async def test_first_refresh_block_without_copied_retry_after(hass, monkeypatch)
     client_factory.assert_not_called()  # the startup retry stays offline
 
 
-async def test_first_scheduled_retry_reaches_ariston(hass, freezer):
+# The pinned client blocks for the parsed duration plus one second, so 299
+# gives a block exactly as long as the 300 s polling interval.
+@pytest.mark.parametrize("block_seconds", [900, 299])
+async def test_first_scheduled_retry_reaches_ariston(hass, freezer, block_seconds):
     """The retry after a block sends a request even if its timer fires early.
 
     Home Assistant schedules the refresh from the loop time truncated to whole
@@ -382,16 +386,45 @@ async def test_first_scheduled_retry_reaches_ariston(hass, freezer):
     device = SimpleNamespace(name="Test boiler", api=api)
     coordinator = DeviceDataUpdateCoordinator(hass, device, 300, "test", update)
     coordinator.async_add_listener(lambda: None)
-    session, patches = _pinned_cloud_patches(b"Requests are blocked for 900 seconds")
+    session, patches = _pinned_cloud_patches(
+        f"Requests are blocked for {block_seconds} seconds".encode()
+    )
     with patches[0], patches[1]:
         await coordinator.async_refresh()
     requests_before = session.requests
-    retry_after = coordinator.last_exception.retry_after
+    # The reported delay, or the polling interval when none was reported.
+    delay = coordinator.last_exception.retry_after or 300
 
-    # Worst case: the timer fires 0.95 s before the reported delay.
-    freezer.tick(retry_after - 0.95)
+    # Worst case: the timer fires 0.95 s before the scheduled delay.
+    freezer.tick(delay - 0.95)
     with patches[0], patches[1]:
         async_fire_time_changed(hass, dt_util.utcnow(), fire_all=True)
         await hass.async_block_till_done()
 
     assert session.requests == requests_before + 1  # not skipped by the client
+
+
+@pytest.mark.parametrize(
+    "change",
+    [
+        {CONF_USERNAME: "other@example.com"},
+        {API_URL_SETTING: "https://other.example/api/v2/"},
+    ],
+)
+async def test_remembered_block_is_dropped_when_account_or_url_changes(
+    hass, monkeypatch, change
+):
+    """A block on the old account or endpoint does not hold back the new one."""
+    entry = _entry()
+    entry.add_to_hass(hass)
+    session, patches = _pinned_cloud_patches(b"Requests are blocked for 900 seconds")
+    with patches[0], patches[1], pytest.raises(ConfigEntryNotReady):
+        await async_setup_entry(hass, entry)
+
+    hass.config_entries.async_update_entry(entry, data={**entry.data, **change})
+    entry._async_set_state(hass, ConfigEntryState.SETUP_IN_PROGRESS, None)
+    _setup_client(monkeypatch, _mock_device())
+    monkeypatch.setattr(
+        hass.config_entries, "async_forward_entry_setups", AsyncMock()
+    )
+    assert await async_setup_entry(hass, entry)  # contacted Ariston again

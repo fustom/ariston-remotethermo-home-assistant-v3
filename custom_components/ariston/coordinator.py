@@ -120,13 +120,16 @@ class DeviceDataUpdateCoordinator(DataUpdateCoordinator):
         On the config entry's first refresh, Home Assistant would otherwise
         retry setup after its own short back-off, so any known delay is passed
         on. Every other refresh (later polls, and the optional bus-error and
-        energy refreshes during setup) only ever slows down: a block shorter
-        than the scan interval keeps the normal schedule. A reported delay is
-        padded (see pad_block_delay) so the retry is not skipped by the client.
+        energy refreshes during setup) only ever slows down: a block whose
+        padded delay (see pad_block_delay) is not longer than the scan interval
+        keeps the normal schedule.
         """
         if not retry_after:
             return None
+        delay = pad_block_delay(retry_after)
         if self._in_first_refresh:
-            return pad_block_delay(retry_after)
+            return delay
+        # Compare the padded delay: a block as long as the interval would
+        # otherwise leave the retry to the normal timer, which can fire early.
         interval = self.update_interval.total_seconds() if self.update_interval else 0
-        return pad_block_delay(retry_after) if retry_after > interval else None
+        return delay if delay > interval else None

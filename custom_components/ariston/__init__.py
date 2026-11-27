@@ -70,7 +70,8 @@ SET_ITEM_BY_ID_SCHEMA = vol.Schema(
 )
 
 
-# Per config entry: when an Ariston 429 block seen during setup ends. Kept
+# Per config entry: the account and API URL an Ariston 429 block seen during
+# setup applies to, and when it ends. Kept
 # outside the entry's runtime data so it survives failed setup attempts, which
 # each create a fresh client that knows nothing about the block.
 RATE_LIMIT_UNTIL = f"{DOMAIN}_rate_limit_until"
@@ -101,20 +102,44 @@ def _reported_delay(error: BaseException) -> float | None:
     return None
 
 
+def _block_owner(entry: ConfigEntry) -> tuple[str, str]:
+    """Return the account and API URL a remembered block belongs to.
+
+    Reauthentication can change either one while keeping the entry ID; a block
+    on the old account or endpoint must not hold back the new one.
+    """
+    return (
+        entry.data.get(CONF_USERNAME, ""),
+        entry.data.get(API_URL_SETTING, ARISTON_API_URL),
+    )
+
+
 def _remember_block(hass: HomeAssistant, entry: ConfigEntry, retry_after: float | None) -> None:
     """Remember a known block so the next setup attempt waits it out."""
     if retry_after:
         hass.data.setdefault(RATE_LIMIT_UNTIL, {})[entry.entry_id] = (
-            time.time() + retry_after
+            _block_owner(entry),
+            time.time() + retry_after,
         )
+
+
+def _remaining_block(hass: HomeAssistant, entry: ConfigEntry) -> float:
+    """Return seconds left on a remembered block for this entry's account."""
+    blocks = hass.data.get(RATE_LIMIT_UNTIL, {})
+    if (block := blocks.get(entry.entry_id)) is None:
+        return 0.0
+    owner, blocked_until = block
+    if owner != _block_owner(entry):
+        del blocks[entry.entry_id]  # account or API URL changed
+        return 0.0
+    return blocked_until - time.time()
 
 
 async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
     """Set up Ariston from a config entry."""
     # Home Assistant also retries setup when it finishes starting, whatever
     # retry_after said: do not contact Ariston while a known block lasts.
-    blocked_until = hass.data.get(RATE_LIMIT_UNTIL, {}).get(entry.entry_id, 0.0)
-    if (remaining := blocked_until - time.time()) > 0:
+    if (remaining := _remaining_block(hass, entry)) > 0:
         raise _rate_limited(remaining)
 
     ariston = Ariston()
