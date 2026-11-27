@@ -16,7 +16,7 @@ from custom_components.ariston.const import ARISTON_CLIMATE_TYPES
 
 ZONE = 1
 COMFORT = {"value": 21.0, "min": 15.0, "max": 25.0, "step": 0.5}
-REDUCED = {"value": 18.0, "min": 10.0, "max": 18.0, "step": 0.5}
+REDUCED = {"value": 18.0, "min": 10.0, "max": 18.0, "step": 1.0}
 MISSING = object()
 
 @pytest.fixture
