@@ -43,13 +43,13 @@ BSB_DESIRED_ROOM_TEMP = "desiredRoomTemp"
 BSB_SETPOINT_COMFORT = "comfort"
 BSB_SETPOINT_REDUCED = "reduced"
 
-# Tolerance used when comparing the desired temp against the reduced setpoint.
+# Tolerance used when comparing the desired temp against the setpoint.
 BSB_TEMP_COMPARE_TOLERANCE = 0.05
 
 
 def _normalize_temp(raw: Any) -> float | None:
     """Normalize a temperature value to float.
-    
+
     Accepts either a scalar (int / float / numeric str) or a mapping
     containing a "value" key (e.g. {"value": 18.5, "min": 10, ...}).
     Returns None if the value is missing or not numeric.
@@ -112,8 +112,6 @@ class AristonThermostat(AristonEntity, ClimateEntity):
         self._bsb_pending_target = None
         super()._handle_coordinator_update()
 
-    
-
     def _get_bsb_zone_mode(self) -> BsbZoneMode:
         """Return the BSB zone mode; UNDEFINED for unknown API values."""
         try:
@@ -141,10 +139,10 @@ class AristonThermostat(AristonEntity, ClimateEntity):
         return _normalize_temp(zone_data.get(BSB_DESIRED_ROOM_TEMP))
 
     def _match_bsb_setpoint(self) -> str | None:
-        """"Match desiredRoomTemp against comfort and reduced setpoints
+        """Match desiredRoomTemp against comfort and reduced setpoints
 
         Returns None when there is no unique match: desiredRoomTemp missing,
-        both setpoints equal, or the cache is tale right after a write.        
+        both setpoints equal, or the cache is tale right after a write.
         """
         desired = self._get_bsb_desired_temp()
         if desired is None:
@@ -184,7 +182,7 @@ class AristonThermostat(AristonEntity, ClimateEntity):
         return setpoint
 
     def _is_bsb_currently_reduced(self) -> bool:
-        """Return True if temperature change currently target the reduced setpoint."""
+        """Return True if temperature changes currently target the reduced setpoint."""
         return self._get_bsb_active_setpoint() == BSB_SETPOINT_REDUCED
 
     @property
@@ -354,10 +352,6 @@ class AristonThermostat(AristonEntity, ClimateEntity):
         """Return the current preset mode, e.g., home, away, temp."""
         if self.device.plant_mode_supported:
             return self.device.plant_mode_text
-        # BSB device — map zone mode value to text
-        mode = self._get_bsb_zone_mode()
-        if mode is BsbZoneMode.UNDEFINED:
-            return None
         return BSB_ZONE_MODE_PRESETS.get(self._get_bsb_zone_mode())
 
     @property
@@ -448,7 +442,7 @@ class AristonThermostat(AristonEntity, ClimateEntity):
                 )
                 return
             await self.device.async_set_zone_mode(zone_mode, self.zone)
-            await async_refresh_after_set(self)            
+            await async_refresh_after_set(self)
             return
 
         # Don't assume index maps to enum value directly
