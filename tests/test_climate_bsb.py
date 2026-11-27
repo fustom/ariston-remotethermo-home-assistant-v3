@@ -1,6 +1,5 @@
 """Tests for BSB zone presets and desiredRoomTemp normalization."""
 
-from statistics import mode
 from unittest.mock import AsyncMock, patch
 
 import pytest
@@ -18,6 +17,7 @@ ZONE = 1
 COMFORT = {"value": 21.0, "min": 15.0, "max": 25.0, "step": 0.5}
 REDUCED = {"value": 18.0, "min": 10.0, "max": 18.0, "step": 1.0}
 MISSING = object()
+
 
 @pytest.fixture
 def bsb_device(ariston_device):
@@ -42,9 +42,10 @@ def bsb_device(ariston_device):
     ariston_device.async_set_zone_mode = AsyncMock()
     return ariston_device
 
+
 @pytest.fixture
 def make_entity(coordinator, bsb_device):
-    """Build a thernmostat, optionally setting desiredRoomTemp."""
+    """Build a thermostat, optionally setting desiredRoomTemp."""
 
     def _make(desired=MISSING):
         if desired is not MISSING:
@@ -53,13 +54,12 @@ def make_entity(coordinator, bsb_device):
 
     return _make
 
+
 def set_mode(device, mode: BsbZoneMode) -> None:
     device.zone_data["mode"] = {"value": mode.value}
 
 
-
 # --- _normalize_temp() --------------------------------------------------------------
-
 @pytest.mark.parametrize(
     ("raw", "expected"),
     [
@@ -83,11 +83,7 @@ def test_normalize_temp(raw, expected):
     assert _normalize_temp(raw) == expected
 
 
-
 # --- native_target_temperature --------------------------------------------------------------
-
-
-
 @pytest.mark.parametrize(
     ("desired", "expected"),
     [(19.5, 19.5), (19, 19.0), ({"value": 19.5}, 19.5), ({"value": 18}, 18.0)]
@@ -103,13 +99,14 @@ def test_target_ignores_desired_for_plant_devices(make_entity, bsb_device):
     assert make_entity(19.5).native_target_temperature == COMFORT["value"]
 
 
-
 # --- _is_bsb_currently_reduced --------------------------------------------------------------
-
+@pytest.mark.parametrize("desired", [MISSING, None, {}, {"value": None}, "ac"])
+def test_target_falls_back(make_entity, desired):
+    assert make_entity(desired).native_target_temperature == COMFORT["value"]
 
 
 @pytest.mark.parametrize("desired", [18, 18.0, "18", {"value": 18}, 18.0000001])
-def test_target_falls_back(make_entity, desired):
+def test_is_reduced_true(make_entity, desired):
     assert make_entity(desired)._is_bsb_currently_reduced() is True
 
 
@@ -148,9 +145,6 @@ def test_bounds_follow_active_setpoint(make_entity, desired, limits):
 
 
 # --- async_set_temperature writes the active setpoint ---------------------------------------
-
-
-
 @pytest.mark.parametrize(
     ("desired", "setter", "other"),
     [
@@ -172,9 +166,6 @@ async def test_set_temperature_targets_active_setpoint(
 
 
 # --- manual and protection modes pick the setpoint explicitly -------------------------------
-
-
-
 async def test_manual_reduced_equal_setpoints_writes_reduced(make_entity, bsb_device):
     set_mode(bsb_device, BsbZoneMode.MANUAL_NIGHT)
     bsb_device.zone_data["chComfTemp"]["value"] = REDUCED["value"]
@@ -211,6 +202,7 @@ async def test_manual_reduced_equal_setpoints_writes_reduced(make_entity, bsb_de
     bsb_device.async_set_comfort_temp.assert_awaited_once_with(22.0, ZONE)
     bsb_device.async_set_reduced_temp.assert_not_awaited()
 
+
 async def test_protection_mode_writes_comfort(make_entity, bsb_device):
     # Start in Automatic reduced period so the "Last known" setpoint is reduced
     set_mode(bsb_device, BsbZoneMode.TIME_PROGRAM)
@@ -227,9 +219,6 @@ async def test_protection_mode_writes_comfort(make_entity, bsb_device):
 
 
 # --- automatic mode: temperature matching with last-known fallback --------------------------
-
-
-
 async def test_automatic_consecutive_writes_stay_on_reduced(make_entity, bsb_device):
     set_mode(bsb_device, BsbZoneMode.TIME_PROGRAM)
 
@@ -249,6 +238,7 @@ async def test_automatic_consecutive_writes_stay_on_reduced(make_entity, bsb_dev
     ]
     bsb_device.async_set_comfort_temp.assert_not_awaited()
 
+
 def test_automatic_follows_schedule_switch(make_entity, bsb_device):
     set_mode(bsb_device, BsbZoneMode.TIME_PROGRAM)
     entity = make_entity(18.0)
@@ -259,9 +249,6 @@ def test_automatic_follows_schedule_switch(make_entity, bsb_device):
 
 
 # --- BSB presets ----------------------------------------------------------------------------
-
-
-
 def test_bsb_supports_preset_mode(make_entity):
     assert make_entity(18.0).supported_features & ClimateEntityFeature.PRESET_MODE
 
@@ -320,6 +307,7 @@ async def test_set_bsb_preset_mode_rejects_unknown(make_entity, bsb_device):
 
     bsb_device.async_set_zone_mode.assert_not_awaited()
 
+
 def test_preset_modes_skip_unknown_api_option(make_entity, bsb_device):
     bsb_device.get_zone_mode_options = lambda z: [0, 1, 2, 3, 4]
     assert make_entity().preset_modes == [
@@ -329,12 +317,14 @@ def test_preset_modes_skip_unknown_api_option(make_entity, bsb_device):
         "comfort"
     ]
 
+
 async def test_set_unknown_api_option_is_rejected(make_entity, bsb_device):
     bsb_device.get_zone_mode_options = lambda z: [0, 1, 2, 3, 4]
     entity = make_entity()
     with patch.object(entity, "async_write_ha_state"):
         await entity.async_set_preset_mode("4")
     bsb_device.async_set_zone_mode.assert_not_awaited()
+
 
 def test_preset_mode_none_for_unknown_zone_mode(make_entity, bsb_device):
     bsb_device.zone_data["mode"] = {"value": 4} # library get_zone_mode_raises
