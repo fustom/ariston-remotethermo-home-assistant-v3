@@ -192,7 +192,7 @@ async def test_manual_reduced_missing_desired_writes_reduced(make_entity, bsb_de
     bsb_device.async_set_comfort_temp.assert_not_awaited()
 
 
-async def test_manual_reduced_equal_setpoints_writes_reduced(make_entity, bsb_device):
+async def test_manual_comfort_equal_setpoints_writes_reduced(make_entity, bsb_device):
     set_mode(bsb_device, BsbZoneMode.MANUAL)
     entity = make_entity(18.0) # equals reduced, but mode says comfort
 
