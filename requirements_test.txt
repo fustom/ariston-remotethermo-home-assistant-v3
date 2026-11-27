@@ -247,9 +247,9 @@ anyio==4.16.0 \
     # via
     #   httpx
     #   httpx2
-ariston==0.19.16 \
-    --hash=sha256:104efcd83357c1d8fb0fcf52d3b5edab528822ef91a7738dbcfede90cd4f5982 \
-    --hash=sha256:77de1d03533c5d487be2839f66ba809c39d5ab7924bd26303f52912dfbd2afb9
+ariston==0.19.21 \
+    --hash=sha256:4fee061ca471db193ec556cefc1386c6af9d260548deffb4ad18be3de77cb58a \
+    --hash=sha256:e3a725b23731e2b3e593bd3f403b51c05fe2f2a72e7050c59c67faad996a56e5
     # via -r requirements_test.in
 astral==2.2 \
     --hash=sha256:b9ef70faf32e81a8ba174d21e8f29dc0b53b409ef035f27e0749ddc13cb5982a \

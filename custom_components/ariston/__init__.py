@@ -34,6 +34,7 @@ from .const import (
     DOMAIN,
     ENERGY_COORDINATOR,
     ENERGY_SCAN_INTERVAL,
+    RATED_POWER_W,
 )
 from .coordinator import DeviceDataUpdateCoordinator
 
@@ -109,6 +110,7 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
         hass.data.setdefault(DOMAIN, {}).setdefault(
             entry.unique_id, {COORDINATOR: {}, ENERGY_COORDINATOR: {}}
         )
+        coordinator.rated_power_w = entry.options.get(RATED_POWER_W)
         hass.data[DOMAIN][entry.unique_id][COORDINATOR] = coordinator
 
         await coordinator.async_config_entry_first_refresh()
@@ -174,7 +176,7 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
                 async_set_item_by_id_service,
                 schema=SET_ITEM_BY_ID_SCHEMA,
             )
-    except ConfigEntryAuthFailed:
+    except (ConfigEntryAuthFailed, ConfigEntryNotReady):
         raise
     except Exception as error:
         _LOGGER.exception("")
