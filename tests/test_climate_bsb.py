@@ -1,10 +1,10 @@
 """Tests for BSB zone presets and desiredRoomTemp normalization."""
 
+from types import MethodType
 from unittest.mock import AsyncMock, patch
 
 import pytest
 
-from types import MethodType
 from ariston.bsb_device import AristonBsbDevice
 from ariston.const import BsbZoneMode
 from homeassistant.components.climate import ClimateEntityFeature
@@ -99,12 +99,12 @@ def test_target_ignores_desired_for_plant_devices(make_entity, bsb_device):
     assert make_entity(19.5).native_target_temperature == COMFORT["value"]
 
 
-# --- _is_bsb_currently_reduced --------------------------------------------------------------
-@pytest.mark.parametrize("desired", [MISSING, None, {}, {"value": None}, "ac"])
+@pytest.mark.parametrize("desired", [MISSING, None, {}, {"value": None}, "abc"])
 def test_target_falls_back(make_entity, desired):
     assert make_entity(desired).native_target_temperature == COMFORT["value"]
 
 
+# --- _is_bsb_currently_reduced --------------------------------------------------------------
 @pytest.mark.parametrize("desired", [18, 18.0, "18", {"value": 18}, 18.0000001])
 def test_is_reduced_true(make_entity, desired):
     assert make_entity(desired)._is_bsb_currently_reduced() is True
@@ -182,7 +182,7 @@ async def test_manual_reduced_equal_setpoints_writes_reduced(make_entity, bsb_de
 
 async def test_manual_reduced_missing_desired_writes_reduced(make_entity, bsb_device):
     set_mode(bsb_device, BsbZoneMode.MANUAL_NIGHT)
-    entity = make_entity() # no desiredRoomTemp
+    entity = make_entity()  # no desiredRoomTemp
 
     assert entity.native_target_temperature == REDUCED["value"]
     assert entity.max_temp == REDUCED["max"]
@@ -194,7 +194,7 @@ async def test_manual_reduced_missing_desired_writes_reduced(make_entity, bsb_de
 
 async def test_manual_comfort_equal_setpoints_writes_reduced(make_entity, bsb_device):
     set_mode(bsb_device, BsbZoneMode.MANUAL)
-    entity = make_entity(18.0) # equals reduced, but mode says comfort
+    entity = make_entity(18.0)  # equals reduced, but mode says comfort
 
     assert entity.min_temp == COMFORT["min"]
     with patch.object(entity, "async_write_ha_state"):
@@ -210,7 +210,7 @@ async def test_protection_mode_writes_comfort(make_entity, bsb_device):
     assert entity._is_bsb_currently_reduced() is True
 
     set_mode(bsb_device, BsbZoneMode.OFF)
-    bsb_device.zone_data["desiredRoomTemp"] = 8.0 # frost protection
+    bsb_device.zone_data["desiredRoomTemp"] = 8.0  # frost protection
     assert entity.min_temp == COMFORT["min"]
     with patch.object(entity, "async_write_ha_state"):
         await entity.async_set_temperature(**{ATTR_TEMPERATURE: 20.0})
@@ -226,7 +226,7 @@ async def test_automatic_consecutive_writes_stay_on_reduced(make_entity, bsb_dev
         bsb_device.zone_data["chRedTemp"]["value"] = temp
 
     bsb_device.async_set_reduced_temp = AsyncMock(side_effect=update_cache)
-    entity = make_entity(18.0) # reduced period; desiredRoomTemp stays 18
+    entity = make_entity(18.0)  # reduced period; desiredRoomTemp stays 18
 
     with patch.object(entity, "async_write_ha_state"):
         await entity.async_set_temperature(**{ATTR_TEMPERATURE: 17.0})
@@ -244,7 +244,7 @@ def test_automatic_follows_schedule_switch(make_entity, bsb_device):
     entity = make_entity(18.0)
     assert entity._is_bsb_currently_reduced() is True
 
-    bsb_device.zone_data["desiredRoomTemp"] = COMFORT["value"] # schedule -> comfort
+    bsb_device.zone_data["desiredRoomTemp"] = COMFORT["value"]  # schedule -> comfort
     assert entity._is_bsb_currently_reduced() is False
 
 
@@ -346,5 +346,5 @@ async def test_set_unknown_api_option_is_rejected(make_entity, bsb_device):
 
 
 def test_preset_mode_none_for_unknown_zone_mode(make_entity, bsb_device):
-    bsb_device.zone_data["mode"] = {"value": 4} # library get_zone_mode_raises
+    bsb_device.zone_data["mode"] = {"value": 4}  # library get_zone_mode_raises
     assert make_entity().preset_mode is None
