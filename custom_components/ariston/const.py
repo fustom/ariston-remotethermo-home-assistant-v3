@@ -19,6 +19,7 @@ from ariston.const import (
     EvoOneDeviceProperties,
     MedDeviceSettings,
     MenuItemNames,
+    NuosSplitHpState,
     NuosSplitProperties,
     SeDeviceSettings,
     SlpDeviceSettings,
@@ -27,7 +28,10 @@ from ariston.const import (
     VelisDeviceProperties,
     WheType,
 )
-from homeassistant.components.binary_sensor import BinarySensorEntityDescription
+from homeassistant.components.binary_sensor import (
+    BinarySensorDeviceClass,
+    BinarySensorEntityDescription,
+)
 from homeassistant.components.climate import ClimateEntityDescription
 from homeassistant.components.number import NumberEntityDescription
 from homeassistant.components.select import SelectEntityDescription
@@ -85,11 +89,13 @@ ATTR_ECONOMY_TEMP: Final[str] = "economy_temp"
 ATTR_HOLIDAY: Final[str] = "holiday"
 ATTR_ZONE: Final[str] = "zone_number"
 ATTR_ERRORS: Final[str] = "errors"
+ATTR_RAW_HP_STATE: Final[str] = "raw_hp_state"
 
 EXTRA_STATE_ATTRIBUTE: Final[str] = "Attribute"
 EXTRA_STATE_DEVICE_METHOD: Final[str] = "DeviceMethod"
 DEVICE_FEATURE_ZONE_HEAT_REQUEST: Final[str] = "ZoneHeatRequest"
 DEVICE_FEATURE_DHW_FLAME: Final[str] = "DhwFlame"
+DEVICE_FEATURE_HP_HEATING: Final[str] = "HpHeating"
 
 
 def _get_ch_heat_request(entity: Any) -> bool:
@@ -124,6 +130,26 @@ def _get_dhw_current_temperature(entity: Any) -> float | None:
         return None
 
     return device.water_heater_current_temperature
+
+
+def _get_hp_state(entity: Any) -> str | None:
+    """Return the NuosSplit heat pump state as a lowercase enum option."""
+    text = entity.device.hp_state_text
+    return text.lower() if text is not None else None
+
+
+def _get_hp_heating(entity: Any) -> bool | None:
+    """Return whether the NuosSplit heat pump is heating.
+
+    Anti-legionella and antifreeze cycles report None: the API does not say
+    whether the heat pump or the electric element runs during them.
+    """
+    match entity.device.hp_state_text:
+        case NuosSplitHpState.HEATING.name:
+            return True
+        case NuosSplitHpState.IDLE.name | NuosSplitHpState.LOCKOUT.name:
+            return False
+    return None
 
 
 def _get_dhw_flame(entity: Any) -> bool:
@@ -736,6 +762,23 @@ ARISTON_SENSOR_TYPES: list[AristonSensorEntityDescription] = [
         whe_types=[WheType.NuosSplit],
     ),
     AristonSensorEntityDescription(
+        key=NuosSplitProperties.HP_STATE,
+        name=f"{NAME} heat pump state",
+        icon="mdi:heat-pump-outline",
+        device_class=SensorDeviceClass.ENUM,
+        options=[state.name.lower() for state in NuosSplitHpState],
+        entity_category=EntityCategory.DIAGNOSTIC,
+        get_native_value=_get_hp_state,
+        extra_states=[
+            {
+                EXTRA_STATE_ATTRIBUTE: ATTR_RAW_HP_STATE,
+                EXTRA_STATE_DEVICE_METHOD: lambda entity: entity.device.hp_state_value,
+            }
+        ],
+        system_types=[SystemType.VELIS],
+        whe_types=[WheType.NuosSplit],
+    ),
+    AristonSensorEntityDescription(
         key=ARISTON_BUS_ERRORS,
         name=f"{NAME} errors count",
         icon="mdi:alert-outline",
@@ -915,6 +958,15 @@ ARISTON_BINARY_SENSOR_TYPES: list[AristonBinarySensorEntityDescription] = [
             }
         ],
         get_is_on=lambda entity: entity.device.holiday_active,
+        system_types=[SystemType.VELIS],
+        whe_types=[WheType.NuosSplit],
+    ),
+    AristonBinarySensorEntityDescription(
+        key=DEVICE_FEATURE_HP_HEATING,
+        name=f"{NAME} heat pump heating",
+        icon="mdi:heat-pump",
+        device_class=BinarySensorDeviceClass.RUNNING,
+        get_is_on=_get_hp_heating,
         system_types=[SystemType.VELIS],
         whe_types=[WheType.NuosSplit],
     ),
