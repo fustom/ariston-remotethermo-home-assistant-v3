@@ -37,6 +37,9 @@ BSB_ZONE_MODE_TEXTS: dict[int, str] = {
 
 BSB_DESIRED_ROOM_TEMP = "desiredRoomTemp"
 
+BSB_SETPOINT_COMFORT = "comfort"
+BSB_SETPOINT_REDUCED = "reduced"
+
 # Tolerance used when comparing the desired temp against the reduced setpoint.
 BSB_TEMP_COMPARE_TOLERANCE = 0.05
 
@@ -95,6 +98,7 @@ class AristonThermostat(AristonEntity, ClimateEntity):
     ) -> None:
         """Initialize the thermostat."""
         super().__init__(coordinator, description, zone)
+        self._bsb_last_setpoint: str = BSB_SETPOINT_COMFORT
 
     def _get_bsb_desired_temp(self) -> float | None:
         """Return the normalized desiredRoomTemp for BSB devices, else None."""
@@ -103,23 +107,52 @@ class AristonThermostat(AristonEntity, ClimateEntity):
         zone_data = self.device.get_zone(self.zone) or {}
         return _normalize_temp(zone_data.get(BSB_DESIRED_ROOM_TEMP))
 
-    def _is_bsb_currently_reduced(self) -> bool:
-        """Check if BSB device is currently targeting the reduced setpoint.
+    def _match_bsb_setpoint(self) -> str | None:
+        """"Match desiredRoomTemp against comfort and reduced setpoints
 
-        Compares desiredRoomTemp against chRedTemp to determine whether the
-        active setpoint is the reduced one. Works for all modes including
-        Automatic (schedule-driven).
+        Returns None when there is no unique match: desiredRoomTemp missing,
+        both setpoints equal, or the cache is tale right after a write.        
         """
         desired = self._get_bsb_desired_temp()
         if desired is None:
-            return False
-        reduced = _normalize_temp(self.device.get_zone_ch_red_temp(self.zone))
-        if reduced is None:
-            return False
+            return None
         comfort = _normalize_temp(self.device.get_zone_ch_comf_temp(self.zone))
-        if comfort is not None and math.isclose(desired, comfort, abs_tol=BSB_TEMP_COMPARE_TOLERANCE):
-            return False
-        return math.isclose(desired, reduced, abs_tol=BSB_TEMP_COMPARE_TOLERANCE)
+        reduced = _normalize_temp(self.device.get_zone_ch_red_temp(self.zone))
+        is_comfort = comfort is not None and math.isclose(
+            desired, comfort, abs_tol=BSB_TEMP_COMPARE_TOLERANCE
+        )
+        is_reduced = reduced is not None and math.isclose(
+            desired, reduced, abs_tol=BSB_TEMP_COMPARE_TOLERANCE
+        )
+        if is_comfort == is_reduced:
+            return None
+        return BSB_SETPOINT_REDUCED if is_reduced else BSB_SETPOINT_COMFORT
+
+    def _get_bsb_active_setpoint(self) -> str | None:
+        """Return the setpoint a temperature change applies to.
+
+        Returns None for non-BSB (plant mode) devices.
+        Manual modes use the zone mode explicitly. Protection always uses
+        comfort. Automatic (and unknown modes) match desiredRoomTemp and
+        keep the last known setpoint when there is no unique match.
+        """
+        if self.device.plant_mode_supported:
+            return None
+        mode = self.device.get_zone_mode(self.zone)
+        if mode is BsbZoneMode.MANUAL:
+            setpoint = BSB_SETPOINT_COMFORT
+        elif mode is BsbZoneMode.MANUAL_NIGHT:
+            setpoint = BSB_SETPOINT_REDUCED
+        elif mode is BsbZoneMode.OFF:
+            setpoint = BSB_SETPOINT_COMFORT
+        else:
+            setpoint = self._match_bsb_setpoint() or self._bsb_last_setpoint
+        self._bsb_last_setpoint = setpoint
+        return setpoint
+
+    def _is_bsb_currently_reduced(self) -> bool:
+        """Return True if temperature change currently target the reduced setpoint."""
+        return self._get_bsb_active_setpoint() == BSB_SETPOINT_REDUCED
 
     @property
     def name(self) -> str:
@@ -179,13 +212,22 @@ class AristonThermostat(AristonEntity, ClimateEntity):
         """Return the target temperature for the device.
 
         For BSB devices, use the normalized desiredRoomTemp as the source of
-        truth. This reflects the active setpoint in all modes, including the
-        schedule-driven setpoint in Automatic mode. Falls back the 
-        library's target temp if desiredRoomTemp is missing or invalid.
+        truth. If it is missing or invalid, fall back to the value of the 
+        active setpoint, then to the library's target temp.
         """
         desired = self._get_bsb_desired_temp()
         if desired is not None:
             return desired
+        setpoint = self._get_bsb_active_setpoint()
+        if setpoint is not None:
+            getter = (
+                self.device.get_zone_ch_red_temp
+                if setpoint == BSB_SETPOINT_REDUCED
+                else self.device.get_zone_ch_comf_temp
+            )
+            value = _normalize_temp(getter(self.zone))
+            if value is not None:
+                return value
         return self.device.get_target_temp_value(self.zone)
 
     # Backward compatibility with Home Assistant < 2026.11, which only reads

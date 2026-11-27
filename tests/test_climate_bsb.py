@@ -53,6 +53,9 @@ def make_entity(coordinator, bsb_device):
 
     return _make
 
+def set_mode(device, mode: BsbZoneMode) -> None:
+    device.zone_data["mode"] = {"value": mode.value}
+
 
 
 # --- _normalize_temp() --------------------------------------------------------------
@@ -166,6 +169,93 @@ async def test_set_temperature_targets_active_setpoint(
     getattr(bsb_device, setter).assert_awaited_once_with(17.0, ZONE)
     getattr(bsb_device, other).assert_not_awaited()
     coordinator.async_request_refresh.assert_awaited_once()
+
+
+# --- manual and protection modes pick the setpoint explicitly -------------------------------
+
+
+
+async def test_manual_reduced_equal_setpoints_writes_reduced(make_entity, bsb_device):
+    set_mode(bsb_device, BsbZoneMode.MANUAL_NIGHT)
+    bsb_device.zone_data["chComfTemp"]["value"] = REDUCED["value"]
+    entity = make_entity(18.0)
+
+    assert entity.min_temp == REDUCED["min"]
+    assert entity.max_temp == REDUCED["max"]
+    assert entity.target_temperature_step == REDUCED["step"]
+    with patch.object(entity, "async_write_ha_state"):
+        await entity.async_set_temperature(**{ATTR_TEMPERATURE: 17.0})
+    bsb_device.async_set_reduced_temp.assert_awaited_once_with(17.0, ZONE)
+    bsb_device.async_set_comfort_temp.assert_not_awaited()
+
+
+async def test_manual_reduced_missing_desired_writes_reduced(make_entity, bsb_device):
+    set_mode(bsb_device, BsbZoneMode.MANUAL_NIGHT)
+    entity = make_entity() # no desiredRoomTemp
+
+    assert entity.native_target_temperature == REDUCED["value"]
+    assert entity.max_temp == REDUCED["max"]
+    with patch.object(entity, "async_write_ha_state"):
+        await entity.async_set_temperature(**{ATTR_TEMPERATURE: 17.0})
+    bsb_device.async_set_reduced_temp.assert_awaited_once_with(17.0, ZONE)
+    bsb_device.async_set_comfort_temp.assert_not_awaited()
+
+
+async def test_manual_reduced_equal_setpoints_writes_reduced(make_entity, bsb_device):
+    set_mode(bsb_device, BsbZoneMode.MANUAL)
+    entity = make_entity(18.0) # equals reduced, but mode says comfort
+
+    assert entity.min_temp == COMFORT["min"]
+    with patch.object(entity, "async_write_ha_state"):
+        await entity.async_set_temperature(**{ATTR_TEMPERATURE: 22.0})
+    bsb_device.async_set_comfort_temp.assert_awaited_once_with(22.0, ZONE)
+    bsb_device.async_set_reduced_temp.assert_not_awaited()
+
+async def test_protection_mode_writes_comfort(make_entity, bsb_device):
+    # Start in Automatic reduced period so the "Last known" setpoint is reduced
+    set_mode(bsb_device, BsbZoneMode.TIME_PROGRAM)
+    entity = make_entity(18.0)
+    assert entity._is_bsb_currently_reduced() is True
+
+    set_mode(bsb_device, BsbZoneMode.OFF)
+    bsb_device.zone_data["desiredRoomTemp"] = 8.0 # frost protection
+    assert entity.min_temp == COMFORT["min"]
+    with patch.object(entity, "async_write_ha_state"):
+        await entity.async_set_temperature(**{ATTR_TEMPERATURE: 20.0})
+    bsb_device.async_set_comfort_temp.assert_awaited_once_with(20.0, ZONE)
+    bsb_device.async_set_reduced_temp.assert_not_awaited()
+
+
+# --- automatic mode: temperature matching with last-known fallback --------------------------
+
+
+
+async def test_automatic_consecutive_writes_stay_on_reduced(make_entity, bsb_device):
+    set_mode(bsb_device, BsbZoneMode.TIME_PROGRAM)
+
+    def update_cache(temp, zone):
+        bsb_device.zone_data["chRedTemp"]["value"] = temp
+
+    bsb_device.async_set_reduced_temp = AsyncMock(side_effect=update_cache)
+    entity = make_entity(18.0) # reduced period; desiredRoomTemp stays 18
+
+    with patch.object(entity, "async_write_ha_state"):
+        await entity.async_set_temperature(**{ATTR_TEMPERATURE: 17.0})
+        await entity.async_set_temperature(**{ATTR_TEMPERATURE: 16.0})
+
+    assert [c.args for c in bsb_device.async_set_reduced_temp.await_args_list] == [
+        (17.0, ZONE),
+        (16.0, ZONE),
+    ]
+    bsb_device.async_set_comfort_temp.assert_not_awaited()
+
+def test_automatic_follows_schedule_switch(make_entity, bsb_device):
+    set_mode(bsb_device, BsbZoneMode.TIME_PROGRAM)
+    entity = make_entity(18.0)
+    assert entity._is_bsb_currently_reduced() is True
+
+    bsb_device.zone_data["desiredRoomTemp"] = COMFORT["value"] # schedule -> comfort
+    assert entity._is_bsb_currently_reduced() is False
 
 
 # --- BSB presets ----------------------------------------------------------------------------
