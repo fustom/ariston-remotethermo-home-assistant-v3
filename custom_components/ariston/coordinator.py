@@ -5,6 +5,8 @@ from __future__ import annotations
 from collections.abc import Callable
 from datetime import timedelta
 import logging
+import math
+import time
 from typing import Any
 
 from ariston.ariston_api import ConnectionException
@@ -16,6 +18,50 @@ from homeassistant.helpers.update_coordinator import DataUpdateCoordinator, Upda
 from .const import DOMAIN
 
 _LOGGER = logging.getLogger(__name__)
+
+# Home Assistant schedules a coordinator's next refresh from the loop time
+# truncated to whole seconds, so a timer can fire up to a second early. Pad
+# every delay reported for a block so the retry lands after the block ends,
+# instead of being skipped by the client and pushed back a full interval.
+RATE_LIMIT_MARGIN_SECONDS = 2
+
+
+def pad_block_delay(retry_after: float) -> float:
+    """Return retry_after rounded up, plus a margin for timer rounding."""
+    return math.ceil(retry_after) + RATE_LIMIT_MARGIN_SECONDS
+
+
+def _find_rate_limit(error: BaseException | None) -> ConnectionException | None:
+    """Return the Ariston 429 in error or its cause chain, if any.
+
+    The client wraps a 429 raised during login in an empty
+    ConnectionException, so the status is only on error.__cause__.
+    """
+    seen: set[int] = set()
+    while error is not None and id(error) not in seen:
+        seen.add(id(error))
+        if isinstance(error, ConnectionException) and error.args[:1] == (429,):
+            return error
+        error = error.__cause__
+    return None
+
+
+def rate_limit_retry_after(error: BaseException, api: Any = None) -> float | None:
+    """Return seconds to wait if error is an Ariston 429, else None.
+
+    The delay comes from a retry_after attribute on the exception when the
+    client provides one, otherwise from the client's own block deadline
+    (AristonAPI._blocked_until), which it sets from the block duration in
+    the 429 body. 0 means rate limited with no known duration.
+    """
+    if (rate_limit := _find_rate_limit(error)) is None:
+        return None
+    if (retry_after := getattr(rate_limit, "retry_after", None)) is not None:
+        return max(0.0, float(retry_after))
+    blocked_until = getattr(api, "_blocked_until", None)
+    if isinstance(blocked_until, (int, float)):
+        return max(0.0, blocked_until - time.time())
+    return 0.0
 
 
 class DeviceDataUpdateCoordinator(DataUpdateCoordinator):
@@ -42,13 +88,48 @@ class DeviceDataUpdateCoordinator(DataUpdateCoordinator):
 
         self.device = device
         self.rated_power_w: int | None = None
+        self._in_first_refresh = False
+
+    async def async_config_entry_first_refresh(self) -> None:
+        """First refresh during setup; marks it for the 429 delay rule."""
+        self._in_first_refresh = True
+        try:
+            await super().async_config_entry_first_refresh()
+        finally:
+            self._in_first_refresh = False
 
     async def _async_update_data(self) -> Any:
-        """Report Ariston HTTP server errors as failed updates."""
+        """Report Ariston rate limits and HTTP server errors as failed updates."""
         try:
             return await super()._async_update_data()
         except ConnectionException as error:
+            retry_after = rate_limit_retry_after(error, getattr(self.device, "api", None))
+            if retry_after is not None:
+                raise UpdateFailed(
+                    "Ariston cloud is rate limiting requests (HTTP 429)",
+                    retry_after=self._rate_limit_delay(retry_after),
+                ) from error
             match error.args:
                 case (int(status),) if 500 <= status < 600:
                     raise UpdateFailed(f"Ariston cloud returned HTTP {status}") from error
             raise
+
+    def _rate_limit_delay(self, retry_after: float) -> float | None:
+        """Return the retry_after to report for a 429, or None for the default.
+
+        On the config entry's first refresh, Home Assistant would otherwise
+        retry setup after its own short back-off, so any known delay is passed
+        on. Every other refresh (later polls, and the optional bus-error and
+        energy refreshes during setup) only ever slows down: a block whose
+        padded delay (see pad_block_delay) is not longer than the scan interval
+        keeps the normal schedule.
+        """
+        if not retry_after:
+            return None
+        delay = pad_block_delay(retry_after)
+        if self._in_first_refresh:
+            return delay
+        # Compare the padded delay: a block as long as the interval would
+        # otherwise leave the retry to the normal timer, which can fire early.
+        interval = self.update_interval.total_seconds() if self.update_interval else 0
+        return delay if delay > interval else None

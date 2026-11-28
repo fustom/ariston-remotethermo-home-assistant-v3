@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import logging
+import time
 
 import voluptuous as vol
 
@@ -36,7 +37,11 @@ from .const import (
     ENERGY_SCAN_INTERVAL,
     RATED_POWER_W,
 )
-from .coordinator import DeviceDataUpdateCoordinator
+from .coordinator import (
+    DeviceDataUpdateCoordinator,
+    pad_block_delay,
+    rate_limit_retry_after,
+)
 
 _LOGGER = logging.getLogger(__name__)
 
@@ -65,8 +70,89 @@ SET_ITEM_BY_ID_SCHEMA = vol.Schema(
 )
 
 
+# Per config entry: the account and API URL an Ariston 429 block seen during
+# setup applies to, and when it ends. Kept
+# outside the entry's runtime data so it survives failed setup attempts, which
+# each create a fresh client that knows nothing about the block.
+RATE_LIMIT_UNTIL = f"{DOMAIN}_rate_limit_until"
+
+
+def _rate_limited(retry_after: float | None) -> ConfigEntryNotReady:
+    """Build the ConfigEntryNotReady for an Ariston 429 block."""
+    not_ready = ConfigEntryNotReady("Ariston cloud is rate limiting requests (HTTP 429)")
+    # Set as an attribute: the retry_after keyword only exists on Home
+    # Assistant 2026.11+, older versions ignore the attribute.
+    not_ready.retry_after = pad_block_delay(retry_after) if retry_after else None
+    return not_ready
+
+
+def _reported_delay(error: BaseException) -> float | None:
+    """Return the first retry_after set on error or its cause chain.
+
+    Home Assistant 2026.11+ copies the coordinator's retry_after onto the
+    ConfigEntryNotReady of a failed first refresh; 2026.10 leaves it on the
+    UpdateFailed cause only.
+    """
+    seen: set[int] = set()
+    while error is not None and id(error) not in seen:
+        seen.add(id(error))
+        if (retry_after := getattr(error, "retry_after", None)) is not None:
+            return retry_after
+        error = error.__cause__
+    return None
+
+
+def _block_owner(entry: ConfigEntry) -> tuple[str, str]:
+    """Return the account and API URL a remembered block belongs to.
+
+    Reauthentication can change either one while keeping the entry ID; a block
+    on the old account or endpoint must not hold back the new one.
+    """
+    return (
+        entry.data.get(CONF_USERNAME, ""),
+        entry.data.get(API_URL_SETTING, ARISTON_API_URL),
+    )
+
+
+def _remember_block(
+    hass: HomeAssistant,
+    entry: ConfigEntry,
+    owner: tuple[str, str],
+    retry_after: float | None,
+) -> None:
+    """Remember a known block so the next setup attempt waits it out.
+
+    owner is the account and API URL the blocked requests were sent with,
+    captured before sending them: the entry may have changed since.
+    """
+    if retry_after:
+        hass.data.setdefault(RATE_LIMIT_UNTIL, {})[entry.entry_id] = (
+            owner,
+            time.time() + retry_after,
+        )
+
+
+def _remaining_block(hass: HomeAssistant, entry: ConfigEntry) -> float:
+    """Return seconds left on a remembered block for this entry's account."""
+    blocks = hass.data.get(RATE_LIMIT_UNTIL, {})
+    if (block := blocks.get(entry.entry_id)) is None:
+        return 0.0
+    owner, blocked_until = block
+    if owner != _block_owner(entry):
+        del blocks[entry.entry_id]  # account or API URL changed
+        return 0.0
+    return blocked_until - time.time()
+
+
 async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
     """Set up Ariston from a config entry."""
+    # Home Assistant also retries setup when it finishes starting, whatever
+    # retry_after said: do not contact Ariston while a known block lasts.
+    if (remaining := _remaining_block(hass, entry)) > 0:
+        raise _rate_limited(remaining)
+
+    # The account and API URL this attempt uses, for any block it runs into.
+    owner = _block_owner(entry)
     ariston = Ariston()
     try:
         api_url_setting = entry.data.get(API_URL_SETTING, ARISTON_API_URL)
@@ -176,9 +262,25 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
                 async_set_item_by_id_service,
                 schema=SET_ITEM_BY_ID_SCHEMA,
             )
-    except (ConfigEntryAuthFailed, ConfigEntryNotReady):
+    except ConfigEntryAuthFailed:
+        raise
+    except ConfigEntryNotReady as error:
+        # A 429 on the first refresh: remember the block, taking its delay
+        # from the coordinator or, failing that, from the client's deadline.
+        api = getattr(ariston, "api", None)
+        if (retry_after := rate_limit_retry_after(error, api)) is not None:
+            retry_after = _reported_delay(error) or retry_after
+            _remember_block(hass, entry, owner, retry_after)
+            # Already padded by the coordinator when it came from there.
+            error.retry_after = retry_after or None
         raise
     except Exception as error:
+        api = getattr(ariston, "api", None)
+        if (retry_after := rate_limit_retry_after(error, api)) is not None:
+            # Expected while the cloud blocks the account: no traceback, and
+            # let the setup retry wait out the block window.
+            _remember_block(hass, entry, owner, retry_after)
+            raise _rate_limited(retry_after) from error
         _LOGGER.exception("")
         raise ConfigEntryNotReady from error
 
