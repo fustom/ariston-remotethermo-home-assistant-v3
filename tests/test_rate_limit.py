@@ -428,3 +428,31 @@ async def test_remembered_block_is_dropped_when_account_or_url_changes(
         hass.config_entries, "async_forward_entry_setups", AsyncMock()
     )
     assert await async_setup_entry(hass, entry)  # contacted Ariston again
+
+
+async def test_late_429_from_old_settings_does_not_block_new_ones(hass, monkeypatch):
+    """A 429 answered after a settings change is saved under the old settings."""
+    entry = _entry()
+    entry.add_to_hass(hass)
+
+    async def connect_then_settings_change(*args):
+        # Reauth saves a new account while the old login is still pending.
+        hass.config_entries.async_update_entry(
+            entry, data={**entry.data, CONF_USERNAME: "other@example.com"}
+        )
+        raise _RateLimitException(900)
+
+    old_client = MagicMock()
+    old_client.async_connect = AsyncMock(side_effect=connect_then_settings_change)
+    monkeypatch.setattr(
+        "custom_components.ariston.Ariston", MagicMock(return_value=old_client)
+    )
+    with pytest.raises(ConfigEntryNotReady):
+        await async_setup_entry(hass, entry)
+
+    entry._async_set_state(hass, ConfigEntryState.SETUP_IN_PROGRESS, None)
+    _setup_client(monkeypatch, _mock_device())
+    monkeypatch.setattr(
+        hass.config_entries, "async_forward_entry_setups", AsyncMock()
+    )
+    assert await async_setup_entry(hass, entry)  # the new account is not blocked

@@ -114,11 +114,20 @@ def _block_owner(entry: ConfigEntry) -> tuple[str, str]:
     )
 
 
-def _remember_block(hass: HomeAssistant, entry: ConfigEntry, retry_after: float | None) -> None:
-    """Remember a known block so the next setup attempt waits it out."""
+def _remember_block(
+    hass: HomeAssistant,
+    entry: ConfigEntry,
+    owner: tuple[str, str],
+    retry_after: float | None,
+) -> None:
+    """Remember a known block so the next setup attempt waits it out.
+
+    owner is the account and API URL the blocked requests were sent with,
+    captured before sending them: the entry may have changed since.
+    """
     if retry_after:
         hass.data.setdefault(RATE_LIMIT_UNTIL, {})[entry.entry_id] = (
-            _block_owner(entry),
+            owner,
             time.time() + retry_after,
         )
 
@@ -142,6 +151,8 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
     if (remaining := _remaining_block(hass, entry)) > 0:
         raise _rate_limited(remaining)
 
+    # The account and API URL this attempt uses, for any block it runs into.
+    owner = _block_owner(entry)
     ariston = Ariston()
     try:
         api_url_setting = entry.data.get(API_URL_SETTING, ARISTON_API_URL)
@@ -259,7 +270,7 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
         api = getattr(ariston, "api", None)
         if (retry_after := rate_limit_retry_after(error, api)) is not None:
             retry_after = _reported_delay(error) or retry_after
-            _remember_block(hass, entry, retry_after)
+            _remember_block(hass, entry, owner, retry_after)
             # Already padded by the coordinator when it came from there.
             error.retry_after = retry_after or None
         raise
@@ -268,7 +279,7 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
         if (retry_after := rate_limit_retry_after(error, api)) is not None:
             # Expected while the cloud blocks the account: no traceback, and
             # let the setup retry wait out the block window.
-            _remember_block(hass, entry, retry_after)
+            _remember_block(hass, entry, owner, retry_after)
             raise _rate_limited(retry_after) from error
         _LOGGER.exception("")
         raise ConfigEntryNotReady from error
